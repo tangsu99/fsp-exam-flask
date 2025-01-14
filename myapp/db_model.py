@@ -53,14 +53,18 @@ class Option(db.Model):
         self.is_correct = is_correct
 
 # 用户表模型
-# class User(db.Model):
-#     __tablename__ = 'users'  # 指定表名
-#     id = db.Column(db.Integer, primary_key=True, autoincrement=True)  # 主键，用户唯一标识，自增
-#     username = db.Column(db.String(100), nullable=False)  # 用户名，不允许为空
-#     password = db.Column(db.String(100), nullable=False)  # 密码，不允许为空
-#     role = db.Column(db.String(100))  # 用户角色，如普通用户、管理员等，可为空
-#     addtime = db.Column(db.DateTime, default=datetime.utcnow)  # 用户新增时间，默认为当前时间
-#     responses = db.relationship('Response', backref='user', lazy=True, cascade='all, delete')  # 与答卷表建立一对多关系，级联删除
+class User(db.Model):
+    __tablename__ = 'users'  # 指定表名
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)  # 主键，用户唯一标识，自增
+    username = db.Column(db.String(100), nullable=False)  # 用户名，不允许为空
+    password = db.Column(db.String(100), nullable=False)  # 密码，不允许为空
+    role = db.Column(db.String(100))  # 用户角色，如普通用户、管理员等，可为空
+    addtime = db.Column(db.DateTime, default=datetime.utcnow)  # 用户新增时间，默认为当前时间
+    # responses = db.relationship('Response', backref='user', lazy=True, cascade='all, delete')  # 与答卷表建立一对多关系，级联删除
+    def __init__(self, username: int, password: str, role: str = '普通用户'):
+        self.username = username
+        self.password = password
+        self.role = role
 
 # 答卷表模型
 class Response(db.Model):
@@ -85,11 +89,14 @@ class Guarantee(db.Model):
     __tablename__ = 'guarantees'  # 指定表名
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)  # 主键，担保唯一标识，自增
     guarantee_qq = db.Column(db.String(25), nullable=False)  # 担保人qq，不允许为空
-    player_id = db.Column(db.String(25), nullable=False)  # 被担保人ID
-    player_uuid = db.Column(db.String(36), nullable=False)  # 被担保人UUID
+    player_qq = db.Column(db.String(25), nullable=False)  # 被担保人qq，不允许为空
+    player_name = db.Column(db.String(25), nullable=False)     # 被担保人ID，不允许为空
+    player_uuid = db.Column(db.String(36), nullable=False)   # 被担保人UUID，不允许为空
     status = db.Column(db.Integer, nullable=False)  # 担保状态，如1-等待，2-通过，3-存疑
     create_time = db.Column(db.DateTime, default=datetime.utcnow)  # 担保记录创建时间，默认为当前时间
-    def __init__(self, guarantee_qq: str, player_id: str, status: int = 0):
+    def __init__(self, guarantee_qq: str, player_qq: str, player_name: str, player_uuid: str, status: int = 0):
         self.guarantee_qq = guarantee_qq
-        self.player_id = player_id
+        self.player_qq = player_qq
+        self.player_name = player_name
+        self.player_uuid = player_uuid
         self.status = status
