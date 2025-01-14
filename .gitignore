@@ -5,3 +5,4 @@ templates/update.html
 venv/
 data/
 log/
+instance/
