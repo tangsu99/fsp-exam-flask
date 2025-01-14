@@ -85,10 +85,11 @@ class Guarantee(db.Model):
     __tablename__ = 'guarantees'  # 指定表名
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)  # 主键，担保唯一标识，自增
     guarantee_qq = db.Column(db.String(25), nullable=False)  # 担保人qq，不允许为空
-    player_qq = db.Column(db.String(25), nullable=False)  # 被担保人qq，不允许为空
+    player_id = db.Column(db.String(25), nullable=False)  # 被担保人ID
+    player_uuid = db.Column(db.String(36), nullable=False)  # 被担保人UUID
     status = db.Column(db.Integer, nullable=False)  # 担保状态，如1-等待，2-通过，3-存疑
     create_time = db.Column(db.DateTime, default=datetime.utcnow)  # 担保记录创建时间，默认为当前时间
-    def __init__(self, guarantee_qq: str, player_qq: str, status: int = 0):
+    def __init__(self, guarantee_qq: str, player_id: str, status: int = 0):
         self.guarantee_qq = guarantee_qq
-        self.player_qq = player_qq
+        self.player_id = player_id
         self.status = status
