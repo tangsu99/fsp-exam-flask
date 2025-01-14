@@ -1,0 +1,7 @@
+__pycache__/
+model/__pycache__/
+static/chat_tmp/
+templates/update.html
+venv/
+data/
+log/
