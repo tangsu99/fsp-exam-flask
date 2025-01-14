@@ -3,9 +3,9 @@ from flask_login import login_user
 from myapp.db_model import User
 from myapp import db
 
-auth = Blueprint('login', __name__)
+auth = Blueprint('auth', __name__)
 
-@auth.route('/')
+@auth.route('/login', methods=['GET'])
 def login_index():
     return render_template('login.html')
 
@@ -16,10 +16,9 @@ def login():
     user = User.query.filter_by(username=username).first()
     if user and user.password == password:
         login_user(user)
-        return redirect(url_for('/admin'))
+        return redirect(url_for('admin.admin_index'))
     else:
-        return 'Invalid username or password'
-    return jsonify({'code': 0, 'desc': '成功'})
+        return redirect(url_for('admin.admin_index'))
     
 @auth.route('/register', methods=['POST'])
 def register():

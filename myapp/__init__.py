@@ -9,6 +9,11 @@ def create_app():
     app = Flask(__name__)
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///your_database.db' # 测试数据库
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+    app.config['SECRET_KEY'] = 'c4329f5e3bc9daf6cd2b82bf9355a5d2'  # 用于安全签名session
+
+    app.template_folder='../templates'
+    app.static_folder = '../static'
+
     login_manager.init_app(app)
     db.init_app(app)
     
@@ -35,7 +40,7 @@ def create_app():
         # 未授权的用户重定向到登录页面
     @login_manager.unauthorized_handler
     def unauthorized():
-        return redirect(url_for('login'))  # 重定向
+        return redirect(url_for('auth.login'))  # 重定向
 
     # 管理登录状态的，这个函数是在每次请求时被调用的，它需要从用户 ID 重新创建一个 User 对象
     # 这是因为 User 对象并不会在请求之间保持，所以我们需要在每次请求开始时重新创建它

@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin page</title>
+    <style>
+        div.box {
+            border: 1px solid red;
+        }
+    </style>
+</head>
+
+<body>
+    <div>
+        <!-- <div class="box">
+            <table>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>标题</th>
+                        <th>简介</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody id="">
+                </tbody>
+            </table>
+            <script>
+                fetch("/admin/AllQuestion")
+                    .then((response) => response.json())
+                    .then((data) => {
+                        console.log(data)
+                        let temp = ''
+                        for (let item of data) {
+                            temp += `
+                            <tr>
+                                <td></td>
+                                <td></td>
+                                <td></td>
+                                <td></td>
+                            </tr>`
+                        }
+                    })
+
+            </script>
+        </div> -->
+        <div class="box" id="page1">
+            <form id="addSurvey">
+                <h2>新建答卷</h2>
+                <p>
+                    <label for="name"></label>
+                    <input type="text" name="description" id="description">
+                </p>
+                <p>
+                    <label for="description"></label>
+                    <textarea name="description" id="description"></textarea>
+                </p>
+                <p>
+                    <button type="button">创建</button>
+                </p>
+            </form>
+            <script>
+                fetch("/admin/addSurvey", data={
+                    
+                })
+            </script>
+        </div>
+        <div class="box" id="page2">
+            <form id="addQuestion">
+                <h2>添加题目</h2>
+                <p>
+                    <label for="survey"></label>
+                    <select type="text" name="survey" id="survey">
+                        <option value="1">测试1</option>
+                    </select>
+                </p>
+                <p>
+                    <label for="single">单选</label>
+                    <input type="radio" id="single" name="type" value="1" checked>
+                    <label for="multiple">多选</label>
+                    <input type="radio" id="multiple" name="type" value="2">
+                    <label for="fillInThe">填空</label>
+                    <input type="radio" id="fillInThe" name="type" value="3">
+                    <label for="subjective">简答</label>
+                    <input type="radio" id="subjective" name="type" value="4">
+                </p>
+                <p>
+                    <label for="title">题目</label>
+                    <textarea name="title" id=""></textarea>
+                </p>
+                <p>
+                    <label for="options">选项</label>
+                <div>
+                    <p></p>
+                </div>
+                </p>
+                <p>
+                    <label for="score">分值</label>
+                    <input type="text" name="score">
+                </p>
+                <p>
+                    <button type="button">添加</button>
+                </p>
+            </form>
+            <script>
+
+            </script>
+        </div>
+    </div>
+</body>
+
+</html>

@@ -1,4 +1,6 @@
 from datetime import datetime
+
+from flask_login import UserMixin
 from myapp import db
 
 question_type_map = {
@@ -47,19 +49,20 @@ class Option(db.Model):
     option_text = db.Column(db.String(200), nullable=False)  # 选项内容，不允许为空
     is_correct = db.Column(db.Boolean)  # 是否为正确选项，对于有标准答案的题目，可为空
     create_time = db.Column(db.DateTime, default=datetime.utcnow)  # 选项创建时间，默认为当前时间
-    def __init__(self, question_id: int, option_text: str, is_correct: bool = None):
+    def __init__(self, question_id: int, option_text: str, is_correct: bool = False):
         self.question_id = question_id
         self.option_text = option_text
         self.is_correct = is_correct
 
 # 用户表模型
-class User(db.Model):
+class User(UserMixin, db.Model):
     __tablename__ = 'users'  # 指定表名
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)  # 主键，用户唯一标识，自增
     username = db.Column(db.String(100), nullable=False)  # 用户名，不允许为空
     password = db.Column(db.String(100), nullable=False)  # 密码，不允许为空
     role = db.Column(db.String(100))  # 用户角色，如普通用户、管理员等，可为空
     addtime = db.Column(db.DateTime, default=datetime.utcnow)  # 用户新增时间，默认为当前时间
+    # is_active = db.Column(db.Boolean, default=True)  # 默认为 True
     # responses = db.relationship('Response', backref='user', lazy=True, cascade='all, delete')  # 与答卷表建立一对多关系，级联删除
     def __init__(self, username: int, password: str, role: str = '普通用户'):
         self.username = username
