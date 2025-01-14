@@ -1,5 +1,11 @@
 ## 环境配置
- * windows
+ * Windows
  ```
  pip install -r requirement.txt 
+ ```
+
+## Run
+ * Windows
+ ```
+ python main.py
  ```
