@@ -9,6 +9,11 @@ question_type_map = {
     3: 'fillInTheBlanks',
     4: 'subjective'
 }
+guarantee_stats_map = {
+    1: 'waiting',
+    2: 'refuse',
+    3: 'agreement'
+}
 
 
 # 问卷表模型
@@ -112,7 +117,7 @@ class Guarantee(db.Model):
     player_qq = db.Column(db.String(25), nullable=False)  # 被担保人qq，不允许为空
     player_name = db.Column(db.String(25), nullable=False)  # 被担保人ID，不允许为空
     player_uuid = db.Column(db.String(36), nullable=False)  # 被担保人UUID，不允许为空
-    status = db.Column(db.Integer, nullable=False)  # 担保状态，如1-等待，2-通过，3-存疑
+    status = db.Column(db.Integer, nullable=False)  # 担保状态
     create_time = db.Column(db.DateTime, default=datetime.utcnow)  # 担保记录创建时间，默认为当前时间
 
     def __init__(self, guarantee_qq: str, player_qq: str, player_name: str, player_uuid: str, status: int = 0):
@@ -121,3 +126,15 @@ class Guarantee(db.Model):
         self.player_name = player_name
         self.player_uuid = player_uuid
         self.status = status
+
+
+class Whitelist(db.Model):
+    __tablename__ = 'whitelist'
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    player_name = db.Column(db.String(25), nullable=False)
+    player_uuid = db.Column(db.String(36), nullable=False)
+    status = db.Column(db.Integer, nullable=False, default=0)  # 1 正常 2 临时封禁 3 永久封禁
+
+    def __init__(self, player_name: str, player_uuid: str):
+        self.player_name = player_name
+        self.player_uuid = player_uuid

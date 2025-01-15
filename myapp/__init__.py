@@ -1,4 +1,4 @@
-from flask import Flask, redirect, url_for
+from flask import Flask, redirect, url_for, render_template
 from flask_login import LoginManager
 from flask_sqlalchemy import SQLAlchemy
 
@@ -38,10 +38,9 @@ def create_app():
 
     @app.route("/")
     def hello():
-        return '<h1>Hello World!</h1>'
+        return render_template('index.html')
 
-        # 未授权的用户重定向到登录页面
-
+    # 未授权的用户重定向到登录页面
     @login_manager.unauthorized_handler
     def unauthorized():
         return redirect(url_for('auth.login'))  # 重定向
