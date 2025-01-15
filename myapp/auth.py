@@ -1,13 +1,14 @@
 from flask import Blueprint, jsonify, redirect, render_template, request, url_for
 from flask_login import login_user
 from myapp.db_model import User
-from myapp import db
 
 auth = Blueprint('auth', __name__)
+
 
 @auth.route('/login', methods=['GET'])
 def login_index():
     return render_template('login.html')
+
 
 @auth.route('/login', methods=['POST'])
 def login():
@@ -19,7 +20,8 @@ def login():
         return redirect(url_for('admin.admin_index'))
     else:
         return redirect(url_for('admin.admin_index'))
-    
+
+
 @auth.route('/register', methods=['POST'])
 def register():
     return jsonify({'code': 0, 'desc': '成功'})

@@ -4,6 +4,7 @@ from myapp import db
 
 guarantee = Blueprint('guarantee', __name__)
 
+
 @guarantee.route('/addGuarantee', methods=['POST'])
 def add_guarantee():
     guarantee_: Guarantee = Guarantee(request.json['name'], request.json['description'])

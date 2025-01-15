@@ -4,9 +4,10 @@ from myapp import db
 
 default = Blueprint('default', __name__)
 
+
 @default.route("/survey/<int:id>", methods=['get'])
 def get_survey(id: int):
-# 查询指定问卷
+    # 查询指定问卷
     survey = Survey.query.get(id)
     if not survey:
         return jsonify({'code': 1, 'desc': '未找到问卷'}), 404

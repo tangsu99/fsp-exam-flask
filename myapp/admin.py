@@ -5,10 +5,12 @@ from myapp import db
 
 admin = Blueprint('admin', __name__)
 
+
 @admin.route('/')
 @login_required
 def admin_index():
     return render_template('admin.html')
+
 
 @admin.route('/AllQuestion')
 @login_required
@@ -39,6 +41,7 @@ def add_survey():
     db.session.commit()
     print(survey.id)
     return jsonify({'code': 0, 'desc': '成功'})
+
 
 @admin.route("/addQuestion", methods=['POST'])
 def add_question():
