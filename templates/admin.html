@@ -50,21 +50,36 @@
             <form id="addSurvey">
                 <h2>新建答卷</h2>
                 <p>
-                    <label for="name"></label>
-                    <input type="text" name="description" id="description">
+                    <label for="surveyname"></label>
+                    <input type="text" name="surveyname" id="surveyname">
                 </p>
                 <p>
                     <label for="description"></label>
                     <textarea name="description" id="description"></textarea>
                 </p>
                 <p>
-                    <button type="button">创建</button>
+                    <button type="button" onclick="creatSurvey()">创建</button>
                 </p>
             </form>
             <script>
-                fetch("/admin/addSurvey", data={
-                    
-                })
+                function creatSurvey() {
+                    let surveyname = document.getElementById('surveyname').value
+                    let description = document.getElementById('description').value
+                    fetch("/admin/addSurvey", {
+                        method: "POST",
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            surveyname,
+                            description
+                        })
+                    }).then(function (response) {
+                        return response.json()
+                    }).then(function (data) {
+                        console.log(data)
+                    })
+                }
             </script>
         </div>
         <div class="box" id="page2">
