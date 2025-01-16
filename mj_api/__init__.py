@@ -17,6 +17,19 @@ def get_skin_url(uuid: str) -> str:
     return data_json["textures"]["SKIN"]["url"]
 
 
+def get_player_uuid(name: str) -> tuple:
+    player_profile_url: str = (
+        f"https://api.mojang.com/users/profiles/minecraft/{name}"
+    )
+    response = requests.get(player_profile_url)
+    if response.status_code == 200:
+        data = response.json()
+        uuid: str = data['id']
+        name: str = data['name']
+        return name, uuid
+    return None
+
+
 def image_to_binary(image: Image):
     img_byte_arr = BytesIO()
     image.save(img_byte_arr, format="PNG")

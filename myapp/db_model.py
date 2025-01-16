@@ -133,8 +133,10 @@ class Whitelist(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     player_name = db.Column(db.String(25), nullable=False)
     player_uuid = db.Column(db.String(36), nullable=False)
+    player_qq = db.Column(db.String(25), nullable=False)
     status = db.Column(db.Integer, nullable=False, default=0)  # 1 正常 2 临时封禁 3 永久封禁
 
-    def __init__(self, player_name: str, player_uuid: str):
+    def __init__(self, player_name: str, player_uuid: str, player_qq: str):
         self.player_name = player_name
         self.player_uuid = player_uuid
+        self.player_qq = player_qq

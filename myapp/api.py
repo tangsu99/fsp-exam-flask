@@ -36,20 +36,6 @@ def whitelists():
 @login_required
 def add_whitelist():
     data = request.get_json()
-    db.session.add(Whitelist(data['name'], data['uuid']))
+    db.session.add(Whitelist(data['name'], data['uuid'], data['qq']))
     db.session.commit()
     return jsonify({'code': 0, 'desc': '成功'})
-
-
-@api.route('/guarantee', methods=['POST'])
-def guarantee():
-    data = request.get_json()
-    response_data = {'code': 0, 'desc': 'yes', 'state': 'success'}
-    # 验证
-    # 添加
-    result = Whitelist.query.filter_by(player_uuid=data['uuid']).first()
-    if result is not None:
-        db.session.add()
-        db.session.commit()
-    return jsonify(response_data)
-
