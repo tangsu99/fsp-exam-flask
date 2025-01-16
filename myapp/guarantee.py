@@ -27,8 +27,9 @@ async def _request():
         Guarantee.create_time >= ten_minutes_ago
     ).all()
     if len(g_result) != 0:
-        response_data['desc'] = '已存在'
+        response_data['desc'] = '担保请求未过期'
         response_data['state'] = 'requestExists'
+        response_data['guaranteeId'] = g_result[0].id
         return jsonify(response_data)
     _res = get_player_uuid(data['playerName'])
     if _res is None:
@@ -47,6 +48,11 @@ async def _request():
         response_data['desc'] = '未找到此担保人'
         response_data['state'] = 'unknownGuarantor'
         return jsonify(response_data)
+    elif g_wl_result.status != 1:
+        response_data['desc'] = '担保人白名单异常'
+        response_data['state'] = 'unknownGuarantor'
+        return jsonify(response_data)
+
     # 存
     _guarantee = Guarantee(data['guaranteeQQ'], data['playerQQ'], data['playerName'], data['playerUUID'])
     db.session.add(_guarantee)
@@ -57,10 +63,8 @@ async def _request():
 @guarantee.route('/query/<name>', methods=['GET'])
 def query(name: str):
     response_data = {'code': 0, 'desc': 'yes', 'data': []}
-    ten_minutes_ago = get_ago_time()
     result = Guarantee.query.filter(
-        Guarantee.player_name == name,
-        Guarantee.create_time >= ten_minutes_ago
+        Guarantee.player_name == name
     ).all()
     if len(result) != 0:
         for i in result:
