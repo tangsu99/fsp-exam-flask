@@ -73,6 +73,7 @@ def query(name: str):
                 'playerQQ': i.player_qq,
                 'playerName': i.player_name,
                 'playerUUID': i.player_uuid,
+                'createTime': i.create_time,
                 'status': i.status
             })
         return jsonify(response_data)
