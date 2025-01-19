@@ -1,4 +1,5 @@
 from flask import Flask, redirect, url_for, render_template
+from flask_cors import CORS
 from flask_login import LoginManager
 from flask_sqlalchemy import SQLAlchemy
 
@@ -11,6 +12,8 @@ def create_app():
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///your_database.db'  # 测试数据库
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     app.config['SECRET_KEY'] = 'c4329f5e3bc9daf6cd2b82bf9355a5d2'  # 用于安全签名session
+
+    cors = CORS(app, resources={r"/default/*": {"origins": "*"}})
 
     app.template_folder = '../templates'
     app.static_folder = '../static'

@@ -1,14 +1,13 @@
-from flask import Blueprint, jsonify, request
-from myapp.db_model import Survey, Question, Option, question_type_map
-from myapp import db
+from flask import Blueprint, jsonify
+from myapp.db_model import Survey, question_type_map
 
 default = Blueprint('default', __name__)
 
 
-@default.route("/survey/<int:id>", methods=['get'])
-def get_survey(id: int):
+@default.route("/survey/<int:sid>", methods=['get'])
+def get_survey(sid: int):
     # 查询指定问卷
-    survey = Survey.query.get(id)
+    survey = Survey.query.get(sid)
     if not survey:
         return jsonify({'code': 1, 'desc': '未找到问卷'}), 404
     # 构建问卷数据结构
@@ -31,7 +30,10 @@ def get_survey(id: int):
         }
         # 查询题目中的所有选项
         for option in question.options:
-            question_data['options'].append(option.option_text)
+            question_data['options'].append({
+                'id': option.id,
+                'text': option.option_text
+            })
 
         survey_data['questions'].append(question_data)
 
