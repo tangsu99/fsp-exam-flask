@@ -1,7 +1,7 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from flask_login import UserMixin
-from myapp import db
+from myapp import db, bcrypt
 
 question_type_map = {
     1: 'singleChoice',
@@ -76,13 +76,19 @@ class User(UserMixin, db.Model):
     password = db.Column(db.String(100), nullable=False)  # 密码，不允许为空
     role = db.Column(db.String(100))  # 用户角色，如普通用户、管理员等，可为空
     addtime = db.Column(db.DateTime, default=datetime.utcnow)  # 用户新增时间，默认为当前时间
-
+    tokens = db.relationship('Token', backref='user', lazy=True)
     # is_active = db.Column(db.Boolean, default=True)  # 默认为 True
     # responses = db.relationship('Response', backref='user', lazy=True, cascade='all, delete')  # 与答卷表建立一对多关系，级联删除
-    def __init__(self, username: int, password: str, role: str = '普通用户'):
+    def __init__(self, username: str, role: str = 'user'):
         self.username = username
-        self.password = password
         self.role = role
+
+    def set_password(self, password):
+        self.password = bcrypt.generate_password_hash(password).decode('utf-8')
+        return self
+
+    def check_password(self, password):
+        return bcrypt.check_password_hash(self.password, password)
 
 
 # 答卷表模型
@@ -140,3 +146,16 @@ class Whitelist(db.Model):
         self.player_name = player_name
         self.player_uuid = player_uuid
         self.player_qq = player_qq
+
+class Token(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    token = db.Column(db.String(256), unique=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    is_revoked = db.Column(db.Boolean, default=False)
+
+    def __init__(self, user_id, token, expires_in=3600):
+        self.user_id = user_id
+        self.token = token
+        self.expires_at = datetime.utcnow() + timedelta(seconds=expires_in)
