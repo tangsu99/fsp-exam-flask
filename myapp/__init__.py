@@ -18,7 +18,12 @@ def create_app():
     app.config['SECRET_KEY'] = 'c4329f5e3bc9daf6cd2b82bf9355a5d2'  # 用于安全签名session
     app.config['SESSION_PROTECTION'] = None  # 禁用会话保护
 
-    cors = CORS(app, resources={r"/default/*": {"origins": "*"}})
+    cors = CORS(app, resources={
+            "/default/*": {"origins": "*"},
+            "/api/*": {"origins": "*"},
+            "/guarantee/*": {"origins": "*"}
+        }
+    )
 
     app.template_folder = '../templates'
     app.static_folder = '../static'
