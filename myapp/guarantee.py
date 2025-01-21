@@ -14,11 +14,11 @@ def get_ago_time():
 @guarantee.route('/request', methods=['POST'])
 async def _request():
     data = request.get_json()
-    response_data = {'code': 0, 'desc': 'yes', 'state': 'success'}
+    response_data = {'code': 0, 'desc': '担保请求提交成功', 'state': 'success'}
     wl_result = Whitelist.query.filter_by(player_uuid=data['playerUUID']).first()
     # 在白名单中
     if wl_result is not None:
-        response_data['desc'] = '已存在'
+        response_data['desc'] = '已存在白名单'
         response_data['state'] = 'alreadyExists'
         return jsonify(response_data)
     ten_minutes_ago = get_ago_time()
@@ -48,7 +48,7 @@ async def _request():
         response_data['desc'] = '未找到此担保人'
         response_data['state'] = 'unknownGuarantor'
         return jsonify(response_data)
-    elif g_wl_result.status != 1:
+    elif g_wl_result.status != 0:
         response_data['desc'] = '担保人白名单异常'
         response_data['state'] = 'unknownGuarantor'
         return jsonify(response_data)
