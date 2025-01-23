@@ -15,6 +15,8 @@ guarantee_stats_map = {
     3: 'agreement'
 }
 
+DEFAULT_AVATAR = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAA/UlEQVQYVzWPvy8DYQCGn+/u+l2RlskZBDMSJGxyS4MmBgMzQ4cOIjaLMBmERSwWf0GlMejA0oTRJJEYKupHRBiaSy6qLr7vPnKNd3mW532TV4wNZYyKwREWkVYopbEsi5RjYwyIkYHMH9pJS4duKdDYND4jVKzbwv7qCm5K0pHO0mqGYFsE72/snp4jSltF0+lKvqII23YJwoBBr5fnp1qyKio7a2Z+85BFf4+CX0dmuziqeJSvNjjZLiKOC7PG6+vHcXs4q1aT1lJ+mteXe+ofDcTBcs5IoSldXjM3PJ4IF3c3LPiThM0fxPrMqIljw+3D4/+ZhLmpCVrRN7+WjFb8RvjH7AAAAABJRU5ErkJggg=='
+print(len(DEFAULT_AVATAR))
 
 # 问卷表模型
 class Survey(db.Model):
@@ -76,6 +78,7 @@ class User(UserMixin, db.Model):
     password = db.Column(db.String(100), nullable=False)  # 密码，不允许为空
     role = db.Column(db.String(100))  # 用户角色，如普通用户、管理员等，可为空
     addtime = db.Column(db.DateTime, default=datetime.utcnow)  # 用户新增时间，默认为当前时间
+    avatar = db.Column(db.String(500), default=DEFAULT_AVATAR)
     tokens = db.relationship('Token', backref='user', lazy=True)
     # is_active = db.Column(db.Boolean, default=True)  # 默认为 True
     # responses = db.relationship('Response', backref='user', lazy=True, cascade='all, delete')  # 与答卷表建立一对多关系，级联删除

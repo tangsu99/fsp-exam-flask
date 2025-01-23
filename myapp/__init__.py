@@ -21,7 +21,8 @@ def create_app():
     cors = CORS(app, resources={
             "/default/*": {"origins": "*"},
             "/api/*": {"origins": "*"},
-            "/guarantee/*": {"origins": "*"}
+            "/guarantee/*": {"origins": "*"},
+            "/auth/*": {"origins": "*"}
         }
     )
 
@@ -70,7 +71,6 @@ def create_app():
     def load_user_from_request(request: Request):
         # 尝试从查询参数中获取 API 密钥
         # api_key = request.args.get('token')
-        print(request.headers)
         # if api_key:
         #     user = User.query.filter_by(api_key=api_key).first()
         #     if user:

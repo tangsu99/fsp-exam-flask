@@ -1,10 +1,11 @@
 from datetime import datetime, timedelta
 
 import jwt
+from django.template.defaultfilters import first
 from flask import Blueprint, jsonify, render_template, request, current_app
-from flask_login import login_user
+from flask_login import login_user, current_user
 
-from myapp.db_model import User, Token
+from myapp.db_model import User, Token, DEFAULT_AVATAR
 from myapp import db
 
 auth = Blueprint('auth', __name__)
@@ -17,9 +18,9 @@ def login_index():
 
 @auth.route('/login', methods=['POST'])
 def login():
-    username = request.form['username']
-    password = request.form['password']
-    # req_data = request.json
+    req_data = request.json
+    username = req_data['username']
+    password = req_data['password']
     user: User = User.query.filter_by(username=username).first()
     if user and user.check_password(password):
         # login_user(user)
@@ -28,7 +29,8 @@ def login():
             {
                 'code': 0,
                 'token': token,
-                'username': user.username
+                'username': user.username,
+                'avatar': user.avatar
             }
         )
     else:
@@ -37,17 +39,45 @@ def login():
                 'code': 1,
                 'desc': 'User not found'
             }
-        ), 404
+        )
 
 
 @auth.route('/register', methods=['POST'])
 def register():
-    username = request.form['username']
-    password = request.form['password']
-    user: User = User(username).set_password(password)
-    db.session.add(user)
-    db.session.commit()
-    return jsonify({'code': 0, 'desc': '成功'})
+    req_data = request.json
+    username = req_data['username']
+    password = req_data['password']
+    repassword = req_data['repassword']
+    if username or password or repassword:
+        if password == repassword:
+            u = User.query.filter_by(username=username).first()
+            if u:
+                return jsonify({'code': 3, 'desc': '用户存在!'})
+            user: User = User(username).set_password(password)
+            db.session.add(user)
+            db.session.commit()
+            token = create_token(user)
+            return jsonify({'code': 0, 'desc': '成功', 'token': token})
+        return jsonify({'code': 2, 'desc': '密码与重复密码不一致'})
+    return jsonify({'code': 1, 'desc': '表单错误'})
+
+
+@auth.route('/check', methods=['GET'])
+def check_login():
+    if current_user.is_authenticated:
+        # 用户已登录，返回用户信息
+        return jsonify({
+            'code': 0,
+            'username': current_user.username,
+            'avatar': current_user.avatar
+        })
+    else:
+        # 用户未登录，返回未登录提示
+        return jsonify({
+            'code': 1,
+            'desc': 'User is not logged in',
+            'avatar': DEFAULT_AVATAR
+        })
 
 
 def generate_token(user, expires_in=3600):
