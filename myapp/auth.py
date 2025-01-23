@@ -1,9 +1,8 @@
 from datetime import datetime, timedelta
 
 import jwt
-from django.template.defaultfilters import first
 from flask import Blueprint, jsonify, render_template, request, current_app
-from flask_login import login_user, current_user
+from flask_login import current_user
 
 from myapp.db_model import User, Token, DEFAULT_AVATAR
 from myapp import db
