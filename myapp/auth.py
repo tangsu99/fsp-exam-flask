@@ -2,17 +2,12 @@ from datetime import datetime, timedelta
 
 import jwt
 from flask import Blueprint, jsonify, render_template, request, current_app
-from flask_login import current_user
+from flask_login import current_user, login_user
 
 from myapp.db_model import User, Token, DEFAULT_AVATAR
 from myapp import db
 
 auth = Blueprint('auth', __name__)
-
-
-@auth.route('/login', methods=['GET'])
-def login_index():
-    return render_template('login.html')
 
 
 @auth.route('/login', methods=['POST'])
@@ -22,14 +17,15 @@ def login():
     password = req_data['password']
     user: User = User.query.filter_by(username=username).first()
     if user and user.check_password(password):
-        # login_user(user)
+        login_user(user)
         token = create_token(user)
         return jsonify(
             {
                 'code': 0,
                 'token': token,
                 'username': user.username,
-                'avatar': user.avatar
+                'avatar': user.avatar,
+                'isAdmin': user.role == 'admin'
             }
         )
     else:
@@ -39,6 +35,23 @@ def login():
                 'desc': 'User not found'
             }
         )
+
+
+@auth.route('/logout', methods=['POST'])
+def logout():
+    if current_user.is_authenticated:
+        # 用户已登录
+        Token.query.filter_by(user=current_user).delete()
+        return jsonify({
+            'code': 0,
+            'desc': '退出成功'
+        })
+    else:
+        # 用户未登录
+        return jsonify({
+            'code': 1,
+            'desc': '用户是未登录状态'
+        })
 
 
 @auth.route('/register', methods=['POST'])
@@ -68,7 +81,8 @@ def check_login():
         return jsonify({
             'code': 0,
             'username': current_user.username,
-            'avatar': current_user.avatar
+            'avatar': current_user.avatar,
+            'isAdmin': current_user.role == 'admin'
         })
     else:
         # 用户未登录，返回未登录提示
