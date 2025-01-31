@@ -60,7 +60,6 @@ def register():
     username = req_data['username']
     password = req_data['password']
     repassword = req_data['repassword']
-    code = req_data['code']
     if username or password or repassword:
         if password == repassword:
             u = User.query.filter_by(username=username).first()

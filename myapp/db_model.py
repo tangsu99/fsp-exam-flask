@@ -74,15 +74,19 @@ class User(UserMixin, db.Model):
     __tablename__ = 'users'  # 指定表名
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)  # 主键，用户唯一标识，自增
     username = db.Column(db.String(100), nullable=False)  # 用户名，不允许为空
+    player_qq = db.Column(db.String(25), nullable=False)
     password = db.Column(db.String(100), nullable=False)  # 密码，不允许为空
     role = db.Column(db.String(100))  # 用户角色，如普通用户、管理员等，可为空
     addtime = db.Column(db.DateTime, default=datetime.utcnow)  # 用户新增时间，默认为当前时间
     avatar = db.Column(db.String(500), default=DEFAULT_AVATAR)
     tokens = db.relationship('Token', backref='user', lazy=True)
+    whitelist = db.relationship('Whitelist', backref='user', lazy=True)
+    status = db.Column(db.Integer, nullable=False, default=0)  # 0 未激活 1 正常 2 临时封禁 3 永久封禁
     # is_active = db.Column(db.Boolean, default=True)  # 默认为 True
     # responses = db.relationship('Response', backref='user', lazy=True, cascade='all, delete')  # 与答卷表建立一对多关系，级联删除
-    def __init__(self, username: str, role: str = 'user'):
+    def __init__(self, username: str, player_qq: str = '1', role: str = 'user'):
         self.username = username
+        self.player_qq = player_qq
         self.role = role
 
     def set_password(self, password):
@@ -97,7 +101,7 @@ class User(UserMixin, db.Model):
 class Response(db.Model):
     __tablename__ = 'responses'  # 指定表名
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)  # 主键，答卷唯一标识，自增
-    # user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'), nullable=False)  # 答题用户id，外键，关联用户表，级联删除
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'), nullable=False)  # 答题用户id，外键，关联用户表，级联删除
     survey_id = db.Column(db.Integer, db.ForeignKey('surveys.id', ondelete='CASCADE'),
                           nullable=False)  # 所答问卷id，外键，关联问卷表，级联删除
     response_time = db.Column(db.DateTime, default=datetime.utcnow)  # 答卷时间，默认为当前时间
@@ -139,15 +143,14 @@ class Guarantee(db.Model):
 class Whitelist(db.Model):
     __tablename__ = 'whitelist'
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     player_name = db.Column(db.String(25), nullable=False)
     player_uuid = db.Column(db.String(36), nullable=False)
-    player_qq = db.Column(db.String(25), nullable=False)
-    status = db.Column(db.Integer, nullable=False, default=0)  # 1 正常 2 临时封禁 3 永久封禁
 
-    def __init__(self, player_name: str, player_uuid: str, player_qq: str):
+    def __init__(self, user_id, player_name: str, player_uuid: str):
+        self.user_id = user_id
         self.player_name = player_name
         self.player_uuid = player_uuid
-        self.player_qq = player_qq
 
 class Token(db.Model):
     id = db.Column(db.Integer, primary_key=True)
