@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 from flask import Blueprint, jsonify, request
 from mj_api import get_player_uuid
-from myapp.db_model import Whitelist, Guarantee
+from myapp.db_model import Whitelist, Guarantee, User
 from myapp import db
 
 guarantee = Blueprint('guarantee', __name__)
@@ -43,12 +43,12 @@ async def _request():
         response_data['desc'] = '未找到此玩家'
         response_data['state'] = 'inconsistentInfo'
         return jsonify(response_data)
-    g_wl_result: Whitelist = Whitelist.query.filter(Whitelist.player_qq == data['guaranteeQQ']).first()
+    g_wl_result: User = User.query.filter(User.player_qq == data['guaranteeQQ']).first()
     if g_wl_result is None:
         response_data['desc'] = '未找到此担保人'
         response_data['state'] = 'unknownGuarantor'
         return jsonify(response_data)
-    elif g_wl_result.status != 0:
+    elif g_wl_result.status != 1:
         response_data['desc'] = '担保人白名单异常'
         response_data['state'] = 'unknownGuarantor'
         return jsonify(response_data)

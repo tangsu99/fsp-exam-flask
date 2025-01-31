@@ -1,5 +1,5 @@
 from flask import Blueprint, jsonify, request
-from flask_login import login_required
+from flask_login import login_required, current_user
 
 from myapp.db_model import Whitelist, User
 from myapp import db
@@ -37,7 +37,8 @@ def whitelists():
 @login_required
 def add_whitelist():
     data = request.get_json()
-    db.session.add(Whitelist(data['name'], data['uuid'], data['qq']))
+    user: User = current_user
+    db.session.add(Whitelist(user.id, data['name'], data['uuid']))
     db.session.commit()
     return jsonify({'code': 0, 'desc': '成功'})
 
