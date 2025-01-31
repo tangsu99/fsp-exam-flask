@@ -48,7 +48,6 @@ def register():
     req_data = request.json
     username = req_data['username']
     password = req_data['password']
-    uuid = req_data['uuid']
     if username or password:
         u = User.query.filter_by(username=username).first()
         if u:
