@@ -1,8 +1,9 @@
 from flask import Blueprint, jsonify, request
 from flask_login import login_required
 
-from myapp.db_model import Whitelist
+from myapp.db_model import Whitelist, User
 from myapp import db
+from myapp.utils import token_check
 
 api = Blueprint('api', __name__)
 
@@ -39,3 +40,21 @@ def add_whitelist():
     db.session.add(Whitelist(data['name'], data['uuid'], data['qq']))
     db.session.commit()
     return jsonify({'code': 0, 'desc': '成功'})
+
+
+@api.route('/register', methods=['POST'])
+@token_check()
+def register():
+    req_data = request.json
+    username = req_data['username']
+    password = req_data['password']
+    uuid = req_data['uuid']
+    if username or password:
+        u = User.query.filter_by(username=username).first()
+        if u:
+            return jsonify({'code': 2, 'desc': '用户存在!'})
+        user: User = User(username).set_password(password)
+        db.session.add(user)
+        db.session.commit()
+        return jsonify({'code': 0, 'desc': '注册成功!'})
+    return jsonify({'code': 1, 'desc': '错误'})
