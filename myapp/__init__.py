@@ -82,7 +82,7 @@ def create_app():
             token = token.replace('Bearer ', '', 1)  # 假设使用 Bearer 认证
             token_record : Token = Token.query.filter_by(token=token).first()
             if token_record and not token_record.is_revoked and token_record.expires_at > datetime.utcnow():
-                return User.query.get(token_record.user_id)
+                return token_record.user
         # 如果两种方式都未找到用户，返回 None
         return None
 

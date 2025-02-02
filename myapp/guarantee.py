@@ -1,5 +1,7 @@
 from datetime import datetime, timedelta
 from flask import Blueprint, jsonify, request
+from flask_login import login_required, current_user
+
 from mj_api import get_player_uuid
 from myapp.db_model import Whitelist, Guarantee, User
 from myapp import db
@@ -12,6 +14,7 @@ def get_ago_time():
 
 
 @guarantee.route('/request', methods=['POST'])
+@login_required
 async def _request():
     data = request.get_json()
     response_data = {'code': 0, 'desc': '担保请求提交成功', 'state': 'success'}
@@ -43,7 +46,7 @@ async def _request():
         response_data['desc'] = '未找到此玩家'
         response_data['state'] = 'inconsistentInfo'
         return jsonify(response_data)
-    g_wl_result: User = User.query.filter(User.player_qq == data['guaranteeQQ']).first()
+    g_wl_result: User = User.query.filter(User.user_qq == data['guaranteeQQ']).first()
     if g_wl_result is None:
         response_data['desc'] = '未找到此担保人'
         response_data['state'] = 'unknownGuarantor'
@@ -54,30 +57,43 @@ async def _request():
         return jsonify(response_data)
 
     # 存
-    _guarantee = Guarantee(data['guaranteeQQ'], data['playerQQ'], data['playerName'], data['playerUUID'])
+    _guarantee = Guarantee(g_wl_result.id, current_user.get_id(), data['playerName'], data['playerUUID'])
     db.session.add(_guarantee)
     db.session.commit()
     return jsonify(response_data)
 
 
-@guarantee.route('/query/<name>', methods=['GET'])
-def query(name: str):
-    response_data = {'code': 0, 'desc': 'yes', 'data': []}
-    result = Guarantee.query.filter(
-        Guarantee.player_name == name
-    ).all()
-    if len(result) != 0:
-        for i in result:
-            response_data['data'].append({
-                'guaranteeQQ': i.guarantee_qq,
-                'playerQQ': i.player_qq,
+@guarantee.route('/query', methods=['GET'])
+@login_required
+def query():
+    response_data = {'code': 0, 'desc': 'yes', 'data': {
+        'guarantee': [],
+        'applicant': []
+    }}
+    g_result = current_user.guarantees
+    if len(g_result) != 0:
+        for i in g_result:
+            response_data['data']['guarantee'].append({
+                'id': i.guarantor.id,
+                'username': i.guarantor.username,
+                'userQQ': i.guarantor.user_qq,
+                'avatar': i.guarantor.avatar,
                 'playerName': i.player_name,
                 'playerUUID': i.player_uuid,
                 'createTime': i.create_time,
                 'status': i.status
             })
-        return jsonify(response_data)
-    else:
-        response_data['code'] = 1
-        response_data['desc'] = '没有找到'
-        return jsonify(response_data)
+    a_result = current_user.applicant
+    if len(a_result) != 0:
+        for i in a_result:
+            response_data['data']['applicant'].append({
+                'id': i.applicant.id,
+                'username': i.applicant.username,
+                'userQQ': i.applicant.user_qq,
+                'avatar': i.applicant.avatar,
+                'playerName': i.player_name,
+                'playerUUID': i.player_uuid,
+                'createTime': i.create_time,
+                'status': i.status
+            })
+    return jsonify(response_data)

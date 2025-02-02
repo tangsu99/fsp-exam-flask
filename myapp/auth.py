@@ -58,14 +58,15 @@ def logout():
 def register():
     req_data = request.json
     username = req_data['username']
+    user_qq = req_data['userQQ']
     password = req_data['password']
-    repassword = req_data['repassword']
-    if username or password or repassword:
-        if password == repassword:
+    re_password = req_data['repassword']
+    if username or password or re_password:
+        if password == re_password:
             u = User.query.filter_by(username=username).first()
             if u:
                 return jsonify({'code': 3, 'desc': '用户存在!'})
-            user: User = User(username).set_password(password)
+            user: User = User(username, user_qq=user_qq).set_password(password)
             db.session.add(user)
             db.session.commit()
             token = create_token(user)
