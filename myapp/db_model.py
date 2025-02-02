@@ -74,19 +74,20 @@ class User(UserMixin, db.Model):
     __tablename__ = 'users'  # 指定表名
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)  # 主键，用户唯一标识，自增
     username = db.Column(db.String(100), nullable=False)  # 用户名，不允许为空
-    player_qq = db.Column(db.String(25), nullable=False)
+    user_qq = db.Column(db.String(25), nullable=False)
     password = db.Column(db.String(100), nullable=False)  # 密码，不允许为空
     role = db.Column(db.String(100))  # 用户角色，如普通用户、管理员等，可为空
     addtime = db.Column(db.DateTime, default=datetime.utcnow)  # 用户新增时间，默认为当前时间
     avatar = db.Column(db.String(500), default=DEFAULT_AVATAR)
-    tokens = db.relationship('Token', backref='user', lazy=True)
-    whitelist = db.relationship('Whitelist', backref='user', lazy=True)
     status = db.Column(db.Integer, nullable=False, default=0)  # 0 未激活 1 正常 2 临时封禁 3 永久封禁
     # is_active = db.Column(db.Boolean, default=True)  # 默认为 True
-    # responses = db.relationship('Response', backref='user', lazy=True, cascade='all, delete')  # 与答卷表建立一对多关系，级联删除
-    def __init__(self, username: str, player_qq: str = '1', role: str = 'user'):
+    tokens = db.relationship('Token', backref='user', lazy=True)
+    guarantees = db.relationship('Guarantee', foreign_keys='Guarantee.guarantee_id', backref='guarantor', lazy=True)
+    applicant = db.relationship('Guarantee', foreign_keys='Guarantee.applicant_id', backref='applicant', lazy=True)
+    responses = db.relationship('Response', backref='user', lazy=True, cascade='all, delete')  # 与答卷表建立一对多关系，级联删除
+    def __init__(self, username: str, user_qq: str = '1', role: str = 'user'):
         self.username = username
-        self.player_qq = player_qq
+        self.user_qq = user_qq
         self.role = role
 
     def set_password(self, password):
@@ -125,16 +126,16 @@ class ResponseDetail(db.Model):
 class Guarantee(db.Model):
     __tablename__ = 'guarantees'  # 指定表名
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)  # 主键，担保唯一标识，自增
-    guarantee_qq = db.Column(db.String(25), nullable=False)  # 担保人qq，不允许为空
-    player_qq = db.Column(db.String(25), nullable=False)  # 被担保人qq，不允许为空
+    guarantee_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)  # 担保人id，不允许为空
+    applicant_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)  # 申请人id，不允许为空
     player_name = db.Column(db.String(25), nullable=False)  # 被担保人ID，不允许为空
     player_uuid = db.Column(db.String(36), nullable=False)  # 被担保人UUID，不允许为空
     status = db.Column(db.Integer, nullable=False)  # 担保状态
     create_time = db.Column(db.DateTime, default=datetime.utcnow)  # 担保记录创建时间，默认为当前时间
 
-    def __init__(self, guarantee_qq: str, player_qq: str, player_name: str, player_uuid: str, status: int = 0):
-        self.guarantee_qq = guarantee_qq
-        self.player_qq = player_qq
+    def __init__(self, guarantee_id: int, applicant_id: int, player_name: str, player_uuid: str, status: int = 0):
+        self.guarantee_id = guarantee_id
+        self.applicant_id = applicant_id
         self.player_name = player_name
         self.player_uuid = player_uuid
         self.status = status
