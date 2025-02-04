@@ -73,27 +73,23 @@ def query():
     g_result = current_user.guarantees
     if len(g_result) != 0:
         for i in g_result:
-            response_data['data']['guarantee'].append({
-                'id': i.guarantor.id,
-                'username': i.guarantor.username,
-                'userQQ': i.guarantor.user_qq,
-                'avatar': i.guarantor.avatar,
-                'playerName': i.player_name,
-                'playerUUID': i.player_uuid,
-                'createTime': i.create_time,
-                'status': i.status
-            })
+            response_data['data']['guarantee'].append(returnData(i))
     a_result = current_user.applicant
     if len(a_result) != 0:
         for i in a_result:
-            response_data['data']['applicant'].append({
-                'id': i.applicant.id,
-                'username': i.applicant.username,
-                'userQQ': i.applicant.user_qq,
-                'avatar': i.applicant.avatar,
-                'playerName': i.player_name,
-                'playerUUID': i.player_uuid,
-                'createTime': i.create_time,
-                'status': i.status
-            })
+            response_data['data']['applicant'].append(returnData(i))
     return jsonify(response_data)
+
+
+def returnData(i: Guarantee):
+    return {
+        'uid': i.applicant.id,
+        'id': i.id,
+        'username': i.applicant.username,
+        'userQQ': i.applicant.user_qq,
+        'avatar': i.applicant.avatar,
+        'playerName': i.player_name,
+        'playerUUID': i.player_uuid,
+        'createTime': i.create_time,
+        'status': i.status
+    }
