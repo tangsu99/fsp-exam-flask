@@ -104,7 +104,7 @@ def generate_token(user, expires_in=3600):
     return token
 
 
-def create_token(user, expires_in=3600):
+def create_token(user, expires_in=3600 * 24 * 7):
     token = generate_token(user, expires_in)
     new_token = Token(user_id=user.id, token=token, expires_in=expires_in)
     db.session.add(new_token)
