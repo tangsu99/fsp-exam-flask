@@ -7,3 +7,5 @@ Flask-Bcrypt==1.0.1
 PyJWT==2.10.1
 toml==0.10.2
 flask-login
+pillow
+requests
