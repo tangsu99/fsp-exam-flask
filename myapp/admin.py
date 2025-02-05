@@ -9,7 +9,7 @@ admin = Blueprint('admin', __name__)
 @admin.route('/')
 @login_required
 def admin_index():
-    return render_template('admin.html')
+    return jsonify({'desc': 'admin'})
 
 
 @admin.route('/AllQuestion')

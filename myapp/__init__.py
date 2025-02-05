@@ -54,7 +54,7 @@ def create_app():
 
     @app.route("/")
     def hello():
-        return render_template('index.html')
+        return 'Hello world!\nHello Flask!'
 
     # 未授权的用户重定向到登录页面
     @login_manager.unauthorized_handler
