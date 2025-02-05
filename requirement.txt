@@ -1,8 +1,9 @@
 -i https://pypi.tuna.tsinghua.edu.cn/simple
 
-Flask==3.0.2
-Flask-Cors==4.0.1
+Flask>=3.1.0
+Flask-Cors>=5.0.0
 Flask-SQLAlchemy==3.1.1
 Flask-Bcrypt==1.0.1
 PyJWT==2.10.1
 toml==0.10.2
+flask-login
