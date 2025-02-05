@@ -4,7 +4,7 @@ import jwt
 from flask import Blueprint, jsonify, render_template, request, current_app
 from flask_login import current_user, login_user
 
-from myapp.db_model import User, Token, DEFAULT_AVATAR
+from myapp.db_model import User, Token, DEFAULT_AVATAR, Whitelist
 from myapp import db
 
 auth = Blueprint('auth', __name__)
@@ -64,7 +64,8 @@ def register():
     if username or password or re_password:
         if password == re_password:
             u = User.query.filter_by(username=username).first()
-            if u:
+            w = Whitelist.query.filter_by(player_name=username).first()
+            if u or w:
                 return jsonify({'code': 3, 'desc': '用户存在!'})
             user: User = User(username, user_qq=user_qq).set_password(password)
             db.session.add(user)
