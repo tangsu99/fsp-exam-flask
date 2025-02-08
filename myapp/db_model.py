@@ -17,6 +17,7 @@ guarantee_stats_map = {
 
 DEFAULT_AVATAR = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAA/UlEQVQYVzWPvy8DYQCGn+/u+l2RlskZBDMSJGxyS4MmBgMzQ4cOIjaLMBmERSwWf0GlMejA0oTRJJEYKupHRBiaSy6qLr7vPnKNd3mW532TV4wNZYyKwREWkVYopbEsi5RjYwyIkYHMH9pJS4duKdDYND4jVKzbwv7qCm5K0pHO0mqGYFsE72/snp4jSltF0+lKvqII23YJwoBBr5fnp1qyKio7a2Z+85BFf4+CX0dmuziqeJSvNjjZLiKOC7PG6+vHcXs4q1aT1lJ+mteXe+ofDcTBcs5IoSldXjM3PJ4IF3c3LPiThM0fxPrMqIljw+3D4/+ZhLmpCVrRN7+WjFb8RvjH7AAAAABJRU5ErkJggg=='
 
+
 # 问卷表模型
 class Survey(db.Model):
     __tablename__ = 'surveys'  # 指定表名
@@ -85,6 +86,7 @@ class User(UserMixin, db.Model):
     guarantees = db.relationship('Guarantee', foreign_keys='Guarantee.guarantee_id', backref='guarantor', lazy=True)
     applicant = db.relationship('Guarantee', foreign_keys='Guarantee.applicant_id', backref='applicant', lazy=True)
     responses = db.relationship('Response', backref='user', lazy=True, cascade='all, delete')  # 与答卷表建立一对多关系，级联删除
+
     def __init__(self, username: str, user_qq: str = '1', role: str = 'user'):
         self.username = username
         self.user_qq = user_qq
@@ -102,7 +104,8 @@ class User(UserMixin, db.Model):
 class Response(db.Model):
     __tablename__ = 'responses'  # 指定表名
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)  # 主键，答卷唯一标识，自增
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'), nullable=False)  # 答题用户id，外键，关联用户表，级联删除
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'),
+                        nullable=False)  # 答题用户id，外键，关联用户表，级联删除
     survey_id = db.Column(db.Integer, db.ForeignKey('surveys.id', ondelete='CASCADE'),
                           nullable=False)  # 所答问卷id，外键，关联问卷表，级联删除
     response_time = db.Column(db.DateTime, default=datetime.utcnow)  # 答卷时间，默认为当前时间
@@ -152,6 +155,7 @@ class Whitelist(db.Model):
         self.user_id = user_id
         self.player_name = player_name
         self.player_uuid = player_uuid
+
 
 class Token(db.Model):
     id = db.Column(db.Integer, primary_key=True)
