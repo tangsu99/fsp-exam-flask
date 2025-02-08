@@ -71,7 +71,16 @@ def register():
             db.session.add(user)
             db.session.commit()
             token = create_token(user)
-            return jsonify({'code': 0, 'desc': '成功', 'token': token})
+            return jsonify(
+                {
+                    'code': 0,
+                    'desc': '成功',
+                    'token': token,
+                    'username': user.username,
+                    'avatar': user.avatar,
+                    'isAdmin': user.role == 'admin'
+                }
+            )
         return jsonify({'code': 2, 'desc': '密码与重复密码不一致'})
     return jsonify({'code': 1, 'desc': '表单错误'})
 
