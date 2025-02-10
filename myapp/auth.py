@@ -1,8 +1,8 @@
 from datetime import datetime, timedelta
 
 import jwt
-from flask import Blueprint, jsonify, render_template, request, current_app
-from flask_login import current_user, login_user
+from flask import Blueprint, jsonify, request, current_app
+from flask_login import current_user, login_user, login_required
 
 from myapp.db_model import User, Token, DEFAULT_AVATAR, Whitelist
 from myapp import db
@@ -38,19 +38,18 @@ def login():
 
 
 @auth.route('/logout', methods=['POST'])
+@login_required
 def logout():
     if current_user.is_authenticated:
         # 用户已登录
-        Token.query.filter_by(user=current_user).delete()
+        token: str = request.headers.get('Authorization')
+        if token and token.startswith('Bearer '):
+            token = token.replace('Bearer ', '', 1)
+        Token.query.filter_by(token=token).delete()
+        db.session.commit()
         return jsonify({
             'code': 0,
             'desc': '退出成功'
-        })
-    else:
-        # 用户未登录
-        return jsonify({
-            'code': 1,
-            'desc': '用户是未登录状态'
         })
 
 
