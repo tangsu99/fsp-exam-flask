@@ -23,7 +23,8 @@ def create_app():
             "/default/*": {"origins": "*"},
             "/api/*": {"origins": "*"},
             "/guarantee/*": {"origins": "*"},
-            "/auth/*": {"origins": "*"}
+            "/auth/*": {"origins": "*"},
+            "/admin/*": {"origins": "*"}
         }
     )
 

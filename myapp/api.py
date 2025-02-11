@@ -24,15 +24,6 @@ def whitelist(player: str):
     return jsonify(response_data)
 
 
-@api.route('/whitelists', methods=['GET'])
-def whitelists():
-    result = Whitelist.query.all()
-    response_data = {'code': 0, 'desc': 'yes', 'list': []}
-    for i in result:
-        response_data['list'].append({'name': i.player_name, 'uuid': i.player_uuid})
-    return jsonify(response_data)
-
-
 @api.route('/whitelistAdd', methods=['POST'])
 @login_required
 def add_whitelist():
