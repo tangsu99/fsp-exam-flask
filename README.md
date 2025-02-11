@@ -5,6 +5,7 @@
  * Windows
  ```
  pip install -r requirement.txt 
+ cp .env.example .env
  ```
 
 ## Run
