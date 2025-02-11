@@ -9,3 +9,4 @@ toml==0.10.2
 flask-login
 pillow
 requests
+python-dotenv

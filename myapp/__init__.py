@@ -1,10 +1,12 @@
 from datetime import datetime
 
-from flask import Flask, redirect, url_for, render_template, Request, jsonify
+from flask import Flask, Request, jsonify
 from flask_bcrypt import Bcrypt
 from flask_cors import CORS
 from flask_login import LoginManager
 from flask_sqlalchemy import SQLAlchemy
+from dotenv import load_dotenv
+import os
 
 login_manager: LoginManager = LoginManager()
 db: SQLAlchemy = SQLAlchemy()
@@ -12,12 +14,13 @@ bcrypt: Bcrypt = Bcrypt()
 
 
 def create_app():
+    load_dotenv()
     app = Flask(__name__)
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///your_database.db'  # 测试数据库
+    app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL')  # 测试数据库
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-    app.config['SECRET_KEY'] = 'c4329f5e3bc9daf6cd2b82bf9355a5d2'  # 用于安全签名session
+    app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')   # 用于安全签名session
     app.config['SESSION_PROTECTION'] = None  # 禁用会话保护
-    app.config['API_TOKEN'] = '5d0f1a51226e42a8b35908823eadfcab'
+    app.config['API_TOKEN'] = os.getenv('API_TOKEN')
 
     cors = CORS(app, resources={
             "/default/*": {"origins": "*"},
