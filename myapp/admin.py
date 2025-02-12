@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify, render_template, request
 from flask_login import login_required
-from myapp.db_model import Question, Survey, Option, question_type_map, Whitelist
+from myapp.db_model import Question, Survey, Option, question_type_map, Whitelist, User
 from myapp import db
 from myapp.utils import required_role
 
@@ -72,4 +72,25 @@ def whitelists():
     response_data = {'code': 0, 'desc': 'yes', 'list': []}
     for i in result:
         response_data['list'].append({'id': i.id, 'uid': i.user_id, 'name': i.player_name, 'uuid': i.player_uuid})
+    return jsonify(response_data)
+
+
+@admin.route('/users', methods=['GET'])
+@login_required
+@required_role('admin')
+def whitelists():
+    result: User = User.query.all()
+    response_data = {'code': 0, 'desc': 'yes', 'list': []}
+    for i in result:
+        response_data['list'].append(
+            {
+                'id': i.id,
+                'username': i.username,
+                'userQQ': i.user_qq,
+                'role': i.role,
+                'addtime': i.addtime,
+                'avatar': i.avatar,
+                'status': i.status
+            }
+        )
     return jsonify(response_data)
