@@ -104,6 +104,8 @@ class User(UserMixin, db.Model):
 class Response(db.Model):
     __tablename__ = 'responses'  # 指定表名
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)  # 主键，答卷唯一标识，自增
+    is_completed = db.Column(db.Boolean, default=False)  # 完成状态，默认为False（未完成）
+    is_reviewed = db.Column(db.Boolean, default=False)  # 阅卷状态，默认为False（未阅卷）
     user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'),
                         nullable=False)  # 答题用户id，外键，关联用户表，级联删除
     survey_id = db.Column(db.Integer, db.ForeignKey('surveys.id', ondelete='CASCADE'),

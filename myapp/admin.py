@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify, render_template, request
 from flask_login import login_required
-from myapp.db_model import Question, Survey, Option, question_type_map, Whitelist, User
+from myapp.db_model import Question, Survey, Option, question_type_map, Whitelist, User, Response
 from myapp import db
 from myapp.utils import required_role
 
@@ -67,7 +67,7 @@ def add_question():
 @admin.route('/whitelist', methods=['GET'])
 @login_required
 @required_role('admin')
-def whitelists():
+def whitelist():
     result = Whitelist.query.all()
     response_data = {'code': 0, 'desc': 'yes', 'list': []}
     for i in result:
@@ -78,8 +78,8 @@ def whitelists():
 @admin.route('/users', methods=['GET'])
 @login_required
 @required_role('admin')
-def whitelists():
-    result: User = User.query.all()
+def users():
+    result = User.query.all()
     response_data = {'code': 0, 'desc': 'yes', 'list': []}
     for i in result:
         response_data['list'].append(
@@ -94,3 +94,25 @@ def whitelists():
             }
         )
     return jsonify(response_data)
+
+
+@admin.route("/responses", methods=['GET'])
+@login_required
+@required_role('admin')
+def get_responses():
+    result = Response.query.all()
+    response_data = {'code': 0, 'desc': 'yes', 'list': []}
+    for i in result:
+        response_data['list'].append(
+            {
+                'id': i.id,
+                'isCompleted': i.is_completed,
+                'isReviewed': i.is_reviewed,
+                'username': i.user.username,
+                'survey': i.survey.name,
+                'responseTime': i.response_time,
+                'createTime': i.create_time
+            }
+        )
+    return jsonify(response_data)
+
