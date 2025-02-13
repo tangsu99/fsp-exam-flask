@@ -27,7 +27,8 @@ def create_app():
             "/api/*": {"origins": "*"},
             "/guarantee/*": {"origins": "*"},
             "/auth/*": {"origins": "*"},
-            "/admin/*": {"origins": "*"}
+            "/admin/*": {"origins": "*"},
+            "/user/*": {"origins": "*"}
         }
     )
 
@@ -45,6 +46,7 @@ def create_app():
     # 导入蓝图
     from myapp.api import api
     from myapp.auth import auth, verify_token
+    from myapp.user import user
     from myapp.admin import admin
     from myapp.default import default
     from myapp.guarantee import guarantee
@@ -52,6 +54,7 @@ def create_app():
     # 注册蓝图
     app.register_blueprint(api, url_prefix='/api')
     app.register_blueprint(auth, url_prefix='/auth')
+    app.register_blueprint(user, url_prefix='/user')
     app.register_blueprint(admin, url_prefix='/admin')
     app.register_blueprint(default, url_prefix='/default')
     app.register_blueprint(guarantee, url_prefix='/guarantee')
