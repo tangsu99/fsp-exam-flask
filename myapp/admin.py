@@ -19,6 +19,7 @@ def admin_index():
 @required_role('admin')
 def all_question():
     result = Question.query.all()
+    response_data = {'code': 0, 'desc': 'yes', 'list': []}
     data = []
     for i in result:
         options = []
@@ -34,7 +35,8 @@ def all_question():
             'score': i.score,
             'options': options
         })
-    return jsonify(data)
+        response_data.list = data
+    return jsonify(response_data)
 
 
 @admin.route("/addSurvey", methods=['POST'])
