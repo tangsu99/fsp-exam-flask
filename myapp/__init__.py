@@ -12,6 +12,8 @@ login_manager: LoginManager = LoginManager()
 db: SQLAlchemy = SQLAlchemy()
 bcrypt: Bcrypt = Bcrypt()
 
+cors = CORS()
+
 
 def create_app():
     load_dotenv()
@@ -22,13 +24,8 @@ def create_app():
     app.config['SESSION_PROTECTION'] = None  # 禁用会话保护
     app.config['API_TOKEN'] = os.getenv('API_TOKEN')
 
-    cors = CORS(app, resources={
-            "/default/*": {"origins": "*"},
-            "/api/*": {"origins": "*"},
-            "/guarantee/*": {"origins": "*"},
-            "/auth/*": {"origins": "*"},
-            "/admin/*": {"origins": "*"},
-            "/user/*": {"origins": "*"}
+    cors.init_app(app=app, resources={
+            "*": {"origins": '*'},
         }
     )
 

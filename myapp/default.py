@@ -1,10 +1,13 @@
 from flask import Blueprint, jsonify
+from flask_login import login_required
+
 from myapp.db_model import Survey, question_type_map
 
 default = Blueprint('default', __name__)
 
 
 @default.route("/survey/<int:sid>", methods=['get'])
+@login_required
 def get_survey(sid: int):
     # 查询指定问卷
     survey = Survey.query.get(sid)
