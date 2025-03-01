@@ -49,41 +49,41 @@ def get_whitelist():
     return jsonify(res)
 
 
-@user.route('/setAvatar', methods=['POST'])
+# @user.route('/setAvatar', methods=['POST'])
+# @login_required
+# def set_avatar():
+#     # 获取请求数据
+#     req_data = request.json
+#
+#     # 检查是否提供了头像 URL
+#     if not req_data or 'avatarUrl' not in req_data:
+#         return jsonify({
+#             'code': 1,
+#             'desc': '缺少头像 URL 参数！'
+#         }), 400
+#
+#     avatar_url = req_data['avatarUrl']
+#
+#     # 修改用户头像
+#     try:
+#         current_user.avatar = avatar_url
+#         db.session.commit()
+#         return jsonify({
+#             'code': 0,
+#             'desc': '头像修改成功！'
+#         })
+#     except Exception as e:
+#         db.session.rollback()
+#         return jsonify({
+#             'code': 3,
+#             'desc': f'头像修改失败：{str(e)}'
+#         }), 500
+
+
+
+@user.route('/setAvatar', methods=['GET'])
 @login_required
 def set_avatar():
-    # 获取请求数据
-    req_data = request.json
-
-    # 检查是否提供了头像 URL
-    if not req_data or 'avatarUrl' not in req_data:
-        return jsonify({
-            'code': 1,
-            'desc': '缺少头像 URL 参数！'
-        }), 400
-
-    avatar_url = req_data['avatarUrl']
-
-    # 修改用户头像
-    try:
-        current_user.avatar = avatar_url
-        db.session.commit()
-        return jsonify({
-            'code': 0,
-            'desc': '头像修改成功！'
-        })
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({
-            'code': 3,
-            'desc': f'头像修改失败：{str(e)}'
-        }), 500
-
-
-
-@user.route('/get_avatar', methods=['GET'])
-@login_required
-def get_avatar():
     player_uuid = request.args.get('uuid')
     if not player_uuid:
         return jsonify({
