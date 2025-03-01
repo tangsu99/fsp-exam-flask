@@ -20,3 +20,19 @@ def getUserInfo():
         }
     })
 
+
+@user.route('/getWhitelist')
+@login_required
+def get_whitelist():
+    temp = current_user.whitelist
+    res = {
+        'code': 0,
+        'list': [],
+    }
+    for item in temp:
+        res['list'].append({
+            'id': item.id,
+            'name': item.player_name,
+            'uuid': item.player_uuid,
+        })
+    return jsonify(res)

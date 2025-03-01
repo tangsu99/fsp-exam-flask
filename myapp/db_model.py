@@ -83,6 +83,7 @@ class User(UserMixin, db.Model):
     status = db.Column(db.Integer, nullable=False, default=0)  # 0 未激活 1 正常 2 临时封禁 3 永久封禁
     # is_active = db.Column(db.Boolean, default=True)  # 默认为 True
     tokens = db.relationship('Token', backref='user', lazy=True)
+    whitelist = db.relationship('Whitelist', backref='wuser', lazy=True)
     guarantees = db.relationship('Guarantee', foreign_keys='Guarantee.guarantee_id', backref='guarantor', lazy=True)
     applicant = db.relationship('Guarantee', foreign_keys='Guarantee.applicant_id', backref='applicant', lazy=True)
     responses = db.relationship('Response', backref='user', lazy=True, cascade='all, delete')  # 与答卷表建立一对多关系，级联删除
