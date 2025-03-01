@@ -1,9 +1,18 @@
+import os
+
 from flask import Blueprint, jsonify, request
 from flask_login import login_required, current_user
 
+from mj_api import get_profile_pic, get_player_uuid
 from myapp import db
+from myapp.db_model import Whitelist
 
 user = Blueprint('user', __name__)
+
+
+AVATAR_DIR = "static/avatar"
+if not os.path.exists(AVATAR_DIR):
+    os.makedirs(AVATAR_DIR)
 
 
 @user.route('/getInfo')
@@ -70,3 +79,70 @@ def set_avatar():
             'desc': f'头像修改失败：{str(e)}'
         }), 500
 
+
+
+@user.route('/get_avatar', methods=['GET'])
+@login_required
+def get_avatar():
+    player_uuid = request.args.get('uuid')
+    if not player_uuid:
+        return jsonify({
+            'code': 1,
+            'desc': 'UUID为空！'
+        }), 400
+
+    wl = current_user.whitelist
+
+    if len(wl) == 0:
+        return jsonify({
+            'code': 2,
+            'desc': '用户不存在白名单！'
+        }), 404
+    wl_item: Whitelist = uuidInWl(wl, player_uuid)
+    if wl_item is None:
+        return jsonify({
+            'code': 3,
+            'desc': '此UUID不属于用户！'
+        }), 403
+
+    name = wl_item.player_name
+    uuid = wl_item.player_uuid
+
+    cache_path = os.path.join(AVATAR_DIR, f'{name}:{uuid}.png')
+    # 检查缓存中是否已有该玩家的头像
+    # if os.path.exists(cache_path):
+    #     return jsonify({"avatar_url": f"/cache/{uuid}.png"})
+
+    # 获取并缓存头像
+    try:
+        avatar_binary = get_profile_pic(uuid)
+        with open(cache_path, "wb") as f:
+            f.write(avatar_binary)
+
+        # 修改用户头像
+        try:
+            current_user.avatar = f'/static/avatar/{name}:{uuid}.png'
+            db.session.commit()
+            return jsonify({
+                'code': 0,
+                'avatar_url': f'/static/avatar/{name}:{uuid}.png',
+                'desc': '更改成功'
+            })
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({
+                'code': 5,
+                'desc': f'头像修改失败：{str(e)}'
+            }), 500
+    except Exception as e:
+        return jsonify({
+            'code': 5,
+            "desc": str(e)
+        }), 500
+
+
+def uuidInWl(wl, uuid):
+    for item in wl:
+        if item['uuid'] == uuid:
+            return item
+    return None
