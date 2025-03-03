@@ -99,7 +99,7 @@ def check_login():
         return jsonify({
             'code': 1,
             'desc': 'User is not logged in',
-            'avatar': DEFAULT_AVATAR
+            'avatar': 'b83565e6-b0d0-4265-bb4f-fdb5e8d00655'
         })
 
 
