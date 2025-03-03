@@ -71,6 +71,7 @@ def add_question():
         req_data["options"],
         req_data["answer"],
     )
+
     db.session.add(question)
     db.session.commit()
     options = req_data["options"]
