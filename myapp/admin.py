@@ -62,7 +62,6 @@ def add_survey():
 @required_role("admin")
 def add_question():
     req_data = request.json
-    print(req_data)
     question: Question = Question(
         req_data["survey"],
         req_data["title"],
