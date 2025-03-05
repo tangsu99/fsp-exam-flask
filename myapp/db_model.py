@@ -67,15 +67,11 @@ class Question(db.Model):
         question_text: str,
         question_type: int,
         score: int,
-        options: list,
-        answer: list,
     ):
         self.survey_id = survey_id
         self.question_text = question_text
         self.question_type = question_type
         self.score = score
-        self.options = options
-        self.answer = answer
 
 
 # 选项表模型
