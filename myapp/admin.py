@@ -68,15 +68,13 @@ def add_question():
         req_data["title"],
         req_data["type"],
         req_data["score"],
-        req_data["options"],
-        req_data["answer"],
     )
 
     db.session.add(question)
     db.session.commit()
     options = req_data["options"]
     for i in options:
-        option: Option = Option(question.id, i, i == req_data["answer"])
+        option: Option = Option(question.id, i['option'], i["isAnswer"])
         db.session.add(option)
     db.session.commit()
     return jsonify({"code": 0, "desc": "成功"})
