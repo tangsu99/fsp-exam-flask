@@ -1,14 +1,13 @@
-from PIL import Image
 import base64
-import requests
-from io import BytesIO
 import json
+from io import BytesIO
+
+import requests
+from PIL import Image
 
 
 def get_skin_url(uuid: str) -> str:
-    player_info_url: str = (
-        f"https://sessionserver.mojang.com/session/minecraft/profile/{uuid}"
-    )
+    player_info_url: str = f"https://sessionserver.mojang.com/session/minecraft/profile/{uuid}"
     response = requests.get(player_info_url)
     base64_data: str = response.json()["properties"][0]["value"]
     decoded_data = base64.b64decode(base64_data).decode("utf-8")
@@ -18,14 +17,12 @@ def get_skin_url(uuid: str) -> str:
 
 
 def get_player_uuid(name: str) -> tuple:
-    player_profile_url: str = (
-        f"https://api.mojang.com/users/profiles/minecraft/{name}"
-    )
+    player_profile_url: str = f"https://api.mojang.com/users/profiles/minecraft/{name}"
     response = requests.get(player_profile_url)
     if response.status_code == 200:
         data = response.json()
-        uuid: str = data['id']
-        name: str = data['name']
+        uuid: str = data["id"]
+        name: str = data["name"]
         return name, uuid
     return None
 

@@ -1,15 +1,16 @@
 from flask import Blueprint, jsonify, render_template, request
 from flask_login import login_required
-from myapp.db_model import (
-    Question,
-    Survey,
-    Option,
-    question_type_map,
-    Whitelist,
-    User,
-    Response,
-)
+
 from myapp import db
+from myapp.db_model import (
+    Option,
+    Question,
+    Response,
+    Survey,
+    User,
+    Whitelist,
+    question_type_map,
+)
 from myapp.utils import required_role
 
 admin = Blueprint("admin", __name__)
@@ -73,7 +74,7 @@ def add_question():
     db.session.commit()
     options = req_data["options"]
     for i in options:
-        option: Option = Option(question.id, i['option'], i["isAnswer"])
+        option: Option = Option(question.id, i["option"], i["isAnswer"])
         db.session.add(option)
     db.session.commit()
     return jsonify({"code": 0, "desc": "成功"})
