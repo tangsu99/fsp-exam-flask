@@ -183,7 +183,7 @@ def get_survey(sid: int):
         # 查询题目中的所有选项
         for option in question.options:
             question_data["options"].append(
-                {"id": option.id, "text": option.option_text}
+                {"id": option.id, "text": option.option_text, 'isCorrect': option.is_correct}
             )
 
         survey_data["questions"].append(question_data)
