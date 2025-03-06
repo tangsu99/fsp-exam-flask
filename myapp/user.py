@@ -1,7 +1,7 @@
 import os
 
 from flask import Blueprint, jsonify, request
-from flask_login import login_required, current_user
+from flask_login import current_user, login_required
 
 from myapp import db
 from myapp.db_model import Whitelist
