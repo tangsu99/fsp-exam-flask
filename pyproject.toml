@@ -1,0 +1,21 @@
+[tool.ruff]
+line-length = 120  # 代码最大行宽
+select = [         # 选择的规则
+    "F",
+    "E",
+    "W",
+    "UP",
+]
+ignore = ["F401"]  # 忽略的规则
+
+# 常见的规则如下：
+
+# 标识   规则	                         简介
+# F	    pyflakes	                    提供了一些比较基础的问题检查
+# E,W	pycodestyle errors, warnings	PEP8 检查
+# I	    isort	                        对 import 语句进行排序
+# UP	pyupgrade	                    提示新版本的 Python 语法
+# N	    pep8-naming	                    PEP8 命名规范检查
+# PL	Pylint	                        知名静态代码检查器
+# PERF	pyperf	                        检测一些性能问题
+# RUF	Ruff	                        Ruff 社区自己实现的一些规则
