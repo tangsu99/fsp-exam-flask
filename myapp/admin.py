@@ -146,7 +146,7 @@ def get_responses():
                 "isCompleted": i.is_completed,
                 "isReviewed": i.is_reviewed,
                 "username": i.user.username,
-                "survey": i.survey.name,
+                "survey": i.survey_res.name,
                 "responseTime": i.response_time,
                 "createTime": i.create_time,
             }
