@@ -27,6 +27,12 @@ class Survey(db.Model):
     questions = db.relationship(
         "Question", backref="survey", lazy=True, cascade="all, delete"
     )  # 与问题表建立一对多关系，级联删除
+    response = db.relationship(
+        "Response", backref="survey_res", lazy=True, cascade="all, delete"
+    )  # 与答卷表建立一对多关系，级联删除
+    type = db.relationship(
+        "QuestionType", backref="survey_q", lazy=True, cascade="all, delete"
+    )
 
     def __init__(self, name: str, description: str, status: int = 0):
         self.name = name
@@ -49,6 +55,9 @@ class Question(db.Model):
     options = db.relationship(
         "Option", backref="question", lazy=True, cascade="all, delete"
     )  # 与选项表建立一对多关系，级联删除
+    response_details = db.relationship(
+        "ResponseDetail", backref="question_r_d", lazy=True, cascade="all, delete"
+    )
 
     def __init__(
         self,
@@ -129,6 +138,8 @@ class Response(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)  # 主键，答卷唯一标识，自增
     is_completed = db.Column(db.Boolean, default=False)  # 完成状态，默认为False（未完成）
     is_reviewed = db.Column(db.Boolean, default=False)  # 阅卷状态，默认为False（未阅卷）
+    player_name = db.Column(db.String(25), nullable=False)
+    player_uuid = db.Column(db.String(36), nullable=False)
     user_id = db.Column(
         db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )  # 答题用户id，外键，关联用户表，级联删除
@@ -138,8 +149,14 @@ class Response(db.Model):
     response_time = db.Column(db.DateTime, default=datetime.utcnow)  # 答卷时间，默认为当前时间
     create_time = db.Column(db.DateTime, default=datetime.utcnow)  # 答卷记录创建时间，默认为当前时间
     response_details = db.relationship(
-        "ResponseDetail", backref="response", lazy=True, cascade="all, delete"
+        "ResponseDetail", backref="response_d", lazy=True, cascade="all, delete"
     )  # 与答题详情表建立一对多关系，级联删除
+
+    def __init__(self, user_id: int, survey_id: int, player_name: str, player_uuid: str):
+        self.user_id = user_id
+        self.survey_id = survey_id
+        self.player_name = player_name
+        self.player_uuid = player_uuid
 
 
 # 答题详情表模型
@@ -190,7 +207,7 @@ class Whitelist(db.Model):
     player_name = db.Column(db.String(25), nullable=False)
     player_uuid = db.Column(db.String(36), nullable=False)
 
-    def __init__(self, user_id, player_name: str, player_uuid: str):
+    def __init__(self, user_id: int, player_name: str, player_uuid: str):
         self.user_id = user_id
         self.player_name = player_name
         self.player_uuid = player_uuid
@@ -208,3 +225,14 @@ class Token(db.Model):
         self.user_id = user_id
         self.token = token
         self.expires_at = datetime.utcnow() + timedelta(seconds=expires_in)
+
+
+class QuestionType(db.Model):
+    __tablename__ = "question_type"
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    type_name = db.Column(db.String(25), nullable=False)
+    survey_id = db.Column(db.Integer, db.ForeignKey("surveys.id"), nullable=False)
+
+    def __init__(self, type_name: str, survey_id: int):
+        self.type_name = type_name
+        self.survey_id = survey_id
