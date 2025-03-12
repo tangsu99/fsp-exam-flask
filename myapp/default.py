@@ -23,6 +23,7 @@ def get_survey(sid: int):
         "create_time": survey.create_time,
         "status": survey.status,
         "questions": [],
+        "type": survey.type[0].type_name,
     }
     # 查询问卷中的所有题目
     for question in survey.questions:
@@ -49,12 +50,31 @@ def awa(response):
     return None
 
 
+@default.route('/check_survey', methods=['POST'])
+@login_required
+def check_survey():
+    user: User = current_user
+    # 检查用户是否有未完成的答卷
+    existing_response = user.responses
+    res: Response = awa(existing_response)
+    if res is not None:
+        return jsonify({"code": 1, "desc": "您有未完成问卷！", "response": res.id})
+
+    return jsonify({'code': 0, 'desc': '暂无问卷! '})
+
+
 @default.route('/start_survey', methods=['POST'])
 @login_required
 def start_survey():
+    user: User = current_user
+    # 检查用户是否有未完成的答卷
+    existing_response = user.responses
+    res: Response = awa(existing_response)
+    if res is not None:
+        return jsonify({"code": 1, "desc": "您有未完成问卷！", "response": res.id})
+
     data = request.get_json()
     type_ = data["playerType"]
-    user: User = current_user
     survey = QuestionType.query.filter_by(type_name=type_).first().survey_q
 
     mc_name = data.get("playerName")  # Minecraft 名称
@@ -62,12 +82,6 @@ def start_survey():
 
     if not all([survey, mc_name, mc_uuid]):
         return jsonify({"code": 2, "desc": "字段无效！"}), 400
-
-    # 检查用户是否有未完成的答卷
-    existing_response = user.responses
-    res: Response = awa(existing_response)
-    if res is not None:
-        return jsonify({"code": 1, "desc": "您有未完成问卷！", "response": res.id}), 400
 
     # 创建新的答卷
     new_response = Response(
@@ -79,11 +93,9 @@ def start_survey():
     db.session.add(new_response)
     db.session.commit()
 
-    print(new_response)
-
     return jsonify({
         "code": 0,
-        "desc": "Survey started successfully",
+        "desc": "问卷开始！",
         "response": new_response.id,
     }), 201
 
