@@ -36,6 +36,9 @@ def get_survey(sid: int):
         }
         # 查询题目中的所有选项
         for option in question.options:
+            if question.question_type == 3 or question.question_type == 4:
+                question_data["options"].append({"id": option.id, "text": '此处作答'})
+                continue
             question_data["options"].append({"id": option.id, "text": option.option_text})
 
         survey_data["questions"].append(question_data)
