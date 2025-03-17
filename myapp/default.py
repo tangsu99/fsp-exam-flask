@@ -103,89 +103,58 @@ def start_survey():
     }), 201
 
 
-@default.route('/submit_response_detail', methods=['POST'])
+@default.route('/complete_survey', methods=['POST'])
 @login_required
-def submit_response_detail():
+def complete_survey():
     data = request.get_json()
     user: User = current_user
     res: Response = awa(user.responses)
     if res is None:
         return jsonify({"code": 1, "desc": "问卷未找到！"}), 400
     response_id = res.id  # 答卷ID
-    question_id = data.get('questionId')  # 问题ID
-    answer = data.get("answer")  # 用户答案
-
-    if not all([response_id, question_id, answer]):
-        return jsonify({"code": 2, "desc": "字段无效！"}), 400
-
-    # 创建答题详情
-    question: Question = Question.query.get(question_id)
-    if question.question_type == 2: # 处理多选
-        for i in answer:
-            new_response_detail = ResponseDetail(
-                response_id=response_id,
-                question_id=question_id,
-                answer=i,
-            )
-            db.session.add(new_response_detail)
-    else:
-        new_response_detail = ResponseDetail(
-            response_id=response_id,
-            question_id=question_id,
-            answer=answer,
-        )
-        db.session.add(new_response_detail)
-    db.session.commit()
-
-    return jsonify({"desc": "成功！"}), 201
-
-
-def count_s(li: list[ResponseDetail]):
-    count = 0
-    for item in li:
-        option: Option = Option.query.get(int(item.answer))
-        if option.is_correct:
-            count += item.question_r_d.score
-    return count
-
-#
-def count_m(li: list[int]):
-    count = 0
-    for item in li:
-        question = Question.query.get(item)
-        # todo 实现多选计分，错一个无分， 少选无分
-    return count
-
-
-@default.route('/complete_survey', methods=['POST'])
-@login_required
-def complete_survey():
-    user: User = current_user
-    res: Response = awa(user.responses)
-    if res is None:
-        return jsonify({"code": 1, "desc": "问卷未找到！"}), 400
-
-    # 标记答卷为已完成
-    res.is_completed = True
-    db.session.commit()
 
     # 计算选择与判断分数
     count_score = 0
 
-    # 获取单选和多选
-    ques_s = []
-    ques_m = {}
-    for item in res.response_details:
-        if item.question_r_d.question_type == 1:
-            ques_s.append(item)
-        elif item.question_r_d.question_type == 2:
-            ques_m[item.question_r_d.id] = item.question_r_d.id
+    for i in data:
+        question_id = i.get('id')  # 问题ID
+        answer = i.get("answer")  # 用户答案
+        if answer is None:
+            continue
+        question: Question = Question.query.get(question_id)
 
-    count_score += count_s(ques_s)
-    # count_score += count_m(ques_m.)
-    print(ques_s)
-    print(ques_m)
-    print(count_score)
+        # 获取问题的正确选项
+        correct_options = [option.id for option in question.options if option.is_correct]
 
+        # 处理单选题
+        if question.question_type == 1:  # 单选题
+            if len(answer) == 1 and answer[0] in correct_options:
+                count_score += question.score  # 答案正确，累加分数
+
+        # 处理多选题
+        elif question.question_type == 2:  # 多选题
+            if set(answer) == set(correct_options):  # 用户答案与正确选项完全匹配
+                count_score += question.score  # 答案正确，累加分数
+
+        # 创建答题详情
+        if question.question_type == 2:  # 处理多选
+            for j in answer:
+                new_response_detail = ResponseDetail(
+                    response_id=response_id,
+                    question_id=question_id,
+                    answer=j,
+                )
+                db.session.add(new_response_detail)
+        else:
+            new_response_detail = ResponseDetail(
+                response_id=response_id,
+                question_id=question_id,
+                answer=answer[0],
+            )
+            db.session.add(new_response_detail)
+
+    # 标记答卷为已完成
+    res.is_completed = True
+    db.session.commit()
 
     return jsonify({"code": 0, "desc": "提交成功！", "score": count_score}), 200
