@@ -61,7 +61,7 @@ def check_survey():
     existing_response = user.responses
     res: Response = awa(existing_response)
     if res is not None:
-        return jsonify({"code": 1, "desc": "您有未完成问卷！", "response": res.id})
+        return jsonify({"code": 1, "desc": "您有未完成问卷！", "response": res.survey_id})
 
     return jsonify({'code': 0, 'desc': '暂无问卷! '})
 
@@ -74,7 +74,7 @@ def start_survey():
     existing_response = user.responses
     res: Response = awa(existing_response)
     if res is not None:
-        return jsonify({"code": 1, "desc": "您有未完成问卷！", "response": res.id})
+        return jsonify({"code": 1, "desc": "您有未完成问卷！", "response": res.survey_id})
 
     data = request.get_json()
     type_ = data["playerType"]
