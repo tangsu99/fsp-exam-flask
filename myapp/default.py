@@ -99,7 +99,7 @@ def start_survey():
     return jsonify({
         "code": 0,
         "desc": "问卷开始！",
-        "response": new_response.id,
+        "response": new_response.survey_id,
     }), 201
 
 
