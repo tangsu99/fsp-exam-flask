@@ -73,13 +73,7 @@ def create_app():
     # 使用 request_loader 自定义加载逻辑
     @login_manager.request_loader
     def load_user_from_request(request: Request):
-        # 尝试从查询参数中获取 API 密钥
-        # api_key = request.args.get('token')
-        # if api_key:
-        #     user = User.query.filter_by(api_key=api_key).first()
-        #     if user:
-        #         return user
-        # 尝试从 HTTP 头中获取 API 密钥
+        # 尝试从查询参数中获取 token
         token: str | None = request.headers.get("Authorization")
         if token and token.startswith("Bearer "):
             token = token.replace("Bearer ", "", 1)  # 假设使用 Bearer 认证
@@ -87,7 +81,7 @@ def create_app():
             if (
                 token_record
                 and not token_record.is_revoked
-                and token_record.expires_at > datetime.now(timezone.utc)
+                and token_record.expires_at.replace(tzinfo=timezone.utc) > datetime.now(timezone.utc)
             ):
                 return token_record.user
         # 如果两种方式都未找到用户，返回 None
