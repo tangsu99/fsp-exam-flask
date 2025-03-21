@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from typing import cast
 from flask import Blueprint, jsonify, request
 from flask_login import current_user, login_required
@@ -208,6 +209,7 @@ def complete_survey():
 
     # 标记答卷为已完成
     res.is_completed = True
+    res.response_time = datetime.now(timezone.utc)
     db.session.commit()
 
     return jsonify({"code": 0, "desc": "提交成功！", "score": count_score}), 200
