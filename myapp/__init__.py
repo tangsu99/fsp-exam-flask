@@ -1,5 +1,5 @@
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 
 from dotenv import load_dotenv
 from flask import Flask, Request, jsonify
@@ -87,7 +87,7 @@ def create_app():
             if (
                 token_record
                 and not token_record.is_revoked
-                and token_record.expires_at > datetime.utcnow()
+                and token_record.expires_at > datetime.now(timezone.utc)
             ):
                 return token_record.user
         # 如果两种方式都未找到用户，返回 None
