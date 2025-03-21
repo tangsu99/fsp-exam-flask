@@ -87,9 +87,7 @@ def whitelist():
     result = Whitelist.query.all()
     response_data = {"code": 0, "desc": "yes", "list": []}
     for i in result:
-        response_data["list"].append(
-            {"id": i.id, "uid": i.user_id, "name": i.player_name, "uuid": i.player_uuid}
-        )
+        response_data["list"].append({"id": i.id, "uid": i.user_id, "name": i.player_name, "uuid": i.player_uuid})
     return jsonify(response_data)
 
 
@@ -147,6 +145,7 @@ def get_responses():
                 "isReviewed": i.is_reviewed,
                 "username": i.user.username,
                 "survey": i.survey_res.name,
+                "surveyId": i.survey_res.id,
                 "responseTime": i.response_time,
                 "createTime": i.create_time,
             }
@@ -183,7 +182,7 @@ def get_survey(sid: int):
         # 查询题目中的所有选项
         for option in question.options:
             question_data["options"].append(
-                {"id": option.id, "text": option.option_text, 'isCorrect': option.is_correct}
+                {"id": option.id, "text": option.option_text, "isCorrect": option.is_correct}
             )
 
         survey_data["questions"].append(question_data)
