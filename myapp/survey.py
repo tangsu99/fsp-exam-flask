@@ -1,3 +1,4 @@
+from typing import cast
 from flask import Blueprint, jsonify, request
 from flask_login import current_user, login_required
 
@@ -5,12 +6,12 @@ from myapp import db
 from myapp.db_model import (
     User,
     Survey,
-    question_type_map,
+    QuestionCategory,
     Response,
     ResponseDetail,
+    Option,
     QuestionType,
     Question,
-    Option,
 )
 
 survey = Blueprint("survey", __name__)
@@ -38,7 +39,7 @@ def get_survey(sid: int):
         question_data = {
             "id": question.id,
             "title": question.question_text,
-            "type": question_type_map[question.question_type],
+            "type": question.question_type,
             "score": question.score,
             "options": [],
         }
@@ -66,25 +67,24 @@ def awa(response):
 @survey.route("/check_survey", methods=["POST"])
 @login_required
 def check_survey():
-    user: User = current_user
+    user: User = cast(User, current_user)
     # 检查用户是否有未完成的答卷
     existing_response = user.responses
-    res: Response = awa(existing_response)
-    if res is not None:
-        return jsonify(
-            {"code": 1, "desc": "您有未完成问卷！", "response": res.survey_id}
-        )
+    res: Response | None = awa(existing_response)
 
-    return jsonify({"code": 0, "desc": "暂无问卷! "})
+    if res is None:
+        return jsonify({"code": 0, "desc": "暂无问卷! "})
+
+    return jsonify({"code": 1, "desc": "您有未完成问卷！", "response": res.survey_id})
 
 
 @survey.route("/start_survey", methods=["POST"])
 @login_required
 def start_survey():
-    user: User = current_user
+    user: User = cast(User, current_user)
     # 检查用户是否有未完成的答卷
     existing_response = user.responses
-    res: Response = awa(existing_response)
+    res: Response | None = awa(existing_response)
     if res is not None:
         return jsonify(
             {"code": 1, "desc": "您有未完成问卷！", "response": res.survey_id}
@@ -92,7 +92,10 @@ def start_survey():
 
     data = request.get_json()
     type_ = data["playerType"]
-    survey = QuestionType.query.filter_by(type_name=type_).first().survey_q
+    question_type = QuestionType.query.filter_by(type_name=type_).first()
+    if question_type is None:
+        return jsonify({"code": 2, "desc": "未找到指定的问卷类型！"}), 400
+    survey = question_type.survey_q
 
     mc_name = data.get("playerName")  # Minecraft 名称
     mc_uuid = data.get("playerUUID")  # Minecraft UUID
@@ -122,71 +125,86 @@ def start_survey():
     )
 
 
+def objective_question_scoring(user_response: list, question: Question) -> float:
+    # 获取问题的正确选项,列表元素的值为正确选项的ID
+    correct_options = [option.id for option in question.options if option.is_correct]
+
+    if question.question_type == QuestionCategory.SINGLE_CHOICE.value:
+        if user_response[0] in correct_options:
+            return question.score
+
+    elif question.question_type == QuestionCategory.MULTIPLE_CHOICE.value:
+        if set(user_response) == set(correct_options):
+            return question.score
+
+    elif question.question_type == QuestionCategory.FILL_IN_THE_BLANKS.value:
+        new_user_response: str = user_response[0]
+        correct_answer_id: int = correct_options[0]
+        option: Option | None = Option.query.get(correct_answer_id)
+        if option is not None:
+            correct_answer: str = option.option_text
+            if new_user_response == correct_answer:
+                return question.score
+
+    # elif question.question_type == QuestionCategory.SUBJECTIVE.value:
+
+    return 0
+
+
+def make_answer_details(
+    user_response: list[str], question: Question, response_id: int, question_id: int
+) -> list[ResponseDetail]:
+    if question.question_type == QuestionCategory.MULTIPLE_CHOICE:
+        return [
+            ResponseDetail(
+                response_id=response_id,
+                question_id=question_id,
+                answer=answer,
+            )
+            for answer in user_response
+        ]
+    else:
+        return [
+            ResponseDetail(
+                response_id=response_id,
+                question_id=question_id,
+                answer=user_response[0],
+            )
+        ]
+
+
 @survey.route("/complete_survey", methods=["POST"])
 @login_required
 def complete_survey():
     data = request.get_json()
-    user: User = current_user
-    res: Response = awa(user.responses)
+    user: User = cast(User, current_user)
+    res: Response | None = awa(user.responses)
     if res is None:
         return jsonify({"code": 1, "desc": "问卷未找到！"}), 400
-    response_id = res.id  # 答卷ID
+    response_id: int = res.id  # 答卷ID
 
-    # 计算选择与判断分数
-    count_score = 0
+    # 客观题分数
+    count_score: float = 0
 
     for i in data:
-        question_id = i.get("id")  # 问题ID
-        answer = i.get("answer")  # 用户答案
-        bingo = False
+        question_id: int = i.get("id")  # 问题ID
+        answer: list | None = i.get("answer")  # 用户答案
+
+        # 允许空题
         if answer is None:
             continue
-        question: Question = Question.query.get(question_id)
 
-        # 获取问题的正确选项,列表元素的值为正确选项的ID
-        correct_options = [
-            option.id for option in question.options if option.is_correct
-        ]
+        question: Question | None = Question.query.get(question_id)
 
-        # 处理单选题
-        if (
-            question.question_type == 1
-            and len(answer) == 1
-            and answer[0] in correct_options
-        ):
-            bingo = True
-        # 处理多选题
-        elif question.question_type == 2 and set(answer) == set(correct_options):
-            bingo = True
+        if question is None:
+            return jsonify({"code": 1, "desc": "题目未找到！"}), 400
 
-        # 处理填空题
-        elif question.question_type == 3:
-            user_answer: str = answer[0]
-            correct_answer_id = correct_options[0]
-            option: Option = Option.query.get(correct_answer_id)
-            correct_answer: str = option.option_text
-            if user_answer == correct_answer:
-                bingo = True
+        # 累加分数
+        count_score += objective_question_scoring(answer, question)
 
         # 创建答题详情
-        if question.question_type == 2:  # 处理多选
-            for j in answer:
-                new_response_detail = ResponseDetail(
-                    response_id=response_id,
-                    question_id=question_id,
-                    answer=j,
-                )
-                db.session.add(new_response_detail)
-        else:
-            new_response_detail = ResponseDetail(
-                response_id=response_id,
-                question_id=question_id,
-                answer=answer[0],
-            )
-            db.session.add(new_response_detail)
-
-            if bingo:
-                count_score += question.score
+        for detail in make_answer_details(answer, question, response_id, question_id):
+            db.session.add(detail)
 
     # 标记答卷为已完成
     res.is_completed = True

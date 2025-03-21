@@ -38,7 +38,7 @@ def create_app():
     db.init_app(app)
     bcrypt.init_app(app)
 
-    from myapp.db_model import Option, Question, Response, ResponseDetail, Survey, Token, User
+    from myapp.db_model import Token
 
     with app.app_context():
         db.create_all()
@@ -46,7 +46,7 @@ def create_app():
     # 导入蓝图
     from myapp.admin import admin
     from myapp.api import api
-    from myapp.auth import auth, verify_token
+    from myapp.auth import auth
     from myapp.survey import survey
     from myapp.guarantee import guarantee
     from myapp.user import user
@@ -70,10 +70,6 @@ def create_app():
 
     # 管理登录状态的，这个函数是在每次请求时被调用的，它需要从用户 ID 重新创建一个 User 对象
     # 这是因为 User 对象并不会在请求之间保持，所以我们需要在每次请求开始时重新创建它
-    # @login_manager.user_loader
-    # def load_user(user_id):
-    #     return User.query.get(int(user_id))
-
     # 使用 request_loader 自定义加载逻辑
     @login_manager.request_loader
     def load_user_from_request(request: Request):
@@ -84,11 +80,15 @@ def create_app():
         #     if user:
         #         return user
         # 尝试从 HTTP 头中获取 API 密钥
-        token: str = request.headers.get("Authorization")
+        token: str | None = request.headers.get("Authorization")
         if token and token.startswith("Bearer "):
             token = token.replace("Bearer ", "", 1)  # 假设使用 Bearer 认证
-            token_record: Token = Token.query.filter_by(token=token).first()
-            if token_record and not token_record.is_revoked and token_record.expires_at > datetime.utcnow():
+            token_record: Token | None = Token.query.filter_by(token=token).first()
+            if (
+                token_record
+                and not token_record.is_revoked
+                and token_record.expires_at > datetime.utcnow()
+            ):
                 return token_record.user
         # 如果两种方式都未找到用户，返回 None
         return None
