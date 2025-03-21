@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, render_template, request
+from flask import Blueprint, jsonify, request
 from flask_login import login_required
 
 from myapp import db
@@ -9,7 +9,6 @@ from myapp.db_model import (
     Survey,
     User,
     Whitelist,
-    question_type_map,
 )
 from myapp.utils import required_role
 
@@ -38,7 +37,7 @@ def all_question():
             {
                 "id": i.id,
                 "title": i.question_text,
-                "type": question_type_map[i.question_type],
+                "type": i.question_type,
                 "score": i.score,
                 "options": options,
             }
@@ -51,7 +50,9 @@ def all_question():
 @login_required
 @required_role("admin")
 def add_survey():
-    survey: Survey = Survey(request.json["name"], request.json["description"])
+    name = request.json["name"]
+    description = request.json["description"]
+    survey: Survey = Survey(name, description)
     db.session.add(survey)
     db.session.commit()
     print(survey.id)
@@ -63,6 +64,9 @@ def add_survey():
 @required_role("admin")
 def add_question():
     req_data = request.json
+    if req_data is None:
+        return jsonify({"code": 1, "desc": "失败"})
+
     question: Question = Question(
         req_data["survey"],
         req_data["title"],
@@ -87,7 +91,9 @@ def whitelist():
     result = Whitelist.query.all()
     response_data = {"code": 0, "desc": "yes", "list": []}
     for i in result:
-        response_data["list"].append({"id": i.id, "uid": i.user_id, "name": i.player_name, "uuid": i.player_uuid})
+        response_data["list"].append(
+            {"id": i.id, "uid": i.user_id, "name": i.player_name, "uuid": i.player_uuid}
+        )
     return jsonify(response_data)
 
 
@@ -175,14 +181,18 @@ def get_survey(sid: int):
         question_data = {
             "id": question.id,
             "title": question.question_text,
-            "type": question_type_map[question.question_type],
+            "type": question.question_type,
             "score": question.score,
             "options": [],
         }
         # 查询题目中的所有选项
         for option in question.options:
             question_data["options"].append(
-                {"id": option.id, "text": option.option_text, "isCorrect": option.is_correct}
+                {
+                    "id": option.id,
+                    "text": option.option_text,
+                    "isCorrect": option.is_correct,
+                }
             )
 
         survey_data["questions"].append(question_data)
