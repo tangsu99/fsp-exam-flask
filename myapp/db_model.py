@@ -4,7 +4,7 @@ from sqlalchemy import Integer, Float, String, Boolean, Text, DateTime, ForeignK
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from flask_sqlalchemy.model import Model
 from flask_login import UserMixin
-from myapp import bcrypt
+from myapp import bcrypt, db
 from enum import Enum, unique
 
 # steve avatar, auth.py import this
@@ -27,7 +27,7 @@ class GuaranteeStatus(Enum):
 
 
 # 问卷表模型
-class Survey(Model):
+class Survey(db.Model):
     __tablename__ = "surveys"  # 指定表名
     id: Mapped[int] = mapped_column(
         Integer, primary_key=True, autoincrement=True
@@ -59,7 +59,7 @@ class Survey(Model):
 
 
 # 问题表模型
-class Question(Model):
+class Question(db.Model):
     __tablename__ = "questions"  # 指定表名
     id: Mapped[int] = mapped_column(
         Integer, primary_key=True, autoincrement=True
@@ -104,7 +104,7 @@ class Question(Model):
 
 
 # 选项表模型
-class Option(Model):
+class Option(db.Model):
     __tablename__ = "options"  # 指定表名
     id: Mapped[int] = mapped_column(
         Integer, primary_key=True, autoincrement=True
@@ -129,7 +129,7 @@ class Option(Model):
 
 
 # 用户表模型
-class User(UserMixin, Model):
+class User(UserMixin, db.Model):
     __tablename__ = "users"  # 指定表名
 
     id: Mapped[int] = mapped_column(
@@ -187,7 +187,7 @@ class User(UserMixin, Model):
 
 
 # 答卷表模型
-class Response(Model):
+class Response(db.Model):
     __tablename__ = "responses"  # 指定表名
     id: Mapped[int] = mapped_column(
         Integer, primary_key=True, autoincrement=True
@@ -226,7 +226,7 @@ class Response(Model):
 
 
 # 答题详情表模型
-class ResponseDetail(Model):
+class ResponseDetail(db.Model):
     __tablename__ = "response_details"  # 指定表名
     id: Mapped[int] = mapped_column(
         Integer, primary_key=True, autoincrement=True
@@ -250,7 +250,7 @@ class ResponseDetail(Model):
         self.answer = answer
 
 
-class Guarantee(Model):
+class Guarantee(db.Model):
     __tablename__ = "guarantees"  # 指定表名
     id: Mapped[int] = mapped_column(
         Integer, primary_key=True, autoincrement=True
@@ -287,7 +287,7 @@ class Guarantee(Model):
         self.status = status
 
 
-class Whitelist(Model):
+class Whitelist(db.Model):
     __tablename__ = "whitelist"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(
@@ -302,7 +302,7 @@ class Whitelist(Model):
         self.player_uuid = player_uuid
 
 
-class Token(Model):
+class Token(db.Model):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("users.id"), nullable=False
@@ -320,7 +320,7 @@ class Token(Model):
         self.expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
 
 
-class QuestionType(Model):
+class QuestionType(db.Model):
     __tablename__ = "question_type"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     type_name: Mapped[str] = mapped_column(String(25), nullable=False)
