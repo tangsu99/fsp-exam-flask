@@ -159,7 +159,7 @@ def get_responses():
     return jsonify(response_data)
 
 
-@admin.route("/survey/<int:sid>", methods=["get"])
+@admin.route("/survey/<int:sid>", methods=["GET"])
 @login_required
 @required_role("admin")
 def get_survey(sid: int):
@@ -198,3 +198,19 @@ def get_survey(sid: int):
         survey_data["questions"].append(question_data)
 
     return jsonify(survey_data)
+
+
+@admin.route("/reviewed", methods=["POST"])
+@login_required
+@required_role("admin")
+def reviewed_response():
+    req_data = request.json
+    rid = req_data.get("response")
+    resp: Response = Response.query.get(rid)
+    if resp is None:
+        return jsonify({"code": 1, "desc": "未找到! "})
+    resp.is_reviewed = True
+    wl = Whitelist(resp.user_id, resp.player_name, resp.player_uuid)
+    db.session.add(wl)
+    db.session.commit()
+    return jsonify({"code": 0, "desc": "通过! "})

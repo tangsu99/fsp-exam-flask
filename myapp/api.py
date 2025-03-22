@@ -8,20 +8,21 @@ from myapp.utils import token_check
 api = Blueprint("api", __name__)
 
 
-@api.route("/whitelist/<player>", methods=["GET"])
-def whitelist(player: str):
-    response_data = {"code": 1, "desc": "not fond"}
-    result = None
-    if len(player) > 16:
-        result = Whitelist.query.filter_by(player_uuid=player).first()
-    else:
-        result = Whitelist.query.filter_by(player_name=player).first()
+@api.route("/whitelist", methods=["POST"])
+def whitelist():
+    data = request.get_json()
+    result = Whitelist.query.filter_by(player_uuid=data.get("uuid")).first()
     if result is not None:
-        response_data["code"] = 0
-        response_data["desc"] = "在白名单中"
-        response_data["uuid"] = result.player_uuid
-        response_data["name"] = result.player_name
-    return jsonify(response_data)
+        if result.player_name != data.get("name"):
+            result.player_name = data.get("name")
+            db.session.commit()
+        return jsonify({
+            "code": 0,
+            "desc": "在白名单中",
+            "uuid": result.player_uuid,
+            "name": result.player_name
+        })
+    return jsonify({"code": 1, "desc": "not fond"})
 
 
 @api.route("/whitelistAdd", methods=["POST"])
