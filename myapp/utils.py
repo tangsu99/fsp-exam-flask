@@ -1,5 +1,5 @@
 from functools import wraps
-
+from typing import cast
 from flask import abort, current_app, request
 from flask_login import current_user
 
@@ -25,7 +25,7 @@ def required_role(role: str):
     def decorator(f):
         @wraps(f)
         def decorated_function(*args, **kwargs):
-            user: User = current_user
+            user: User = cast(User, current_user)
             if user.role != role:
                 abort(401, description="角色不符")
             return f(*args, **kwargs)
