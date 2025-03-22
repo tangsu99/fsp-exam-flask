@@ -9,6 +9,7 @@ api = Blueprint("api", __name__)
 
 
 @api.route("/whitelist", methods=["POST"])
+@token_check()
 def whitelist():
     data = request.get_json()
     result = Whitelist.query.filter_by(player_uuid=data.get("uuid")).first()
@@ -26,7 +27,7 @@ def whitelist():
 
 
 @api.route("/whitelistAdd", methods=["POST"])
-@login_required
+@token_check()
 def add_whitelist():
     user: User = cast(User, current_user)
     data = request.get_json()
