@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 
 from flask import Blueprint, jsonify, request
 from flask_login import current_user, login_required
@@ -10,8 +10,9 @@ from myapp.db_model import Guarantee, User, Whitelist
 guarantee = Blueprint("guarantee", __name__)
 
 
-def get_ago_time():
-    return datetime.utcnow() - timedelta(minutes=10)
+def get_ago_time() -> datetime:
+    time: datetime = datetime.now(timezone.utc) - timedelta(minutes=10)
+    return time
 
 
 @guarantee.route("/request", methods=["POST"])
@@ -27,7 +28,8 @@ async def _request():
         return jsonify(response_data)
     ten_minutes_ago = get_ago_time()
     g_result = Guarantee.query.filter(
-        Guarantee.player_uuid == data["playerUUID"], Guarantee.create_time >= ten_minutes_ago
+        Guarantee.player_uuid == data["playerUUID"],
+        Guarantee.create_time >= ten_minutes_ago,
     ).all()
     if len(g_result) != 0:
         response_data["desc"] = "担保请求未过期"
@@ -42,11 +44,15 @@ async def _request():
     name: str = _res[0]
     uuid: str = _res[1]
     # 验证
-    if name.lower() != data["playerName"].lower() or uuid != data["playerUUID"].replace("-", ""):
+    if name.lower() != data["playerName"].lower() or uuid != data["playerUUID"].replace(
+        "-", ""
+    ):
         response_data["desc"] = "未找到此玩家"
         response_data["state"] = "inconsistentInfo"
         return jsonify(response_data)
-    g_wl_result: User = User.query.filter(User.user_qq == data["guaranteeQQ"]).first()
+    g_wl_result: User | None = User.query.filter(
+        User.user_qq == data["guaranteeQQ"]
+    ).first()
     if g_wl_result is None:
         response_data["desc"] = "未找到此担保人"
         response_data["state"] = "unknownGuarantor"
@@ -57,7 +63,9 @@ async def _request():
         return jsonify(response_data)
 
     # 存
-    _guarantee = Guarantee(g_wl_result.id, current_user.get_id(), data["playerName"], data["playerUUID"])
+    _guarantee = Guarantee(
+        g_wl_result.id, current_user.get_id(), data["playerName"], data["playerUUID"]
+    )
     db.session.add(_guarantee)
     db.session.commit()
     return jsonify(response_data)
@@ -66,7 +74,11 @@ async def _request():
 @guarantee.route("/query", methods=["GET"])
 @login_required
 def query():
-    response_data = {"code": 0, "desc": "yes", "data": {"guarantee": [], "applicant": []}}
+    response_data = {
+        "code": 0,
+        "desc": "yes",
+        "data": {"guarantee": [], "applicant": []},
+    }
     g_result = current_user.guarantees
     if len(g_result) != 0:
         for i in g_result:
