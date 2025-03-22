@@ -2,7 +2,6 @@ from datetime import datetime, timezone, timedelta
 from typing import Optional
 from sqlalchemy import Integer, Float, String, Boolean, Text, DateTime, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from flask_sqlalchemy.model import Model
 from flask_login import UserMixin
 from myapp import bcrypt, db
 from enum import Enum, unique

@@ -1,35 +1,37 @@
-from datetime import datetime, timedelta
-
+from datetime import datetime, timezone, timedelta
+from typing import Optional
 import jwt
 from flask import Blueprint, current_app, jsonify, request
 from flask_login import current_user, login_required, login_user
 
 from myapp import db
-from myapp.db_model import DEFAULT_AVATAR, Token, User, Whitelist
+from myapp.db_model import Token, User, Whitelist
 
 auth = Blueprint("auth", __name__)
 
 
 @auth.route("/login", methods=["POST"])
 def login():
-    req_data = request.json
-    username = req_data["username"]
-    password = req_data["password"]
-    user: User = User.query.filter_by(username=username).first()
-    if user and user.check_password(password):
-        login_user(user)
-        token = create_token(user)
-        return jsonify(
-            {
-                "code": 0,
-                "token": token,
-                "username": user.username,
-                "avatar": user.avatar,
-                "isAdmin": user.role == "admin",
-            }
-        )
-    else:
-        return jsonify({"code": 1, "desc": "User not found"})
+    req_data: Optional[dict[str, str]] = request.json
+    if req_data:
+        username = req_data["username"]
+        password = req_data["password"]
+        user: User | None = User.query.filter_by(username=username).first()
+        if user and user.check_password(password):
+            login_user(user)
+            token = create_token(user)
+            return jsonify(
+                {
+                    "code": 0,
+                    "token": token,
+                    "username": user.username,
+                    "avatar": user.avatar,
+                    "isAdmin": user.role == "admin",
+                }
+            )
+        else:
+            return jsonify({"code": 1, "desc": "User not found"})
+    return jsonify({"code": 1, "desc": "error"})
 
 
 @auth.route("/logout", methods=["POST"])
@@ -37,43 +39,46 @@ def login():
 def logout():
     if current_user.is_authenticated:
         # 用户已登录
-        token: str = request.headers.get("Authorization")
+        token: str | None = request.headers.get("Authorization")
         if token and token.startswith("Bearer "):
             token = token.replace("Bearer ", "", 1)
         Token.query.filter_by(token=token).delete()
         db.session.commit()
         return jsonify({"code": 0, "desc": "退出成功"})
+    return jsonify({"code": 1, "desc": "error"})
 
 
 @auth.route("/register", methods=["POST"])
 def register():
-    req_data = request.json
-    username = req_data["username"]
-    user_qq = req_data["userQQ"]
-    password = req_data["password"]
-    re_password = req_data["repassword"]
-    if username or password or re_password:
-        if password == re_password:
-            u = User.query.filter_by(username=username).first()
-            w = Whitelist.query.filter_by(player_name=username).first()
-            if u or w:
-                return jsonify({"code": 3, "desc": "用户存在!"})
-            user: User = User(username, user_qq=user_qq).set_password(password)
-            db.session.add(user)
-            db.session.commit()
-            token = create_token(user)
-            return jsonify(
-                {
-                    "code": 0,
-                    "desc": "成功",
-                    "token": token,
-                    "username": user.username,
-                    "avatar": user.avatar,
-                    "isAdmin": user.role == "admin",
-                }
-            )
-        return jsonify({"code": 2, "desc": "密码与重复密码不一致"})
-    return jsonify({"code": 1, "desc": "表单错误"})
+    req_data: Optional[dict[str, str]] = request.json
+    if req_data:
+        username = req_data["username"]
+        user_qq = req_data["userQQ"]
+        password = req_data["password"]
+        re_password = req_data["repassword"]
+        if username or password or re_password:
+            if password == re_password:
+                u = User.query.filter_by(username=username).first()
+                w = Whitelist.query.filter_by(player_name=username).first()
+                if u or w:
+                    return jsonify({"code": 3, "desc": "用户存在!"})
+                user: User = User(username, user_qq=user_qq).set_password(password)
+                db.session.add(user)
+                db.session.commit()
+                token = create_token(user)
+                return jsonify(
+                    {
+                        "code": 0,
+                        "desc": "成功",
+                        "token": token,
+                        "username": user.username,
+                        "avatar": user.avatar,
+                        "isAdmin": user.role == "admin",
+                    }
+                )
+            return jsonify({"code": 2, "desc": "密码与重复密码不一致"})
+        return jsonify({"code": 1, "desc": "表单错误"})
+    return jsonify({"code": 1, "desc": "error"})
 
 
 @auth.route("/check", methods=["GET"])
@@ -90,11 +95,20 @@ def check_login():
         )
     else:
         # 用户未登录，返回未登录提示
-        return jsonify({"code": 1, "desc": "User is not logged in", "avatar": "b83565e6-b0d0-4265-bb4f-fdb5e8d00655"})
+        return jsonify(
+            {
+                "code": 1,
+                "desc": "User is not logged in",
+                "avatar": "b83565e6-b0d0-4265-bb4f-fdb5e8d00655",
+            }
+        )
 
 
 def generate_token(user, expires_in=3600):
-    payload = {"user_id": user.id, "exp": datetime.utcnow() + timedelta(hours=expires_in * 24)}
+    payload = {
+        "user_id": user.id,
+        "exp": datetime.now(timezone.utc) + timedelta(hours=expires_in * 24),
+    }
     secret_key = current_app.config["SECRET_KEY"]
     token = jwt.encode(payload, secret_key, algorithm="HS256")
     return token
