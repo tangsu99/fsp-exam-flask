@@ -97,6 +97,21 @@ def whitelist():
     return jsonify(response_data)
 
 
+@admin.route("/whitelist", methods=["POST"])
+@login_required
+@required_role("admin")
+def add_whitelist():
+    req_data = request.json
+    if req_data is None:
+        return jsonify({"desc": "错误!"})
+    for i in req_data:
+        wl = Whitelist(i.get('name'), i.get('uuid'))
+        db.session.add(wl)
+    db.session.commit()
+    return jsonify({"desc": "成功!"})
+
+
+
 @admin.route("/users", methods=["GET"])
 @login_required
 @required_role("admin")

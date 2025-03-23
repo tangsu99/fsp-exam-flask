@@ -45,6 +45,7 @@ def create_app():
 
     # 导入蓝图
     from myapp.admin import admin
+    from myapp.query import query
     from myapp.api import api
     from myapp.auth import auth
     from myapp.survey import survey
@@ -56,6 +57,7 @@ def create_app():
     app.register_blueprint(auth, url_prefix="/auth")
     app.register_blueprint(user, url_prefix="/user")
     app.register_blueprint(admin, url_prefix="/admin")
+    app.register_blueprint(query, url_prefix="/query")
     app.register_blueprint(survey, url_prefix="/survey")
     app.register_blueprint(guarantee, url_prefix="/guarantee")
 
