@@ -214,6 +214,9 @@ class Response(db.Model):
     response_details: Mapped[list["ResponseDetail"]] = relationship(
         "ResponseDetail", backref="response_d", lazy="select", cascade="all, delete"
     )  # 与答题详情表建立一对多关系，级联删除
+    response_score: Mapped[list["ResponseScore"]] = relationship(
+        "ResponseScore", backref="response_s", lazy="select", cascade="all, delete"
+    )
 
     def __init__(
         self, user_id: int, survey_id: int, player_name: str, player_uuid: str
@@ -222,6 +225,23 @@ class Response(db.Model):
         self.survey_id = survey_id
         self.player_name = player_name
         self.player_uuid = player_uuid
+
+
+class ResponseScore(db.Model):
+    __tablename__ = "response_scores"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    score: Mapped[float] = mapped_column()
+    question_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("questions.id"), nullable=False
+    )
+    response_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("responses.id", ondelete="CASCADE"), nullable=False
+    )
+
+    def __init__(self, score: float, question_id: int, response_id: int):
+        self.score = score
+        self.question_id = question_id
+        self.response_id = response_id
 
 
 # 答题详情表模型

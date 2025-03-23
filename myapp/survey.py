@@ -12,7 +12,7 @@ from myapp.db_model import (
     ResponseDetail,
     Option,
     QuestionType,
-    Question,
+    Question, ResponseScore,
 )
 
 survey = Blueprint("survey", __name__)
@@ -201,8 +201,12 @@ def complete_survey():
             return jsonify({"code": 1, "desc": "题目未找到！"}), 400
 
         # 累加分数
-        count_score += objective_question_scoring(answer, question)
-
+        score_ = objective_question_scoring(answer, question)
+        count_score += score_
+        if score_ != 0:
+            db.session.add(ResponseScore(question.score, question.id, response_id))
+        else:
+            db.session.add(ResponseScore(0, question.id, response_id))
         # 创建答题详情
         for detail in make_answer_details(answer, question, response_id, question_id):
             db.session.add(detail)
