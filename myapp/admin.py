@@ -8,7 +8,7 @@ from myapp.db_model import (
     Response,
     Survey,
     User,
-    Whitelist, ResponseDetail,
+    Whitelist, ResponseDetail, ResponseScore,
 )
 from myapp.utils import required_role
 
@@ -144,13 +144,17 @@ def get_responses():
     result = Response.query.all()
     response_data = {"code": 0, "desc": "yes", "list": []}
     for i in result:
+        scores = ResponseScore.query.filter_by(response_id=i.id).all()
+        total_score = sum(score.score for score in scores)  # 计算总分
         response_data["list"].append(
             {
                 "id": i.id,
                 "isCompleted": i.is_completed,
                 "isReviewed": i.is_reviewed,
                 "username": i.user.username,
+                "playername": i.player_name,
                 "survey": i.survey_res.name,
+                "score": total_score,
                 "surveyId": i.survey_res.id,
                 "responseTime": i.response_time,
                 "createTime": i.create_time,
@@ -226,7 +230,7 @@ def get_detail(resp_id: int):
     if not survey:
         return jsonify({"code": 1, "desc": "未找到问卷"}), 404
     survey_data = {
-        "id": survey.id,
+        "id": res.id,
         "name": survey.name,
         "description": survey.description,
         "create_time": survey.create_time,
@@ -243,6 +247,7 @@ def get_detail(resp_id: int):
             "score": question.score,
             "options": [],
             "answer": [],
+            "countScore": ResponseScore.query.filter_by(question_id=question.id, response_id=resp_id).first().score,
         }
         for option in question.options:
             question_data["options"].append(
@@ -259,3 +264,22 @@ def get_detail(resp_id: int):
         survey_data["questions"].append(question_data)
 
     return jsonify(survey_data)
+
+
+@admin.route("/detail_score", methods=["POST"])
+@login_required
+@required_role("admin")
+def set_score():
+    req_data = request.json
+    score = req_data.get("score")
+    question_id = req_data.get("questionId")
+    response_id = req_data.get("responseId")
+    if not all([score, response_id, question_id]):
+        return jsonify({"code": 2, "desc": "字段无效！"}), 400
+    res = ResponseScore.query.filter_by(question_id=question_id, response_id=response_id).first()
+    if res is not None:
+        res.score = score
+    else:
+        db.session.add(ResponseScore(score, question_id, response_id))
+    db.session.commit()
+    return jsonify({"code": 0, "desc": "更改成功！"})
