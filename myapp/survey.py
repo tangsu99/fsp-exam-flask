@@ -155,7 +155,7 @@ def objective_question_scoring(user_response: list, question: Question) -> float
 def make_answer_details(
     user_response: list[str], question: Question, response_id: int, question_id: int
 ) -> list[ResponseDetail]:
-    if question.question_type == QuestionCategory.MULTIPLE_CHOICE:
+    if question.question_type == QuestionCategory.MULTIPLE_CHOICE.value:
         return [
             ResponseDetail(
                 response_id=response_id,
