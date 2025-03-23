@@ -8,7 +8,7 @@ from myapp.db_model import (
     Response,
     Survey,
     User,
-    Whitelist,
+    Whitelist, ResponseDetail,
 )
 from myapp.utils import required_role
 
@@ -214,3 +214,48 @@ def reviewed_response():
     db.session.add(wl)
     db.session.commit()
     return jsonify({"code": 0, "desc": "通过! "})
+
+
+@admin.route("/detail/<int:resp_id>", methods=["GET"])
+@login_required
+@required_role("admin")
+def get_detail(resp_id: int):
+    res: Response = Response.query.get(resp_id)
+    # 查询指定问卷
+    survey = Survey.query.get(res.survey_id)
+    if not survey:
+        return jsonify({"code": 1, "desc": "未找到问卷"}), 404
+    survey_data = {
+        "id": survey.id,
+        "name": survey.name,
+        "description": survey.description,
+        "create_time": survey.create_time,
+        "status": survey.status,
+        "questions": [],
+        "type": survey.type[0].type_name,
+    }
+    # 查询问卷中的所有题目
+    for question in survey.questions:
+        question_data = {
+            "id": question.id,
+            "title": question.question_text,
+            "type": question.question_type,
+            "score": question.score,
+            "options": [],
+            "answer": [],
+        }
+        for option in question.options:
+            question_data["options"].append(
+                {"id": option.id, "text": option.option_text, "isCorrect": option.is_correct}
+            )
+
+        # 查询题目中的所有选项详情
+        details: list[ResponseDetail] = ResponseDetail.query.filter_by(question_id=question.id, response_id=resp_id)
+        for detail in details:
+            question_data["answer"].append(
+                {"id": detail.id, "text": detail.answer}
+            )
+
+        survey_data["questions"].append(question_data)
+
+    return jsonify(survey_data)
