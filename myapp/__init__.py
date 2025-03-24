@@ -23,11 +23,16 @@ def create_app():
     app.config["SECRET_KEY"] = os.getenv("SECRET_KEY")  # 用于安全签名session
     app.config["SESSION_PROTECTION"] = None  # 禁用会话保护
     app.config["API_TOKEN"] = os.getenv("API_TOKEN")
+    allowed_origins = os.getenv('ALLOWED_ORIGINS', '').split(',')
 
     cors.init_app(
         app=app,
         resources={
-            "*": {"origins": "*"},
+            r"/*": {
+                "origins": allowed_origins,
+                "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+                "allow_headers": ["Content-Type", "Authorization"]
+            }
         },
     )
 
