@@ -1,9 +1,12 @@
+import re
 from functools import wraps
 from typing import cast
 from flask import abort, current_app, request
 from flask_login import current_user
 
 from myapp.db_model import User
+
+PASSWORD_PATTERN = re.compile(r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,16}$")
 
 
 def token_check():
@@ -33,3 +36,7 @@ def required_role(role: str):
         return decorated_function
 
     return decorator
+
+
+def check_password(password: str) -> bool:
+    return bool(PASSWORD_PATTERN.match(password))

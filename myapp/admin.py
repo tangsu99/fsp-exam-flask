@@ -10,7 +10,7 @@ from myapp.db_model import (
     User,
     Whitelist, ResponseDetail, ResponseScore, QuestionType,
 )
-from myapp.utils import required_role
+from myapp.utils import required_role, check_password
 
 admin = Blueprint("admin", __name__)
 
@@ -111,26 +111,149 @@ def add_whitelist():
     return jsonify({"desc": "成功!"})
 
 
-
 @admin.route("/users", methods=["GET"])
 @login_required
 @required_role("admin")
 def users():
-    result = User.query.all()
-    response_data = {"code": 0, "desc": "yes", "list": []}
-    for i in result:
-        response_data["list"].append(
-            {
-                "id": i.id,
-                "username": i.username,
-                "userQQ": i.user_qq,
-                "role": i.role,
-                "addtime": i.addtime,
-                "avatar": i.avatar,
-                "status": i.status,
-            }
-        )
-    return jsonify(response_data)
+    page = request.args.get("page", 1, type=int)  # 获取页码，默认为 1
+    per_page = request.args.get("size", 10, type=int)  # 获取每页条数，默认为 10
+
+    # 分页查询用户
+    pagination = User.query.paginate(page=page, per_page=per_page, error_out=False)
+    users = pagination.items
+
+    # 构造返回数据
+    user_data = []
+    for user in users:
+        user_data.append({
+            "id": user.id,
+            "username": user.username,
+            "user_qq": user.user_qq,
+            "role": user.role,
+            "status": user.status,
+            "addtime": user.addtime.isoformat() if user.addtime else None,
+            "avatar": user.avatar
+        })
+
+    return jsonify({
+        "code": 0,
+        "desc": "success",
+        "list": user_data,
+        "page": pagination.page,
+        "size": pagination.per_page,
+        "total": pagination.total
+    })
+
+
+@admin.route("/user", methods=["GET"])
+@login_required
+@required_role("admin")
+def get_user():
+    id_ = request.args.get("id", 0, type=int)
+    user: User = User.query.get(id_)
+    if user is None:
+        return jsonify({"code": 1, "desc": "未找到用户！"}), 400
+    return jsonify({
+        "code": 0,
+        "desc": "success",
+        "data": {
+            "id": user.id,
+            "username": user.username,
+            "user_qq": user.user_qq,
+            "role": user.role,
+            "status": user.status,
+            "addtime": user.addtime.isoformat() if user.addtime else None,
+            "avatar": user.avatar
+        }
+    })
+
+
+
+@admin.route("/user", methods=["POST"])
+@login_required
+@required_role("admin")
+def add_user():
+    req_data = request.json
+    username = req_data.get("username")
+    user_qq = req_data.get("user_qq")
+    role = req_data.get("role")
+    password = req_data.get("password")
+
+    # 校验必填字段
+    if not all([username, user_qq, role, password]):
+        return jsonify({"code": 1, "desc": "缺少必填字段！"}), 400
+
+    # 检查用户名是否已存在
+    if User.query.filter_by(username=username).first():
+        return jsonify({"code": 2, "desc": "用户名已存在！"}), 400
+
+    # 创建用户
+    new_user = User(username=username, user_qq=user_qq, role=role).set_password(password)
+    db.session.add(new_user)
+    db.session.commit()
+
+    return jsonify({"code": 0, "desc": "用户创建成功！"})
+
+
+@admin.route("/user", methods=["PUT"])
+@login_required
+@required_role("admin")
+def set_user():
+    req_data = request.json
+    user_id = req_data.get("id")
+    username = req_data.get("username")
+    password = req_data.get("password")
+    user_qq = req_data.get("user_qq")
+    role = req_data.get("role")
+    status = req_data.get("status")
+
+    # 校验必填字段
+    if not user_id:
+        return jsonify({"code": 1, "desc": "缺少用户ID！"}), 400
+
+    # 查询用户
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"code": 2, "desc": "用户不存在！"}), 404
+
+    # 更新用户信息
+    if username:
+        user.username = username
+    if password is not None and check_password(password):
+        user.set_password(password)
+    if user_qq:
+        user.user_qq = user_qq
+    if role:
+        user.role = role
+    if status is not None:
+        user.status = status
+
+    db.session.commit()
+
+    return jsonify({"code": 0, "desc": "用户信息更新成功！"})
+
+
+@admin.route("/user", methods=["DELETE"])
+@login_required
+@required_role("admin")
+def del_user():
+    req_data = request.json
+    user_id = req_data.get("id")
+
+    # 校验必填字段
+    if not user_id:
+        return jsonify({"code": 1, "desc": "缺少用户ID！"}), 400
+
+    # 查询用户
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"code": 2, "desc": "用户不存在！"}), 404
+
+    # 删除用户
+    db.session.delete(user)
+    db.session.commit()
+
+    return jsonify({"code": 0, "desc": "用户删除成功！"})
 
 
 @admin.route("/surveys", methods=["GET"])
