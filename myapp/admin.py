@@ -88,12 +88,25 @@ def add_question():
 @login_required
 @required_role("admin")
 def whitelist():
-    result = Whitelist.query.all()
-    response_data = {"code": 0, "desc": "yes", "list": []}
+    page = request.args.get("page", 1, type=int)  # 获取页码，默认为 1
+    per_page = request.args.get("size", 10, type=int)  # 获取每页条数，默认为 10
+
+    # 分页查询白名单
+    pagination = Whitelist.query.paginate(page=page, per_page=per_page, error_out=False)
+    result = pagination.items
+
+    # 构造返回数据
+    response_data = {"code": 0, "desc": "success", "list": []}
     for i in result:
         response_data["list"].append(
             {"id": i.id, "uid": i.user_id, "name": i.player_name, "uuid": i.player_uuid}
         )
+
+    # 添加分页信息
+    response_data["page"] = pagination.page
+    response_data["size"] = pagination.per_page
+    response_data["total"] = pagination.total
+
     return jsonify(response_data)
 
 
