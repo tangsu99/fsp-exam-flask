@@ -132,7 +132,8 @@ def users():
     per_page = request.args.get("size", 10, type=int)  # 获取每页条数，默认为 10
 
     # 分页查询用户
-    pagination = User.query.paginate(page=page, per_page=per_page, error_out=False)
+    query = User.query.filter(User.status != 4)
+    pagination = query.paginate(page=page, per_page=per_page, error_out=False)
     users = pagination.items
 
     # 构造返回数据
@@ -258,12 +259,13 @@ def del_user():
         return jsonify({"code": 1, "desc": "缺少用户ID！"}), 400
 
     # 查询用户
-    user = User.query.get(user_id)
+    user: User = User.query.get(user_id)
     if not user:
         return jsonify({"code": 2, "desc": "用户不存在！"}), 404
 
-    # 删除用户
-    db.session.delete(user)
+    # 删除用户，逻辑删除
+    user.status = 4
+    # db.session.delete(user)
     db.session.commit()
 
     return jsonify({"code": 0, "desc": "用户删除成功！"})
