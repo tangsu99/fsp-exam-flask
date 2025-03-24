@@ -150,7 +150,7 @@ class User(UserMixin, db.Model):
     avatar: Mapped[str] = mapped_column(String(500), default=DEFAULT_AVATAR)
     status: Mapped[int] = mapped_column(
         Integer, nullable=False, default=0
-    )  # 0 未激活 1 正常 2 临时封禁 3 永久封禁
+    )  # 0 未激活 1 正常 2 临时封禁 3 永久封禁 4 删除
     # is_active = db.mapped_column(db.Boolean, default=True)  # 默认为 True
     tokens: Mapped[list["Token"]] = relationship("Token", backref="user", lazy="select")
     whitelist: Mapped[list["Whitelist"]] = relationship(
