@@ -5,7 +5,7 @@ from flask import Blueprint, current_app, jsonify, request
 from flask_login import current_user, login_required, login_user
 
 from myapp import db
-from myapp.db_model import Token, User, Whitelist
+from myapp.db_model import Token, User, Whitelist, RegistrationLimit
 
 auth = Blueprint("auth", __name__)
 
@@ -50,35 +50,60 @@ def logout():
 
 @auth.route("/register", methods=["POST"])
 def register():
-    req_data: Optional[dict[str, str]] = request.json
-    if req_data:
-        username = req_data["username"]
-        user_qq = req_data["userQQ"]
-        password = req_data["password"]
-        re_password = req_data["repassword"]
-        if username or password or re_password:
-            if password == re_password:
-                u = User.query.filter_by(username=username).first()
-                w = Whitelist.query.filter_by(player_name=username).first()
-                if u or w:
-                    return jsonify({"code": 3, "desc": "用户存在!"})
-                user: User = User(username, user_qq=user_qq).set_password(password)
-                db.session.add(user)
-                db.session.commit()
-                token = create_token(user)
-                return jsonify(
-                    {
-                        "code": 0,
-                        "desc": "成功",
-                        "token": token,
-                        "username": user.username,
-                        "avatar": user.avatar,
-                        "isAdmin": user.role == "admin",
-                    }
-                )
-            return jsonify({"code": 2, "desc": "密码与重复密码不一致"})
+    req_data = request.json
+    if not req_data:
+        return jsonify({"code": 1, "desc": "请求数据错误"})
+
+    # 获取客户端IP
+    client_ip = request.headers.get('X-Forwarded-For', request.remote_addr).split(',')[0]
+
+    # 检查IP注册限制
+    if check_ip_registration_limit(client_ip):
+        return jsonify({"code": 4, "desc": "该IP注册次数过多，请稍后再试"})
+
+    username = req_data.get("username")
+    user_qq = req_data.get("userQQ")
+    password = req_data.get("password")
+    re_password = req_data.get("repassword")
+
+    # 验证必填字段
+    if not all([username, password, re_password]):
         return jsonify({"code": 1, "desc": "表单错误"})
-    return jsonify({"code": 1, "desc": "error"})
+
+    # 验证密码一致性
+    if password != re_password:
+        return jsonify({"code": 2, "desc": "密码与重复密码不一致"})
+
+    # 检查用户名是否已存在
+    if User.query.filter_by(username=username).first():
+        return jsonify({"code": 3, "desc": "用户名已存在"})
+
+    # 检查白名单
+    if Whitelist.query.filter_by(player_name=username).first():
+        return jsonify({"code": 3, "desc": "用户名已存在"})
+
+    # 创建用户
+    try:
+        user = User(username=username, user_qq=user_qq).set_password(password)
+        db.session.add(user)
+
+        # 记录IP注册信息
+        record_ip_registration(client_ip)
+
+        db.session.commit()
+
+        token = create_token(user)
+        return jsonify({
+            "code": 0,
+            "desc": "注册成功",
+            "token": token,
+            "username": user.username,
+            "avatar": user.avatar,
+            "isAdmin": user.role == "admin",
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"code": 5, "desc": "注册失败，请稍后再试"})
 
 
 @auth.route("/check", methods=["GET"])
@@ -102,6 +127,20 @@ def check_login():
                 "avatar": "b83565e6-b0d0-4265-bb4f-fdb5e8d00655",
             }
         )
+
+
+def check_ip_registration_limit(ip):
+    one_hour_ago = datetime.now(timezone.utc) - timedelta(hours=1)
+    registrations = RegistrationLimit.query.filter(
+        RegistrationLimit.ip == ip,
+        RegistrationLimit.register_time >= one_hour_ago
+    ).count()
+    return registrations >= 2
+
+
+def record_ip_registration(ip):
+    registration = RegistrationLimit(ip=ip)
+    db.session.add(registration)
 
 
 def generate_token(user, expires_in=3600):

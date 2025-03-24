@@ -350,3 +350,11 @@ class QuestionType(db.Model):
     def __init__(self, type_name: str, survey_id: int):
         self.type_name = type_name
         self.survey_id = survey_id
+
+
+class RegistrationLimit(db.Model):
+    __tablename__ = "registration_limits"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    ip: Mapped[str] = mapped_column(String(45), nullable=False)  # 支持IPv6的最大长度
+    register_time = db.Column(db.DateTime, default=datetime.utcnow)
