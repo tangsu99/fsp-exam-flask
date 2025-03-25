@@ -172,6 +172,10 @@ class User(UserMixin, db.Model):
         "Response", backref="user", lazy="select", cascade="all, delete"
     )  # 与答卷表建立一对多关系，级联删除
 
+    reset_password_token: Mapped[list["ResetPasswordToken"]] = relationship(
+        "ResetPasswordToken", backref="user_r_p_t", lazy="select", cascade="all, delete"
+    )
+
     def __init__(self, username: str, user_qq: str = "1", role: str = "user"):
         self.username = username
         self.user_qq = user_qq
@@ -358,3 +362,21 @@ class RegistrationLimit(db.Model):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     ip: Mapped[str] = mapped_column(String(45), nullable=False)  # 支持IPv6的最大长度
     register_time = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class ResetPasswordToken(db.Model):
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id"), nullable=False
+    )
+    token: Mapped[str] = mapped_column(String(256), unique=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.now(timezone.utc)
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    is_revoked: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    def __init__(self, user_id, token, expires_in=3600):
+        self.user_id = user_id
+        self.token = token
+        self.expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
