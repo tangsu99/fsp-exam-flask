@@ -42,7 +42,10 @@ def logout():
         token: str | None = request.headers.get("Authorization")
         if token and token.startswith("Bearer "):
             token = token.replace("Bearer ", "", 1)
-        Token.query.filter_by(token=token).delete()
+        tk: Token = Token.query.filter_by(token=token)
+        if tk is None:
+            return jsonify({"code": 4, "desc": "Token not found"})
+        db.session.delete(tk)
         db.session.commit()
         return jsonify({"code": 0, "desc": "退出成功"})
     return jsonify({"code": 1, "desc": "error"})
