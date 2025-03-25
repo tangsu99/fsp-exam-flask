@@ -2,6 +2,7 @@ from flask import Blueprint, jsonify, request
 from flask_login import current_user, login_required
 
 from myapp import db
+from myapp.db_model import User, Token
 
 user = Blueprint("user", __name__)
 
@@ -64,3 +65,17 @@ def set_avatar():
     except Exception as e:
         db.session.rollback()
         return jsonify({"code": 3, "desc": f"头像修改失败：{str(e)}"}), 500
+
+
+def update_password(uid: int, token: str, new_password: str, old_password: str) -> bool:
+    if new_password != old_password:
+        return False
+
+    user: User = User.query.get(uid)
+
+    token_record: Token | None = Token.query.filter_by(token=token).first()
+
+    user.set_password(new_password)
+    db.session.delete(token_record)
+    db.session.commit()
+    return True
