@@ -366,6 +366,8 @@ def reviewed_response():
     resp: Response = Response.query.get(rid)
     if resp is None:
         return jsonify({"code": 1, "desc": "未找到! "})
+    if resp.is_reviewed:
+        return jsonify({"code": 1, "desc": "已被审核! "})
     wl = Whitelist.query.filter_by(player_uuid=resp.player_uuid).first()
     if wl is not None:
         resp.is_reviewed = True
