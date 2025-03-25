@@ -6,12 +6,11 @@ from flask import Blueprint, current_app, jsonify, request
 from flask_login import current_user, login_required, login_user
 
 from myapp import APP, db, reset_password_mail, mail
-from myapp.db_model import Token, User, Whitelist, RegistrationLimit
+from myapp.db_model import Token, User, Whitelist, RegistrationLimit, ResetPasswordToken
 from myapp.utils import check_password
 
 auth = Blueprint("auth", __name__)
 
-reset_password_map = {}
 
 @auth.route("/login", methods=["POST"])
 def login():
@@ -33,8 +32,8 @@ def login():
                 }
             )
         else:
-            return jsonify({"code": 1, "desc": "User not found"})
-    return jsonify({"code": 1, "desc": "error"})
+            return jsonify({"code": 1, "desc": "用户名或密码错误!"})
+    return jsonify({"code": 1, "desc": "字段错误！"})
 
 
 @auth.route("/logout", methods=["POST"])
@@ -152,19 +151,18 @@ def find_password():
 
 @auth.route('/findPassword', methods=["PUT"])
 def find_password_set():
-    token = request.args.get('token')
+    token = ResetPasswordToken.query.filter_by(token=request.args.get('token', '')).first()
     if not token:
-        return jsonify({"code": 4, "desc": "未找到!"}), 404
+        return jsonify({"code": 4, "desc": "无效token!"}), 404
     data = request.json
     password = data.get('password')
     if not check_password(password):
         return jsonify({"code": 2, "desc": "密码不合法!"})
-
-    user: User | None = User.query.get(reset_password_map.get(token))
+    user: User | None = token.user_r_p_t
     if not user:
         return jsonify({"code": 4, "desc": "未找到用户!"}), 404
-    reset_password_map.pop(token)
     user.set_password(password)
+    db.session.delete(token)
     db.session.commit()
     return jsonify({"code": 0, "desc": "修改成功！"})
 
@@ -172,7 +170,8 @@ def find_password_set():
 def send_reset_password(user):
     with APP.app_context():
         token = generate_token(user)
-        reset_password_map[token] = user.id
+        db.session.add(ResetPasswordToken(user.id, token))
+        db.session.commit()
         msg = reset_password_mail([f'{user.user_qq}@qq.com'], token)
         mail.send(msg)
 
