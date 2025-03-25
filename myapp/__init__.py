@@ -6,12 +6,15 @@ from flask import Flask, Request, jsonify
 from flask_bcrypt import Bcrypt
 from flask_cors import CORS
 from flask_login import LoginManager
+from flask_mail import Mail
 from flask_sqlalchemy import SQLAlchemy
+
+from myapp.mail import reset_password_mail
 
 login_manager: LoginManager = LoginManager()
 db: SQLAlchemy = SQLAlchemy()
 bcrypt: Bcrypt = Bcrypt()
-
+mail: Mail = Mail()
 cors = CORS()
 
 
@@ -23,7 +26,18 @@ def create_app():
     app.config["SECRET_KEY"] = os.getenv("SECRET_KEY")  # 用于安全签名session
     app.config["SESSION_PROTECTION"] = None  # 禁用会话保护
     app.config["API_TOKEN"] = os.getenv("API_TOKEN")
+    # cors
     allowed_origins = os.getenv('ALLOWED_ORIGINS', '').split(',')
+    # mail
+    app.config['MAIL_SERVER'] = os.getenv('MAIL_SERVER', 'smtp.qq.com')  # 邮件服务器地址
+    app.config['MAIL_PORT'] = os.getenv('MAIL_PORT', 465)  # 邮件服务器端口
+    app.config['MAIL_USE_SSL'] = os.getenv('MAIL_USE_SSL', True)  # 启用SSL
+    app.config['MAIL_USERNAME'] = os.getenv('MAIL_USERNAME', 'your_email@qq.com')  # 发件人邮箱
+    app.config['MAIL_PASSWORD'] = os.getenv('MAIL_PASSWORD', 'your_auth_password')  # 邮箱授权码/密码？？
+    app.config['MAIL_DEFAULT_SENDER'] = os.getenv('MAIL_DEFAULT_SENDER', 'your_email@qq.com')  # 默认发件人
+
+    # 重置密码页面
+    app.config['RESET_PASSWORD_URL'] = os.getenv('RESET_PASSWORD_URL', 'http://localhost:5173/#/reset_password?token=')  # 默认发件人
 
     cors.init_app(
         app=app,
@@ -42,6 +56,7 @@ def create_app():
     login_manager.init_app(app)
     db.init_app(app)
     bcrypt.init_app(app)
+    mail.init_app(app)
 
     from myapp.db_model import Token
 
