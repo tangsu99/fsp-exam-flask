@@ -17,10 +17,14 @@ bcrypt: Bcrypt = Bcrypt()
 mail: Mail = Mail()
 cors = CORS()
 
+APP: Flask
+
 
 def create_app():
     load_dotenv()
     app = Flask(__name__)
+    global APP
+    APP = app
     app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL")  # 测试数据库
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
     app.config["SECRET_KEY"] = os.getenv("SECRET_KEY")  # 用于安全签名session

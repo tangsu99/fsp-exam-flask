@@ -1,14 +1,17 @@
 from datetime import datetime, timezone, timedelta
+from threading import Thread
 from typing import Optional
 import jwt
 from flask import Blueprint, current_app, jsonify, request
 from flask_login import current_user, login_required, login_user
 
-from myapp import db
+from myapp import APP, db, reset_password_mail, mail
 from myapp.db_model import Token, User, Whitelist, RegistrationLimit
+from myapp.utils import check_password
 
 auth = Blueprint("auth", __name__)
 
+reset_password_map = {}
 
 @auth.route("/login", methods=["POST"])
 def login():
@@ -42,7 +45,7 @@ def logout():
         token: str | None = request.headers.get("Authorization")
         if token and token.startswith("Bearer "):
             token = token.replace("Bearer ", "", 1)
-        tk: Token = Token.query.filter_by(token=token)
+        tk: Token = Token.query.filter_by(token=token).first()
         if tk is None:
             return jsonify({"code": 4, "desc": "Token not found"})
         db.session.delete(tk)
@@ -62,7 +65,7 @@ def register():
 
     # 检查IP注册限制
     if check_ip_registration_limit(client_ip):
-        return jsonify({"code": 4, "desc": "该IP注册次数过多，请稍后再试"})
+        return jsonify({"code": 5, "desc": "该IP注册次数过多，请稍后再试!"})
 
     username = req_data.get("username")
     user_qq = req_data.get("userQQ")
@@ -71,19 +74,19 @@ def register():
 
     # 验证必填字段
     if not all([username, password, re_password]):
-        return jsonify({"code": 1, "desc": "表单错误"})
+        return jsonify({"code": 1, "desc": "表单错误!"})
 
     # 验证密码一致性
     if password != re_password:
-        return jsonify({"code": 2, "desc": "密码与重复密码不一致"})
+        return jsonify({"code": 2, "desc": "密码与重复密码不一致!"})
 
     # 检查用户名是否已存在
     if User.query.filter_by(username=username).first():
-        return jsonify({"code": 3, "desc": "用户名已存在"})
+        return jsonify({"code": 3, "desc": "用户名已存在!"})
 
     # 检查白名单
     if Whitelist.query.filter_by(player_name=username).first():
-        return jsonify({"code": 3, "desc": "用户名已存在"})
+        return jsonify({"code": 3, "desc": "用户名已存在!"})
 
     # 创建用户
     try:
@@ -130,6 +133,48 @@ def check_login():
                 "avatar": "b83565e6-b0d0-4265-bb4f-fdb5e8d00655",
             }
         )
+
+
+@auth.route('/findPassword', methods=["POST"])
+def find_password():
+    client_ip = request.headers.get('X-Forwarded-For', request.remote_addr).split(',')[0]
+    if check_ip_registration_limit(client_ip):
+        return jsonify({"code": 5, "desc": "该IP请求次数过多，请稍后再试!"})
+
+    username = request.json.get('username')
+    qq = request.json.get('userQQ')
+    user = User.query.filter_by(user_qq=qq, username=username).first()
+    if not user:
+        return jsonify({"code": 4, "desc": "未找到用户!"}), 404
+    Thread(target=send_reset_password, args=(user,), ).start()
+    return jsonify({"code": 0, "desc": "发送成功！请查找邮箱!"})
+
+
+@auth.route('/findPassword', methods=["PUT"])
+def find_password_set():
+    token = request.args.get('token')
+    if not token:
+        return jsonify({"code": 4, "desc": "未找到!"}), 404
+    data = request.json
+    password = data.get('password')
+    if not check_password(password):
+        return jsonify({"code": 2, "desc": "密码不合法!"})
+
+    user: User | None = User.query.get(reset_password_map.get(token))
+    if not user:
+        return jsonify({"code": 4, "desc": "未找到用户!"}), 404
+    reset_password_map.pop(token)
+    user.set_password(password)
+    db.session.commit()
+    return jsonify({"code": 0, "desc": "修改成功！"})
+
+
+def send_reset_password(user):
+    with APP.app_context():
+        token = generate_token(user)
+        reset_password_map[token] = user.id
+        msg = reset_password_mail([f'{user.user_qq}@qq.com'], token)
+        mail.send(msg)
 
 
 def check_ip_registration_limit(ip):
