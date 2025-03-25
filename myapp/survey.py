@@ -12,7 +12,7 @@ from myapp.db_model import (
     ResponseDetail,
     Option,
     QuestionType,
-    Question, ResponseScore,
+    Question, ResponseScore, Whitelist,
 )
 
 survey = Blueprint("survey", __name__)
@@ -95,14 +95,19 @@ def start_survey():
     type_ = data["playerType"]
     question_type = QuestionType.query.filter_by(type_name=type_).first()
     if question_type is None:
-        return jsonify({"code": 2, "desc": "未找到指定的问卷类型！"}), 400
-    survey = question_type.survey_q
+        return jsonify({"code": 4, "desc": "未找到指定的问卷类型！"}), 400
 
     mc_name = data.get("playerName")  # Minecraft 名称
     mc_uuid = data.get("playerUUID")  # Minecraft UUID
 
+    wl = Whitelist.query.filter_by(player_uuid=mc_uuid).first()
+    if wl is not None:
+        return jsonify({"code": 2, "desc": "此玩家存在已有白名单! "})
+
+    survey = question_type.survey_q
+
     if not all([survey, mc_name, mc_uuid]):
-        return jsonify({"code": 2, "desc": "字段无效！"}), 400
+        return jsonify({"code": 1, "desc": "字段无效！"}), 400
 
     # 创建新的答卷
     new_response = Response(
