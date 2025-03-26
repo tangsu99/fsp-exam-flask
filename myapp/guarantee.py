@@ -17,7 +17,7 @@ def get_ago_time() -> datetime:
 
 @guarantee.route("/request", methods=["POST"])
 @login_required
-async def _request():
+def _request():
     data = request.get_json()
     response_data = {"code": 0, "desc": "担保请求提交成功", "state": "success"}
     wl_result = Whitelist.query.filter_by(player_uuid=data["playerUUID"]).first()
