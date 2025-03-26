@@ -400,6 +400,10 @@ def get_detail(resp_id: int):
     }
     # 查询问卷中的所有题目
     for question in survey.questions:
+        response_score: ResponseScore | None = ResponseScore.query.filter_by(question_id=question.id, response_id=resp_id).first()
+        score = 0
+        if response_score is not None:
+            score = response_score.score
         question_data = {
             "id": question.id,
             "title": question.question_text,
@@ -407,7 +411,7 @@ def get_detail(resp_id: int):
             "score": question.score,
             "options": [],
             "answer": [],
-            "countScore": ResponseScore.query.filter_by(question_id=question.id, response_id=resp_id).first().score,
+            "countScore": score,
         }
         for option in question.options:
             question_data["options"].append(
