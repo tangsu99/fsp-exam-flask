@@ -1,6 +1,5 @@
 from flask import Blueprint, jsonify, request
 from flask_login import login_required
-from sqlalchemy import false
 
 from myapp import db
 from myapp.db_model import (
@@ -46,7 +45,7 @@ def all_question():
                 "options": options,
             }
         )
-        response_data.list = data
+        response_data["list"] = data
     return jsonify(response_data)
 
 
@@ -54,13 +53,15 @@ def all_question():
 @login_required
 @required_role("admin")
 def add_survey():
-    name = request.json["name"]
-    description = request.json["description"]
-    survey: Survey = Survey(name, description)
-    db.session.add(survey)
-    db.session.commit()
-    print(survey.id)
-    return jsonify({"code": 0, "desc": "成功"})
+    if request.json:
+        name = request.json["name"]
+        description = request.json["description"]
+        survey: Survey = Survey(name, description)
+        db.session.add(survey)
+        db.session.commit()
+        print(survey.id)
+        return jsonify({"code": 0, "desc": "成功"})
+    return jsonify({"code": 1, "desc": "失败"})
 
 
 @admin.route("/addQuestion", methods=["POST"])
@@ -114,18 +115,20 @@ def whitelist():
     return jsonify(response_data)
 
 
-@admin.route("/whitelist", methods=["POST"])
-@login_required
-@required_role("admin")
-def add_whitelist():
-    req_data = request.json
-    if req_data is None:
-        return jsonify({"desc": "错误!"})
-    for i in req_data:
-        wl = Whitelist(i.get("name"), i.get("uuid"))
-        db.session.add(wl)
-    db.session.commit()
-    return jsonify({"desc": "成功!"})
+# @admin.route("/whitelist", methods=["POST"])
+# @login_required
+# @required_role("admin")
+# def add_whitelist():
+#     req_data = request.json
+#     if req_data is None:
+#         return jsonify({"desc": "错误!"})
+#     for i in req_data:
+#         name = i.get("name")
+#         uuid = i.get("uuid")
+#         wl = Whitelist(name=name, uuid=uuid)
+#         db.session.add(wl)
+#     db.session.commit()
+#     return jsonify({"desc": "成功!"})
 
 
 @admin.route("/users", methods=["GET"])
@@ -228,37 +231,39 @@ def add_user():
 @required_role("admin")
 def set_user():
     req_data = request.json
-    user_id = req_data.get("id")
-    username = req_data.get("username")
-    password = req_data.get("password")
-    user_qq = req_data.get("user_qq")
-    role = req_data.get("role")
-    status = req_data.get("status")
+    if req_data:
+        user_id = req_data.get("id")
+        username = req_data.get("username")
+        password = req_data.get("password")
+        user_qq = req_data.get("user_qq")
+        role = req_data.get("role")
+        status = req_data.get("status")
 
-    # 校验必填字段
-    if not user_id:
-        return jsonify({"code": 1, "desc": "缺少用户ID！"}), 400
+        # 校验必填字段
+        if not user_id:
+            return jsonify({"code": 1, "desc": "缺少用户ID！"}), 400
 
-    # 查询用户
-    user = User.query.get(user_id)
-    if not user:
-        return jsonify({"code": 2, "desc": "用户不存在！"}), 404
+        # 查询用户
+        user = User.query.get(user_id)
+        if not user:
+            return jsonify({"code": 2, "desc": "用户不存在！"}), 404
 
-    # 更新用户信息
-    if username:
-        user.username = username
-    if password is not None and check_password(password):
-        user.set_password(password)
-    if user_qq:
-        user.user_qq = user_qq
-    if role:
-        user.role = role
-    if status is not None:
-        user.status = status
+        # 更新用户信息
+        if username:
+            user.username = username
+        if password is not None and check_password(password):
+            user.set_password(password)
+        if user_qq:
+            user.user_qq = user_qq
+        if role:
+            user.role = role
+        if status is not None:
+            user.status = status
 
-    db.session.commit()
+        db.session.commit()
 
-    return jsonify({"code": 0, "desc": "用户信息更新成功！"})
+        return jsonify({"code": 0, "desc": "用户信息更新成功！"})
+    return jsonify({"code": 1, "desc": "缺少信息"}), 400
 
 
 @admin.route("/user", methods=["DELETE"])
@@ -266,23 +271,25 @@ def set_user():
 @required_role("admin")
 def del_user():
     req_data = request.json
-    user_id = req_data.get("id")
+    if req_data:
+        user_id = req_data.get("id")
 
-    # 校验必填字段
-    if not user_id:
-        return jsonify({"code": 1, "desc": "缺少用户ID！"}), 400
+        # 校验必填字段
+        if not user_id:
+            return jsonify({"code": 1, "desc": "缺少用户ID！"}), 400
 
-    # 查询用户
-    user: User = User.query.get(user_id)
-    if not user:
-        return jsonify({"code": 2, "desc": "用户不存在！"}), 404
+        # 查询用户
+        user: User | None = User.query.get(user_id)
+        if not user:
+            return jsonify({"code": 2, "desc": "用户不存在！"}), 404
 
-    # 删除用户，逻辑删除
-    user.status = 4
-    # db.session.delete(user)
-    db.session.commit()
+        # 删除用户，逻辑删除
+        user.status = 4
+        # db.session.delete(user)
+        db.session.commit()
 
-    return jsonify({"code": 0, "desc": "用户删除成功！"})
+        return jsonify({"code": 0, "desc": "用户删除成功！"})
+    return jsonify({"code": 1, "desc": "缺少信息"})
 
 
 @admin.route("/surveys", methods=["GET"])
@@ -376,30 +383,34 @@ def get_survey(sid: int):
 @required_role("admin")
 def reviewed_response():
     req_data = request.json
-    rid = req_data.get("response")
-    resp: Response = Response.query.get(rid)
-    if resp is None:
-        return jsonify({"code": 1, "desc": "未找到! "})
-    if resp.is_reviewed:
-        return jsonify({"code": 1, "desc": "已被审核! "})
-    wl = Whitelist.query.filter_by(player_uuid=resp.player_uuid).first()
-    if wl is not None:
-        resp.is_reviewed = True
-        db.session.commit()
-        return jsonify({"code": 2, "desc": "此玩家存在已有白名单! "})
+    if req_data:
+        rid = req_data.get("response")
+        resp: Response | None = Response.query.get(rid)
+        if resp is None:
+            return jsonify({"code": 1, "desc": "未找到! "})
+        if resp.is_reviewed:
+            return jsonify({"code": 1, "desc": "已被审核! "})
+        wl = Whitelist.query.filter_by(player_uuid=resp.player_uuid).first()
+        if wl is not None:
+            resp.is_reviewed = True
+            db.session.commit()
+            return jsonify({"code": 2, "desc": "此玩家存在已有白名单! "})
 
-    resp.is_reviewed = True
-    db.session.add(Whitelist(resp.user_id, resp.player_name, resp.player_uuid))
-    db.session.commit()
-    return jsonify({"code": 0, "desc": "通过! "})
+        resp.is_reviewed = True
+        db.session.add(Whitelist(resp.user_id, resp.player_name, resp.player_uuid))
+        db.session.commit()
+        return jsonify({"code": 0, "desc": "通过! "})
+    return jsonify({"code": 4, "desc": "错误! "})
 
 
 @admin.route("/detail/<int:resp_id>", methods=["GET"])
 @login_required
 @required_role("admin")
 def get_detail(resp_id: int):
-    res: Response = Response.query.get(resp_id)
+    res: Response | None = Response.query.get(resp_id)
     # 查询指定问卷
+    if res is None:
+        return jsonify({"code": 1, "desc": "信息不足"}), 404
     survey = Survey.query.get(res.survey_id)
     if not survey:
         return jsonify({"code": 1, "desc": "未找到问卷"}), 404
@@ -441,7 +452,7 @@ def get_detail(resp_id: int):
         # 查询题目中的所有选项详情
         details: list[ResponseDetail] = ResponseDetail.query.filter_by(
             question_id=question.id, response_id=resp_id
-        )
+        ).all()
         for detail in details:
             question_data["answer"].append({"id": detail.id, "text": detail.answer})
 
@@ -455,20 +466,22 @@ def get_detail(resp_id: int):
 @required_role("admin")
 def set_score():
     req_data = request.json
-    score = req_data.get("score")
-    question_id = req_data.get("questionId")
-    response_id = req_data.get("responseId")
-    if not all([score, response_id, question_id]):
-        return jsonify({"code": 2, "desc": "字段无效！"}), 400
-    res = ResponseScore.query.filter_by(
-        question_id=question_id, response_id=response_id
-    ).first()
-    if res is not None:
-        res.score = score
-    else:
-        db.session.add(ResponseScore(score, question_id, response_id))
-    db.session.commit()
-    return jsonify({"code": 0, "desc": "更改成功！"})
+    if req_data:
+        score = req_data.get("score")
+        question_id = req_data.get("questionId")
+        response_id = req_data.get("responseId")
+        if not all([score, response_id, question_id]):
+            return jsonify({"code": 2, "desc": "字段无效！"}), 400
+        res = ResponseScore.query.filter_by(
+            question_id=question_id, response_id=response_id
+        ).first()
+        if res is not None:
+            res.score = score
+        else:
+            db.session.add(ResponseScore(score, question_id, response_id))
+        db.session.commit()
+        return jsonify({"code": 0, "desc": "更改成功！"})
+    return jsonify({"code": 1, "desc": "缺少信息！"})
 
 
 @admin.route("/question_type", methods=["GET"])
@@ -484,7 +497,7 @@ def get_all_question_type():
     }
 
     for i in res:
-        res_data.get("list").append(
+        res_data["list"].append(
             {
                 "id": i.id,
                 "typeName": i.type_name,
@@ -500,24 +513,26 @@ def get_all_question_type():
 @required_role("admin")
 def set_question_type():
     req_data = request.json
-    id_ = req_data.get("id")
-    survey_id = req_data.get("surveyId")
-    type_name = req_data.get("typeName")
+    if req_data:
+        id_ = req_data.get("id")
+        survey_id = req_data.get("surveyId")
+        type_name = req_data.get("typeName")
 
-    if Survey.query.get(id_) is None:
-        return jsonify({"code": 1, "desc": "未找到问卷！"})
+        if Survey.query.get(id_) is None:
+            return jsonify({"code": 1, "desc": "未找到问卷！"})
 
-    res: QuestionType = QuestionType.query.filter_by(id=id_).first()
-    if res is None:
-        return jsonify({"code": 1, "desc": "未找到类型！"})
-    res.type_name = type_name
-    res.survey_id = survey_id
+        res: QuestionType | None = QuestionType.query.filter_by(id=id_).first()
+        if res is None:
+            return jsonify({"code": 1, "desc": "未找到类型！"})
+        res.type_name = type_name
+        res.survey_id = survey_id
 
-    db.session.commit()
+        db.session.commit()
 
-    res_data = {
-        "code": 0,
-        "desc": "成功! ",
-    }
+        res_data = {
+            "code": 0,
+            "desc": "成功! ",
+        }
 
-    return jsonify(res_data)
+        return jsonify(res_data)
+    return jsonify("wtf")
