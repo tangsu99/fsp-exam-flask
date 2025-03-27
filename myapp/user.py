@@ -71,11 +71,14 @@ def update_password(uid: int, token: str, new_password: str, old_password: str) 
     if new_password != old_password:
         return False
 
-    user: User = User.query.get(uid)
+    user: User | None = User.query.get(uid)
 
-    token_record: Token | None = Token.query.filter_by(token=token).first()
+    if user:
+        token_record: Token | None = Token.query.filter_by(token=token).first()
 
-    user.set_password(new_password)
-    db.session.delete(token_record)
-    db.session.commit()
-    return True
+        user.set_password(new_password)
+        db.session.delete(token_record)
+        db.session.commit()
+        return True
+
+    return False

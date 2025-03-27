@@ -1,5 +1,6 @@
 from flask import Blueprint, jsonify, request
 from flask_login import login_required
+from sqlalchemy import false
 
 from myapp import db
 from myapp.db_model import (
@@ -8,7 +9,10 @@ from myapp.db_model import (
     Response,
     Survey,
     User,
-    Whitelist, ResponseDetail, ResponseScore, QuestionType,
+    Whitelist,
+    ResponseDetail,
+    ResponseScore,
+    QuestionType,
 )
 from myapp.utils import required_role, check_password
 
@@ -118,7 +122,7 @@ def add_whitelist():
     if req_data is None:
         return jsonify({"desc": "错误!"})
     for i in req_data:
-        wl = Whitelist(i.get('name'), i.get('uuid'))
+        wl = Whitelist(i.get("name"), i.get("uuid"))
         db.session.add(wl)
     db.session.commit()
     return jsonify({"desc": "成功!"})
@@ -139,24 +143,28 @@ def users():
     # 构造返回数据
     user_data = []
     for user in users:
-        user_data.append({
-            "id": user.id,
-            "username": user.username,
-            "user_qq": user.user_qq,
-            "role": user.role,
-            "status": user.status,
-            "addtime": user.addtime.isoformat() if user.addtime else None,
-            "avatar": user.avatar
-        })
+        user_data.append(
+            {
+                "id": user.id,
+                "username": user.username,
+                "user_qq": user.user_qq,
+                "role": user.role,
+                "status": user.status,
+                "addtime": user.addtime.isoformat() if user.addtime else None,
+                "avatar": user.avatar,
+            }
+        )
 
-    return jsonify({
-        "code": 0,
-        "desc": "success",
-        "list": user_data,
-        "page": pagination.page,
-        "size": pagination.per_page,
-        "total": pagination.total
-    })
+    return jsonify(
+        {
+            "code": 0,
+            "desc": "success",
+            "list": user_data,
+            "page": pagination.page,
+            "size": pagination.per_page,
+            "total": pagination.total,
+        }
+    )
 
 
 @admin.route("/user", methods=["GET"])
@@ -164,23 +172,24 @@ def users():
 @required_role("admin")
 def get_user():
     id_ = request.args.get("id", 0, type=int)
-    user: User = User.query.get(id_)
+    user: User | None = User.query.get(id_)
     if user is None:
         return jsonify({"code": 1, "desc": "未找到用户！"}), 400
-    return jsonify({
-        "code": 0,
-        "desc": "success",
-        "data": {
-            "id": user.id,
-            "username": user.username,
-            "user_qq": user.user_qq,
-            "role": user.role,
-            "status": user.status,
-            "addtime": user.addtime.isoformat() if user.addtime else None,
-            "avatar": user.avatar
+    return jsonify(
+        {
+            "code": 0,
+            "desc": "success",
+            "data": {
+                "id": user.id,
+                "username": user.username,
+                "user_qq": user.user_qq,
+                "role": user.role,
+                "status": user.status,
+                "addtime": user.addtime.isoformat() if user.addtime else None,
+                "avatar": user.avatar,
+            },
         }
-    })
-
+    )
 
 
 @admin.route("/user", methods=["POST"])
@@ -188,25 +197,30 @@ def get_user():
 @required_role("admin")
 def add_user():
     req_data = request.json
-    username = req_data.get("username")
-    user_qq = req_data.get("user_qq")
-    role = req_data.get("role")
-    password = req_data.get("password")
 
-    # 校验必填字段
-    if not all([username, user_qq, role, password]):
-        return jsonify({"code": 1, "desc": "缺少必填字段！"}), 400
+    if req_data:
+        username: str | None = req_data.get("username")
+        user_qq: str | None = req_data.get("user_qq")
+        role: str | None = req_data.get("role")
+        password: str | None = req_data.get("password")
 
-    # 检查用户名是否已存在
-    if User.query.filter_by(username=username).first():
-        return jsonify({"code": 2, "desc": "用户名已存在！"}), 400
+        # 校验必填字段
+        if not username or not user_qq or not role or not password:
+            return jsonify({"code": 1, "desc": "缺少必填字段！"}), 400
 
-    # 创建用户
-    new_user = User(username=username, user_qq=user_qq, role=role).set_password(password)
-    db.session.add(new_user)
-    db.session.commit()
+        # 检查用户名是否已存在
+        if User.query.filter_by(username=username).first():
+            return jsonify({"code": 2, "desc": "用户名已存在！"}), 400
 
-    return jsonify({"code": 0, "desc": "用户创建成功！"})
+        # 创建用户
+        new_user = User(username=username, user_qq=user_qq, role=role).set_password(
+            password
+        )
+        db.session.add(new_user)
+        db.session.commit()
+
+        return jsonify({"code": 0, "desc": "用户创建成功！"})
+    return jsonify({"code": 1, "desc": "缺少必填字段！"}), 400
 
 
 @admin.route("/user", methods=["PUT"])
@@ -400,7 +414,9 @@ def get_detail(resp_id: int):
     }
     # 查询问卷中的所有题目
     for question in survey.questions:
-        response_score: ResponseScore | None = ResponseScore.query.filter_by(question_id=question.id, response_id=resp_id).first()
+        response_score: ResponseScore | None = ResponseScore.query.filter_by(
+            question_id=question.id, response_id=resp_id
+        ).first()
         score = 0
         if response_score is not None:
             score = response_score.score
@@ -415,15 +431,19 @@ def get_detail(resp_id: int):
         }
         for option in question.options:
             question_data["options"].append(
-                {"id": option.id, "text": option.option_text, "isCorrect": option.is_correct}
+                {
+                    "id": option.id,
+                    "text": option.option_text,
+                    "isCorrect": option.is_correct,
+                }
             )
 
         # 查询题目中的所有选项详情
-        details: list[ResponseDetail] = ResponseDetail.query.filter_by(question_id=question.id, response_id=resp_id)
+        details: list[ResponseDetail] = ResponseDetail.query.filter_by(
+            question_id=question.id, response_id=resp_id
+        )
         for detail in details:
-            question_data["answer"].append(
-                {"id": detail.id, "text": detail.answer}
-            )
+            question_data["answer"].append({"id": detail.id, "text": detail.answer})
 
         survey_data["questions"].append(question_data)
 
@@ -440,7 +460,9 @@ def set_score():
     response_id = req_data.get("responseId")
     if not all([score, response_id, question_id]):
         return jsonify({"code": 2, "desc": "字段无效！"}), 400
-    res = ResponseScore.query.filter_by(question_id=question_id, response_id=response_id).first()
+    res = ResponseScore.query.filter_by(
+        question_id=question_id, response_id=response_id
+    ).first()
     if res is not None:
         res.score = score
     else:
@@ -462,11 +484,13 @@ def get_all_question_type():
     }
 
     for i in res:
-        res_data.get("list").append({
-            "id": i.id,
-            "typeName": i.type_name,
-            "surveyId": i.survey_id,
-        })
+        res_data.get("list").append(
+            {
+                "id": i.id,
+                "typeName": i.type_name,
+                "surveyId": i.survey_id,
+            }
+        )
 
     return jsonify(res_data)
 
@@ -481,17 +505,11 @@ def set_question_type():
     type_name = req_data.get("typeName")
 
     if Survey.query.get(id_) is None:
-        return jsonify({
-            "code": 1,
-            "desc": "未找到问卷！"
-        })
+        return jsonify({"code": 1, "desc": "未找到问卷！"})
 
     res: QuestionType = QuestionType.query.filter_by(id=id_).first()
     if res is None:
-        return jsonify({
-            "code": 1,
-            "desc": "未找到类型！"
-        })
+        return jsonify({"code": 1, "desc": "未找到类型！"})
     res.type_name = type_name
     res.survey_id = survey_id
 
