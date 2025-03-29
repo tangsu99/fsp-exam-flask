@@ -61,7 +61,6 @@ def add_survey():
         survey: Survey = Survey(name, description)
         db.session.add(survey)
         db.session.commit()
-        print(survey.id)
         return jsonify({"code": 0, "desc": "成功"})
     return jsonify({"code": 1, "desc": "失败"})
 
@@ -205,7 +204,7 @@ def add_user():
 
     if req_data:
         username: str | None = req_data.get("username")
-        user_qq: str | None = req_data.get("user_qq")
+        user_qq: str | None = req_data.get("userQQ")
         role: str | None = req_data.get("role")
         password: str | None = req_data.get("password")
 
@@ -237,7 +236,7 @@ def set_user():
         user_id = req_data.get("id")
         username = req_data.get("username")
         password = req_data.get("password")
-        user_qq = req_data.get("user_qq")
+        user_qq = req_data.get("userQQ")
         role = req_data.get("role")
         status = req_data.get("status")
 
