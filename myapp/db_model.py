@@ -197,8 +197,8 @@ class Response(db.Model):
     is_completed: Mapped[bool] = mapped_column(
         Boolean, default=False
     )  # 完成状态，默认为False（未完成）
-    is_reviewed: Mapped[bool] = mapped_column(
-        Boolean, default=False
+    is_reviewed: Mapped[int] = mapped_column(
+        Integer, default=0
     )  # 阅卷状态，默认为False（未阅卷）
     player_name: Mapped[str] = mapped_column(String(25), nullable=False)
     player_uuid: Mapped[str] = mapped_column(String(36), nullable=False)

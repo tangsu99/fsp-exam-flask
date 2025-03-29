@@ -8,11 +8,13 @@ from flask_cors import CORS
 from flask_login import LoginManager
 from flask_mail import Mail
 from flask_sqlalchemy import SQLAlchemy
+from flask_migrate import Migrate
 
 from myapp.mail import reset_password_mail
 
 login_manager: LoginManager = LoginManager()
 db: SQLAlchemy = SQLAlchemy()
+migrate = Migrate()
 bcrypt: Bcrypt = Bcrypt()
 mail: Mail = Mail()
 cors = CORS()
@@ -59,6 +61,7 @@ def create_app():
 
     login_manager.init_app(app)
     db.init_app(app)
+    migrate.init_app(app, db)
     bcrypt.init_app(app)
     mail.init_app(app)
 
