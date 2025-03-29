@@ -398,18 +398,19 @@ def reviewed_response():
     req_data = request.json
     if req_data:
         rid = req_data.get("response")
+        status = req_data.get("status")
         resp: Response | None = Response.query.get(rid)
         if resp is None:
             return jsonify({"code": 1, "desc": "未找到! "})
         if resp.is_reviewed:
             return jsonify({"code": 1, "desc": "已被审核! "})
+        if status in [0, 1, 2]:
+            return jsonify({"code": 4, "desc": "未知状态！"})
+        resp.is_reviewed = status
         wl = Whitelist.query.filter_by(player_uuid=resp.player_uuid).first()
         if wl is not None:
-            resp.is_reviewed = True
             db.session.commit()
-            return jsonify({"code": 2, "desc": "此玩家存在已有白名单! "})
-
-        resp.is_reviewed = True
+            return jsonify({"code": 0, "desc": "此玩家存在已有白名单! "})
         db.session.add(Whitelist(resp.user_id, resp.player_name, resp.player_uuid))
         db.session.commit()
         return jsonify({"code": 0, "desc": "通过! "})
