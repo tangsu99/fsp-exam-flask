@@ -404,7 +404,7 @@ def reviewed_response():
             return jsonify({"code": 1, "desc": "未找到! "})
         if resp.is_reviewed:
             return jsonify({"code": 1, "desc": "已被审核! "})
-        if status in [0, 1, 2]:
+        if status not in [0, 1, 2]:
             return jsonify({"code": 4, "desc": "未知状态！"})
         resp.is_reviewed = status
         wl = Whitelist.query.filter_by(player_uuid=resp.player_uuid).first()
