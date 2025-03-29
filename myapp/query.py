@@ -1,5 +1,5 @@
 from flask import Blueprint, jsonify, request
-from flask_login import login_required
+from flask_login import login_required, current_user
 
 from myapp import db
 from myapp.db_model import (
@@ -26,9 +26,9 @@ def index():
 @query.route("/response", methods=["GET"])
 @login_required
 def response():
+    user: User = current_user
     # 查询所有答卷记录
-    responses = Response.query.all()
-
+    responses = user.responses
     response_data = []
     for res in responses:
         scores = ResponseScore.query.filter_by(response_id=res.id).all()
