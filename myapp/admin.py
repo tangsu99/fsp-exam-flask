@@ -1,5 +1,7 @@
 from flask import Blueprint, jsonify, request
 from flask_login import login_required
+from flask_sqlalchemy import pagination
+from sqlalchemy.engine import result
 
 from myapp import db
 from myapp.db_model import (
@@ -315,8 +317,20 @@ def get_surveys():
 @login_required
 @required_role("admin")
 def get_responses():
-    result = Response.query.all()
-    response_data = {"code": 0, "desc": "yes", "list": []}
+    page = request.args.get("page", 1, type=int)  # 获取页码，默认为 1
+    per_page = request.args.get("size", 10, type=int)  # 获取每页条数，默认为 10
+
+    pagination = Response.query.paginate(page=page, per_page=per_page, error_out=False)
+    result = pagination.items
+
+    response_data = {
+        "code": 0,
+        "desc": "yes",
+        "list": [],
+        "page": pagination.page,
+        "size": pagination.per_page,
+        "total": pagination.total,
+    }
     for i in result:
         scores = ResponseScore.query.filter_by(response_id=i.id).all()
         total_score = sum(score.score for score in scores)  # 计算总分
