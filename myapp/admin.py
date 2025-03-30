@@ -376,8 +376,12 @@ def get_survey(sid: int):
             "title": question.question_text,
             "type": question.question_type,
             "score": question.score,
+            "img_urls": [],
             "options": [],
         }
+        for img in question.img_urls:
+            question_data["img_urls"].append({"alt": img.img_alt, "url": img.img_url})
+
         # 查询题目中的所有选项
         for option in question.options:
             question_data["options"].append(
