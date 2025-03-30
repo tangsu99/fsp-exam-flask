@@ -1,12 +1,11 @@
 from flask import Blueprint, jsonify, request
 from flask_login import login_required
-from flask_sqlalchemy import pagination
-from sqlalchemy.engine import result
 
 from myapp import db
 from myapp.db_model import (
     Option,
     Question,
+    QuestionImgURL,
     Response,
     Survey,
     User,
@@ -82,6 +81,13 @@ def add_question():
 
     db.session.add(question)
     db.session.commit()
+
+    img_urls = req_data["img_urls"]
+    for item in img_urls:
+        img: QuestionImgURL = QuestionImgURL(question.id, item["alt"], item["url"])
+        db.session.add(img)
+    db.session.commit()
+
     options = req_data["options"]
     for i in options:
         option: Option = Option(question.id, i["option"], i["isAnswer"])
@@ -104,9 +110,7 @@ def whitelist():
     # 构造返回数据
     response_data = {"code": 0, "desc": "success", "list": []}
     for i in result:
-        response_data["list"].append(
-            {"id": i.id, "uid": i.user_id, "name": i.player_name, "uuid": i.player_uuid}
-        )
+        response_data["list"].append({"id": i.id, "uid": i.user_id, "name": i.player_name, "uuid": i.player_uuid})
 
     # 添加分页信息
     response_data["page"] = pagination.page
@@ -217,9 +221,7 @@ def add_user():
             return jsonify({"code": 2, "desc": "用户名已存在！"}), 400
 
         # 创建用户
-        new_user = User(username=username, user_qq=user_qq, role=role).set_password(
-            password
-        )
+        new_user = User(username=username, user_qq=user_qq, role=role).set_password(password)
         db.session.add(new_user)
         db.session.commit()
 
@@ -486,9 +488,7 @@ def set_score():
         response_id = req_data.get("responseId")
         if not all([score, response_id, question_id]):
             return jsonify({"code": 2, "desc": "字段无效！"}), 400
-        res = ResponseScore.query.filter_by(
-            question_id=question_id, response_id=response_id
-        ).first()
+        res = ResponseScore.query.filter_by(question_id=question_id, response_id=response_id).first()
         if res is not None:
             res.score = score
         else:
