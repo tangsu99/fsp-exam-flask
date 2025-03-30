@@ -79,12 +79,12 @@ class Question(db.Model):
     create_time: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.now(timezone.utc)
     )  # 问题创建时间，默认为当前时间
-
+    img_urls: Mapped[list["QuestionImgURL"]] = relationship(
+        "QuestionImgURL", backref="question_img", lazy="select", cascade="all ,delete"
+    )  # 与图片表建立一对多关系，级联删除
     options: Mapped[list["Option"]] = relationship(
         "Option", backref="question", lazy="select", cascade="all, delete"
-    )
-
-    # 与选项表建立一对多关系，级联删除
+    )  # 与选项表建立一对多关系，级联删除
     response_details: Mapped[list["ResponseDetail"]] = relationship(
         "ResponseDetail", backref="question_r_d", lazy="select", cascade="all, delete"
     )
@@ -100,6 +100,29 @@ class Question(db.Model):
         self.question_text = question_text
         self.question_type = question_type
         self.score = score
+
+
+# 问题图片表模型
+class QuestionImgURL(db.Model):
+    __tablename__ = "question_img_urls"  # 指定表名
+    id: Mapped[int] = mapped_column(
+        Integer, primary_key=True, autoincrement=True
+    )  # 主键，选项唯一标识，自增
+    question_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("questions.id", ondelete="CASCADE"), nullable=False
+    )  # 所属问题id，外键，关联问题表，级联删除
+    img_alt: Mapped[str] = mapped_column(String(200))  # 图片alt，允许为空
+    img_url: Mapped[str] = mapped_column(
+        String(200), nullable=False
+    )  # 图片URL，不允许为空
+    create_time: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.now(timezone.utc)
+    )  # 选项创建时间，默认为当前时间
+
+    def __init__(self, question_id: int, img_alt: str, img_url: str):
+        self.question_id = question_id
+        self.img_alt = img_alt
+        self.img_url = img_url
 
 
 # 选项表模型
