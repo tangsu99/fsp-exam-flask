@@ -12,7 +12,9 @@ from myapp.db_model import (
     ResponseDetail,
     Option,
     QuestionType,
-    Question, ResponseScore, Whitelist,
+    Question,
+    ResponseScore,
+    Whitelist,
 )
 
 survey = Blueprint("survey", __name__)
@@ -42,19 +44,22 @@ def get_survey(sid: int):
             "title": question.question_text,
             "type": question.question_type,
             "score": question.score,
+            "img_urls": [],
             "options": [],
         }
+
+        for img in question.img_urls:
+            question_data["img_urls"].append({"alt": img.img_alt, "url": img.img_url})
+
         # 查询题目中的所有选项
         for option in question.options:
             if question.question_type == 3 or question.question_type == 4:
                 question_data["options"].append({"id": option.id, "text": "此处作答"})
                 continue
-            question_data["options"].append(
-                {"id": option.id, "text": option.option_text}
-            )
+            question_data["options"].append({"id": option.id, "text": option.option_text})
 
+        print(question_data["img_urls"])
         survey_data["questions"].append(question_data)
-
     return jsonify(survey_data)
 
 
@@ -87,9 +92,7 @@ def start_survey():
     existing_response = user.responses
     res: Response | None = awa(existing_response)
     if res is not None:
-        return jsonify(
-            {"code": 1, "desc": "您有未完成问卷！", "response": res.survey_id}
-        )
+        return jsonify({"code": 1, "desc": "您有未完成问卷！", "response": res.survey_id})
 
     data = request.get_json()
     type_ = data["playerType"]
