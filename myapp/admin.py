@@ -6,15 +6,15 @@ from myapp.db_model import (
     Option,
     Question,
     QuestionImgURL,
+    QuestionType,
     Response,
+    ResponseDetail,
+    ResponseScore,
     Survey,
     User,
     Whitelist,
-    ResponseDetail,
-    ResponseScore,
-    QuestionType,
 )
-from myapp.utils import required_role, check_password
+from myapp.utils import check_password, required_role
 
 admin = Blueprint("admin", __name__)
 
@@ -82,9 +82,9 @@ def add_question():
     db.session.add(question)
     db.session.commit()
 
-    img_urls = req_data["img_urls"]
-    for item in img_urls:
-        img: QuestionImgURL = QuestionImgURL(question.id, item["alt"], item["url"])
+    img_list: list = req_data["img_list"]
+    for item in img_list:
+        img: QuestionImgURL = QuestionImgURL(question.id, item["alt"], item["data"])
         db.session.add(img)
     db.session.commit()
 
@@ -376,11 +376,11 @@ def get_survey(sid: int):
             "title": question.question_text,
             "type": question.question_type,
             "score": question.score,
-            "img_urls": [],
+            "img_list": [],
             "options": [],
         }
-        for img in question.img_urls:
-            question_data["img_urls"].append({"alt": img.img_alt, "url": img.img_url})
+        for img in question.img_list:
+            question_data["img_list"].append({"alt": img.img_alt, "data": img.img_data})
 
         # 查询题目中的所有选项
         for option in question.options:

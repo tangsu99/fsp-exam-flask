@@ -1,19 +1,20 @@
 from datetime import datetime, timezone
 from typing import cast
+
 from flask import Blueprint, jsonify, request
 from flask_login import current_user, login_required
 
 from myapp import db
 from myapp.db_model import (
-    User,
-    Survey,
+    Option,
+    Question,
     QuestionCategory,
+    QuestionType,
     Response,
     ResponseDetail,
-    Option,
-    QuestionType,
-    Question,
     ResponseScore,
+    Survey,
+    User,
     Whitelist,
 )
 
@@ -44,12 +45,12 @@ def get_survey(sid: int):
             "title": question.question_text,
             "type": question.question_type,
             "score": question.score,
-            "img_urls": [],
+            "img_list": [],
             "options": [],
         }
 
-        for img in question.img_urls:
-            question_data["img_urls"].append({"alt": img.img_alt, "url": img.img_url})
+        for img in question.img_list:
+            question_data["img_list"].append({"alt": img.img_alt, "data": img.img_data})
 
         # 查询题目中的所有选项
         for option in question.options:
@@ -58,7 +59,6 @@ def get_survey(sid: int):
                 continue
             question_data["options"].append({"id": option.id, "text": option.option_text})
 
-        print(question_data["img_urls"])
         survey_data["questions"].append(question_data)
     return jsonify(survey_data)
 

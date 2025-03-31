@@ -1,10 +1,12 @@
-from datetime import datetime, timezone, timedelta
-from typing import Optional
-from sqlalchemy import Integer, Float, String, Boolean, Text, DateTime, ForeignKey
-from sqlalchemy.orm import Mapped, mapped_column, relationship
-from flask_login import UserMixin
-from myapp import bcrypt, db
+from datetime import datetime, timedelta, timezone
 from enum import Enum, unique
+from typing import Optional
+
+from flask_login import UserMixin
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from myapp import bcrypt, db
 
 # steve avatar, auth.py import this
 DEFAULT_AVATAR = "8667ba71-b85a-4004-af54-457a9734eed7"
@@ -28,12 +30,8 @@ class GuaranteeStatus(Enum):
 # 问卷表模型
 class Survey(db.Model):
     __tablename__ = "surveys"  # 指定表名
-    id: Mapped[int] = mapped_column(
-        Integer, primary_key=True, autoincrement=True
-    )  # 主键，问卷唯一标识，自增
-    name: Mapped[str] = mapped_column(
-        String(200), nullable=False
-    )  # 问卷名称，不允许为空
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)  # 主键，问卷唯一标识，自增
+    name: Mapped[str] = mapped_column(String(200), nullable=False)  # 问卷名称，不允许为空
     description: Mapped[Optional[str]] = mapped_column(Text)  # 问卷描述，可为空
     create_time: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.now(timezone.utc)
@@ -60,27 +58,21 @@ class Survey(db.Model):
 # 问题表模型
 class Question(db.Model):
     __tablename__ = "questions"  # 指定表名
-    id: Mapped[int] = mapped_column(
-        Integer, primary_key=True, autoincrement=True
-    )  # 主键，问题唯一标识，自增
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)  # 主键，问题唯一标识，自增
     survey_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("surveys.id", ondelete="CASCADE"), nullable=False
     )  # 所属问卷id，外键，关联问卷表，级联删除
-    question_text: Mapped[str] = mapped_column(
-        String(500), nullable=False
-    )  # 问题内容，不允许为空
+    question_text: Mapped[str] = mapped_column(String(500), nullable=False)  # 问题内容，不允许为空
     question_type: Mapped[int] = mapped_column(
         Integer, nullable=False
     )  # 问题类型，不允许为空，如1-单选，2-多选，3-填空，4-简答等
     score: Mapped[float] = mapped_column(Float, nullable=False)  # 问题分值，不允许为空
-    sequence: Mapped[Optional[int]] = mapped_column(
-        Integer
-    )  # 问题排序，值越大排越前面，可为空
+    sequence: Mapped[Optional[int]] = mapped_column(Integer)  # 问题排序，值越大排越前面，可为空
     create_time: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.now(timezone.utc)
     )  # 问题创建时间，默认为当前时间
-    img_urls: Mapped[list["QuestionImgURL"]] = relationship(
-        "QuestionImgURL", backref="question_img", lazy="select", cascade="all ,delete"
+    img_list: Mapped[list["QuestionImgURL"]] = relationship(
+        "QuestionImgURL", backref="question_images_backref", lazy="select", cascade="all ,delete"
     )  # 与图片表建立一对多关系，级联删除
     options: Mapped[list["Option"]] = relationship(
         "Option", backref="question", lazy="select", cascade="all, delete"
@@ -104,42 +96,32 @@ class Question(db.Model):
 
 # 问题图片表模型
 class QuestionImgURL(db.Model):
-    __tablename__ = "question_img_urls"  # 指定表名
-    id: Mapped[int] = mapped_column(
-        Integer, primary_key=True, autoincrement=True
-    )  # 主键，选项唯一标识，自增
+    __tablename__ = "question_images"  # 指定表名
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)  # 主键，选项唯一标识，自增
     question_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("questions.id", ondelete="CASCADE"), nullable=False
     )  # 所属问题id，外键，关联问题表，级联删除
     img_alt: Mapped[str] = mapped_column(String(200))  # 图片alt，允许为空
-    img_url: Mapped[str] = mapped_column(
-        Text, nullable=False
-    )  # 图片URL，不允许为空
+    img_data: Mapped[str] = mapped_column(Text, nullable=False)  # 图片数据，URL 或者 Base64 编码的图片，不允许为空
     create_time: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.now(timezone.utc)
     )  # 选项创建时间，默认为当前时间
 
-    def __init__(self, question_id: int, img_alt: str, img_url: str):
+    def __init__(self, question_id: int, img_alt: str, img_data: str):
         self.question_id = question_id
         self.img_alt = img_alt
-        self.img_url = img_url
+        self.img_data = img_data
 
 
 # 选项表模型
 class Option(db.Model):
     __tablename__ = "options"  # 指定表名
-    id: Mapped[int] = mapped_column(
-        Integer, primary_key=True, autoincrement=True
-    )  # 主键，选项唯一标识，自增
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)  # 主键，选项唯一标识，自增
     question_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("questions.id", ondelete="CASCADE"), nullable=False
     )  # 所属问题id，外键，关联问题表，级联删除
-    option_text: Mapped[str] = mapped_column(
-        String(200), nullable=False
-    )  # 选项内容，不允许为空
-    is_correct: Mapped[Optional[bool]] = mapped_column(
-        Boolean
-    )  # 是否为正确选项，对于有标准答案的题目，可为空
+    option_text: Mapped[str] = mapped_column(String(200), nullable=False)  # 选项内容，不允许为空
+    is_correct: Mapped[Optional[bool]] = mapped_column(Boolean)  # 是否为正确选项，对于有标准答案的题目，可为空
     create_time: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.now(timezone.utc)
     )  # 选项创建时间，默认为当前时间
@@ -154,19 +136,11 @@ class Option(db.Model):
 class User(UserMixin, db.Model):
     __tablename__ = "users"  # 指定表名
 
-    id: Mapped[int] = mapped_column(
-        Integer, primary_key=True, autoincrement=True
-    )  # 主键，用户唯一标识，自增
-    username: Mapped[str] = mapped_column(
-        String(100), nullable=False
-    )  # 用户名，不允许为空
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)  # 主键，用户唯一标识，自增
+    username: Mapped[str] = mapped_column(String(100), nullable=False)  # 用户名，不允许为空
     user_qq: Mapped[str] = mapped_column(String(25), nullable=False)
-    password: Mapped[str] = mapped_column(
-        String(100), nullable=False
-    )  # 密码，不允许为空
-    role: Mapped[str] = mapped_column(
-        String(100)
-    )  # 用户角色，如普通用户、管理员等，可为空
+    password: Mapped[str] = mapped_column(String(100), nullable=False)  # 密码，不允许为空
+    role: Mapped[str] = mapped_column(String(100))  # 用户角色，如普通用户、管理员等，可为空
     addtime: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.now(timezone.utc)
     )  # 用户新增时间，默认为当前时间
@@ -175,9 +149,7 @@ class User(UserMixin, db.Model):
         Integer, nullable=False, default=0
     )  # 0 未激活 1 正常 2 临时封禁 3 永久封禁 4 删除
     tokens: Mapped[list["Token"]] = relationship("Token", backref="user", lazy="select")
-    whitelist: Mapped[list["Whitelist"]] = relationship(
-        "Whitelist", backref="wuser", lazy="select"
-    )
+    whitelist: Mapped[list["Whitelist"]] = relationship("Whitelist", backref="wuser", lazy="select")
     guarantees: Mapped[list["Guarantee"]] = relationship(
         "Guarantee",
         foreign_keys="Guarantee.guarantee_id",
@@ -214,15 +186,9 @@ class User(UserMixin, db.Model):
 # 答卷表模型
 class Response(db.Model):
     __tablename__ = "responses"  # 指定表名
-    id: Mapped[int] = mapped_column(
-        Integer, primary_key=True, autoincrement=True
-    )  # 主键，答卷唯一标识，自增
-    is_completed: Mapped[bool] = mapped_column(
-        Boolean, default=False
-    )  # 完成状态，默认为False（未完成）
-    is_reviewed: Mapped[int] = mapped_column(
-        Integer, default=0
-    )  # 阅卷状态，默认为False（未阅卷）
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)  # 主键，答卷唯一标识，自增
+    is_completed: Mapped[bool] = mapped_column(Boolean, default=False)  # 完成状态，默认为False（未完成）
+    is_reviewed: Mapped[int] = mapped_column(Integer, default=0)  # 阅卷状态，默认为False（未阅卷）
     player_name: Mapped[str] = mapped_column(String(25), nullable=False)
     player_uuid: Mapped[str] = mapped_column(String(36), nullable=False)
     user_id: Mapped[int] = mapped_column(
@@ -244,9 +210,7 @@ class Response(db.Model):
         "ResponseScore", backref="response_s", lazy="select", cascade="all, delete"
     )
 
-    def __init__(
-        self, user_id: int, survey_id: int, player_name: str, player_uuid: str
-    ):
+    def __init__(self, user_id: int, survey_id: int, player_name: str, player_uuid: str):
         self.user_id = user_id
         self.survey_id = survey_id
         self.player_name = player_name
@@ -257,12 +221,8 @@ class ResponseScore(db.Model):
     __tablename__ = "response_scores"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     score: Mapped[float] = mapped_column()
-    question_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("questions.id"), nullable=False
-    )
-    response_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("responses.id", ondelete="CASCADE"), nullable=False
-    )
+    question_id: Mapped[int] = mapped_column(Integer, ForeignKey("questions.id"), nullable=False)
+    response_id: Mapped[int] = mapped_column(Integer, ForeignKey("responses.id", ondelete="CASCADE"), nullable=False)
 
     def __init__(self, score: float, question_id: int, response_id: int):
         self.score = score
@@ -273,9 +233,7 @@ class ResponseScore(db.Model):
 # 答题详情表模型
 class ResponseDetail(db.Model):
     __tablename__ = "response_details"  # 指定表名
-    id: Mapped[int] = mapped_column(
-        Integer, primary_key=True, autoincrement=True
-    )  # 主键，答题详情唯一标识，自增
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)  # 主键，答题详情唯一标识，自增
     response_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("responses.id", ondelete="CASCADE"), nullable=False
     )  # 所属答卷id，外键，关联答卷表，级联删除
@@ -297,21 +255,11 @@ class ResponseDetail(db.Model):
 
 class Guarantee(db.Model):
     __tablename__ = "guarantees"  # 指定表名
-    id: Mapped[int] = mapped_column(
-        Integer, primary_key=True, autoincrement=True
-    )  # 主键，担保唯一标识，自增
-    guarantee_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("users.id"), nullable=False
-    )  # 担保人id，不允许为空
-    applicant_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("users.id"), nullable=False
-    )  # 申请人id，不允许为空
-    player_name: Mapped[str] = mapped_column(
-        String(25), nullable=False
-    )  # 被担保人ID，不允许为空
-    player_uuid: Mapped[str] = mapped_column(
-        String(36), nullable=False
-    )  # 被担保人UUID，不允许为空
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)  # 主键，担保唯一标识，自增
+    guarantee_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)  # 担保人id，不允许为空
+    applicant_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)  # 申请人id，不允许为空
+    player_name: Mapped[str] = mapped_column(String(25), nullable=False)  # 被担保人ID，不允许为空
+    player_uuid: Mapped[str] = mapped_column(String(36), nullable=False)  # 被担保人UUID，不允许为空
     status: Mapped[int] = mapped_column(Integer, nullable=False)  # 担保状态
     create_time: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.now(timezone.utc)
@@ -335,9 +283,7 @@ class Guarantee(db.Model):
 class Whitelist(db.Model):
     __tablename__ = "whitelist"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    user_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("users.id"), nullable=True, default=None
-    )
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=True, default=None)
     player_name: Mapped[str] = mapped_column(String(25), nullable=False)
     player_uuid: Mapped[str] = mapped_column(String(36), nullable=False)
 
@@ -349,13 +295,9 @@ class Whitelist(db.Model):
 
 class Token(db.Model):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    user_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("users.id"), nullable=False
-    )
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
     token: Mapped[str] = mapped_column(String(256), unique=True, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.now(timezone.utc)
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc))
     expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     is_revoked: Mapped[bool] = mapped_column(Boolean, default=False)
 
@@ -369,9 +311,7 @@ class QuestionType(db.Model):
     __tablename__ = "question_type"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     type_name: Mapped[str] = mapped_column(String(25), nullable=False)
-    survey_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("surveys.id"), nullable=False
-    )
+    survey_id: Mapped[int] = mapped_column(Integer, ForeignKey("surveys.id"), nullable=False)
 
     def __init__(self, type_name: str, survey_id: int):
         self.type_name = type_name
@@ -388,13 +328,9 @@ class RegistrationLimit(db.Model):
 
 class ResetPasswordToken(db.Model):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    user_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("users.id"), nullable=False
-    )
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
     token: Mapped[str] = mapped_column(String(256), unique=True, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.now(timezone.utc)
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc))
     expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     is_revoked: Mapped[bool] = mapped_column(Boolean, default=False)
 
