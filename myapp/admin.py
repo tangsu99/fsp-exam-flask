@@ -155,7 +155,7 @@ def users():
             {
                 "id": user.id,
                 "username": user.username,
-                "user_qq": user.user_qq,
+                "userQQ": user.user_qq,
                 "role": user.role,
                 "status": user.status,
                 "addtime": user.addtime.isoformat() if user.addtime else None,
