@@ -113,7 +113,7 @@ class QuestionImgURL(db.Model):
     )  # 所属问题id，外键，关联问题表，级联删除
     img_alt: Mapped[str] = mapped_column(String(200))  # 图片alt，允许为空
     img_url: Mapped[str] = mapped_column(
-        String(200), nullable=False
+        Text, nullable=False
     )  # 图片URL，不允许为空
     create_time: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.now(timezone.utc)
