@@ -149,7 +149,7 @@ class User(UserMixin, db.Model):
         Integer, nullable=False, default=0
     )  # 0 未激活 1 正常 2 临时封禁 3 永久封禁 4 删除
     tokens: Mapped[list["Token"]] = relationship("Token", backref="user", lazy="select")
-    whitelist: Mapped[list["Whitelist"]] = relationship("Whitelist", backref="wuser", lazy="select")
+    whitelist: Mapped[list["Whitelist"]] = relationship("Whitelist", backref="wl_user", lazy="select")
     guarantees: Mapped[list["Guarantee"]] = relationship(
         "Guarantee",
         foreign_keys="Guarantee.guarantee_id",

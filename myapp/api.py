@@ -17,6 +17,10 @@ def whitelist():
         if result.player_name != data.get("name"):
             result.player_name = data.get("name")
             db.session.commit()
+
+        if result.wl_user.status != 1:
+            jsonify({"code": 3, "desc": "账户状态异常！"})
+
         res = {
             "code": 0,
             "desc": "在白名单中",
