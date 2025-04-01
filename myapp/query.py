@@ -1,18 +1,14 @@
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify
 from flask_login import login_required, current_user
 from sqlalchemy import desc
 from typing import cast
 from myapp import db
 from myapp.db_model import (
-    Option,
     Question,
     Response,
     Survey,
     User,
-    Whitelist,
-    ResponseDetail,
     ResponseScore,
-    QuestionType,
 )
 
 query = Blueprint("query", __name__)
@@ -37,19 +33,30 @@ def response():
         .all()
     )
 
-    response_data = []
+    response_data: list = []
     for res in top_10_responses:
-        scores = ResponseScore.query.filter_by(response_id=res.id).all()
-        total_score = sum(score.score for score in scores)  # 计算总分
+        answer_sheet: list = ResponseScore.query.filter_by(response_id=res.id).all()
+        total_score = sum(question.score for question in answer_sheet)  # 计算总分
+
+        questionnaire: list = Question.query.filter_by(survey_id=res.survey_id).all()
+        full_score = sum(question.score for question in questionnaire)
+
+        # 确保 survey_res 和 type 数据加载正确
+        survey_res: Survey = res.survey_res  # type: ignore
+        if survey_res and survey_res.type:
+            survey_type = survey_res.type[0].type_name if survey_res.type[0] else "Unknown"
+        else:
+            survey_type = "Unknown"
 
         # 构造返回数据
         response_data.append(
             {
                 "id": res.id,
-                "type": res.survey_res.type[0].type_name,
+                "type": survey_type,
                 "responseTime": res.response_time,
-                "isReviewed": res.is_reviewed,
-                "score": total_score,
+                "state": res.is_reviewed,
+                "get_score": total_score,
+                "full_score": full_score,
             }
         )
 
