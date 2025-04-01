@@ -323,7 +323,7 @@ class RegistrationLimit(db.Model):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     ip: Mapped[str] = mapped_column(String(45), nullable=False)  # 支持IPv6的最大长度
-    register_time = db.Column(db.DateTime, default=datetime.utcnow)
+    register_time = db.Column(db.DateTime, default=datetime.now(timezone.utc))
 
 
 class ResetPasswordToken(db.Model):
