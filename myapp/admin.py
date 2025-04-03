@@ -458,9 +458,13 @@ def get_detail(resp_id: int):
             "totalScore": question.score,
             "userGetScore": score,
             "options": [],
-            "img_list": question.img_list.all(),
+            "img_list": [],
             "userAnswer": [],
         }
+
+        for img in question.img_list:
+            question_data["img_list"].append({"alt": img.img_alt, "data": img.img_data})
+
         for option in question.options:
             question_data["options"].append(
                 {
@@ -474,8 +478,9 @@ def get_detail(resp_id: int):
         details: list[ResponseDetail] = ResponseDetail.query.filter_by(
             question_id=question.id, response_id=resp_id
         ).all()
+
         for detail in details:
-            question_data["answer"].append({"id": detail.id, "text": detail.answer})
+            question_data["userAnswer"].append({"id": detail.id, "text": detail.answer})
 
         survey_data["questions"].append(question_data)
 
