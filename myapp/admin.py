@@ -455,10 +455,11 @@ def get_detail(resp_id: int):
             "id": question.id,
             "title": question.question_text,
             "type": question.question_type,
-            "score": question.score,
+            "totalScore": question.score,
+            "userGetScore": score,
             "options": [],
-            "answer": [],
-            "countScore": score,
+            "img_list": question.img_list.all(),
+            "userAnswer": [],
         }
         for option in question.options:
             question_data["options"].append(
