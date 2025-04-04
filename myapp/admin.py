@@ -480,7 +480,7 @@ def get_detail(resp_id: int):
         ).all()
 
         for detail in details:
-            question_data["userAnswer"].append({"id": detail.id, "text": detail.answer})
+            question_data["userAnswer"].append({"question_id": detail.id, "selected_option_id": detail.answer})
 
         survey_data["questions"].append(question_data)
 
