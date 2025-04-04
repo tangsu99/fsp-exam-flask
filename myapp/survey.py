@@ -134,16 +134,17 @@ def start_survey():
     )
 
 
-def objective_question_scoring(user_response: list, question: Question) -> float:
+def objective_question_scoring(user_response: list[str], question: Question) -> float:
     # 获取问题的正确选项,列表元素的值为正确选项的ID
-    correct_options = [option.id for option in question.options if option.is_correct]
+    correct_options: list[int] = [option.id for option in question.options if option.is_correct]
 
     if question.question_type == QuestionCategory.SINGLE_CHOICE.value:
-        if user_response[0] in correct_options:
+        if int(user_response[0]) in correct_options:
             return question.score
 
     elif question.question_type == QuestionCategory.MULTIPLE_CHOICE.value:
-        if set(user_response) == set(correct_options):
+        user_response_int: list[int] = [int(option) for option in user_response]
+        if set(user_response_int) == set(correct_options):
             return question.score
 
     elif question.question_type == QuestionCategory.FILL_IN_THE_BLANKS.value:
@@ -154,8 +155,6 @@ def objective_question_scoring(user_response: list, question: Question) -> float
             correct_answer: str = option.option_text
             if new_user_response == correct_answer:
                 return question.score
-
-    # elif question.question_type == QuestionCategory.SUBJECTIVE.value:
 
     return 0
 
