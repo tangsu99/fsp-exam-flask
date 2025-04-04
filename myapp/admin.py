@@ -1,7 +1,5 @@
-from re import MULTILINE
 from flask import Blueprint, jsonify, request
 from flask_login import login_required
-from sqlalchemy import false, true
 
 from myapp import db
 from myapp.db_model import (
@@ -97,6 +95,35 @@ def add_question():
         db.session.add(option)
     db.session.commit()
     return jsonify({"code": 0, "desc": "成功"})
+
+
+@admin.route("/delQuestion", methods=["POST"])
+@login_required
+@required_role("admin")
+def del_question():
+    req_data = request.json
+    if req_data is None:
+        return jsonify({"code": 1, "desc": "缺少数据"})
+
+    try:
+        # 直接通过主键获取问题
+        question = db.session.get(Question, req_data)
+
+        if question is None:
+            return jsonify({"code": 0, "desc": "题目不存在"})
+
+        # 删除问题
+        db.session.delete(question)
+
+        # 提交事务
+        db.session.commit()
+        return jsonify({"code": 0, "desc": "删除成功"})
+
+    except Exception as e:
+        # 处理其他异常
+        db.session.rollback()
+        print(f"An error occurred while deleting the question: {e}")
+        return jsonify({"code": 1, "desc": "出现错误"})
 
 
 @admin.route("/whitelist", methods=["GET"])
@@ -489,8 +516,6 @@ def get_detail(resp_id: int):
                 user_selected_option.append(int(detail.answer))
 
         for option in question.options:
-            # print(user_selected_option)
-            # print(option.id)
             question_data["options"].append(
                 {
                     "id": option.id,

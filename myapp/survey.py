@@ -204,8 +204,9 @@ def complete_survey():
 
         question: Question | None = Question.query.get(question_id)
 
+        # 如果这道题已经被删除，就算了
         if question is None:
-            return jsonify({"code": 1, "desc": "题目未找到！"}), 400
+            continue
 
         # 累加分数
         score_ = objective_question_scoring(answer, question)
