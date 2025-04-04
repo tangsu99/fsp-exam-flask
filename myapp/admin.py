@@ -1,10 +1,13 @@
+from re import MULTILINE
 from flask import Blueprint, jsonify, request
 from flask_login import login_required
+from sqlalchemy import false, true
 
 from myapp import db
 from myapp.db_model import (
     Option,
     Question,
+    QuestionCategory,
     QuestionImgURL,
     QuestionType,
     Response,
@@ -427,13 +430,16 @@ def reviewed_response():
 @login_required
 @required_role("admin")
 def get_detail(resp_id: int):
-    res: Response | None = Response.query.get(resp_id)
     # 查询指定问卷
+    res: Response | None = Response.query.get(resp_id)
     if res is None:
         return jsonify({"code": 1, "desc": "信息不足"}), 404
+
     survey = Survey.query.get(res.survey_id)
+
     if not survey:
         return jsonify({"code": 1, "desc": "未找到问卷"}), 404
+
     survey_data = {
         "id": res.id,
         "name": survey.name,
@@ -448,9 +454,18 @@ def get_detail(resp_id: int):
         response_score: ResponseScore | None = ResponseScore.query.filter_by(
             question_id=question.id, response_id=resp_id
         ).first()
+
+        # 查询题目中的所有选项详情
+        details: list[ResponseDetail] = ResponseDetail.query.filter_by(
+            question_id=question.id, response_id=resp_id
+        ).all()
+
         score = 0
+        user_selected_option: list[int] = []
+
         if response_score is not None:
             score = response_score.score
+
         question_data = {
             "id": question.id,
             "title": question.question_text,
@@ -459,31 +474,34 @@ def get_detail(resp_id: int):
             "userGetScore": score,
             "options": [],
             "img_list": [],
-            "userAnswer": [],
+            "text_answer": "",
         }
 
         for img in question.img_list:
             question_data["img_list"].append({"alt": img.img_alt, "data": img.img_data})
 
+        # 标注用户选择的选项
+        if (
+            question.question_type == QuestionCategory.SINGLE_CHOICE.value
+            or question.question_type == QuestionCategory.MULTIPLE_CHOICE.value
+        ):
+            for detail in details:
+                user_selected_option.append(int(detail.answer))
+
         for option in question.options:
+            # print(user_selected_option)
+            # print(option.id)
             question_data["options"].append(
                 {
                     "id": option.id,
                     "text": option.option_text,
                     "isCorrect": option.is_correct,
+                    "isSelected": True if option.id in user_selected_option else False,
+                    "inputText": details[0].answer if question.question_type in [3, 4] and len(details) != 0 else "",
                 }
             )
 
-        # 查询题目中的所有选项详情
-        details: list[ResponseDetail] = ResponseDetail.query.filter_by(
-            question_id=question.id, response_id=resp_id
-        ).all()
-
-        for detail in details:
-            question_data["userAnswer"].append({"question_id": detail.id, "selected_option_id": detail.answer})
-
         survey_data["questions"].append(question_data)
-
     return jsonify(survey_data)
 
 
