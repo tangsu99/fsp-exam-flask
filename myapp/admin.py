@@ -66,6 +66,29 @@ def add_survey():
     return jsonify({"code": 1, "desc": "失败"})
 
 
+@admin.route("/modSurvey", methods=["POST"])
+@login_required
+@required_role("admin")
+def mod_survey():
+    if request.json:
+        sid = request.json["sid"]
+        name = request.json["name"]
+        description = request.json["description"]
+        if sid and name and description:
+            survey: Survey | None = Survey.query.get(sid)
+            if survey is None:
+                return jsonify({"code": 1, "desc": "问卷不存在"})
+
+            survey.name = name
+            survey.description = description
+
+            db.session.commit()
+            return jsonify({"code": 0, "desc": "成功"})
+
+        return jsonify({"code": 1, "desc": "缺少数据"})
+    return jsonify({"code": 1, "desc": "缺少数据"})
+
+
 def add_question_images(question_id: int, img_list: list) -> None:
     for item in img_list:
         img: QuestionImgURL = QuestionImgURL(question_id=question_id, img_alt=item["alt"], img_data=item["data"])
