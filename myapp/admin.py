@@ -80,6 +80,11 @@ def add_question():
         req_data["score"],
     )
 
+    options = req_data["options"]
+
+    if (options is None) or (not len(options) > 0):
+        return jsonify({"code": 1, "desc": "失败"})
+
     db.session.add(question)
     db.session.commit()
 
@@ -89,7 +94,10 @@ def add_question():
         db.session.add(img)
     db.session.commit()
 
-    options = req_data["options"]
+    # 如果是填空题或者判断题，设置第一个选项为正确选项
+    if question.question_type in [3, 4]:
+        options[0]["isCorrect"] = True
+
     for i in options:
         option: Option = Option(question.id, i["text"], i["isCorrect"])
         db.session.add(option)
@@ -410,7 +418,7 @@ def get_survey(sid: int):
             "options": [],
         }
         for img in question.img_list:
-            question_data["img_list"].append({"alt": img.img_alt, "data": img.img_data})
+            question_data["img_list"].append({"id": img.id, "alt": img.img_alt, "data": img.img_data})
 
         # 查询题目中的所有选项
         for option in question.options:
