@@ -1,5 +1,6 @@
 from flask import Blueprint, jsonify, request
 from flask_login import login_required
+from sqlalchemy import null
 
 from myapp import db
 from myapp.db_model import (
@@ -65,44 +66,104 @@ def add_survey():
     return jsonify({"code": 1, "desc": "失败"})
 
 
+def add_question_images(question_id: int, img_list: list) -> None:
+    for item in img_list:
+        img: QuestionImgURL = QuestionImgURL(question_id=question_id, img_alt=item["alt"], img_data=item["data"])
+        db.session.add(img)
+
+
+def add_question_options(question_id: int, question_type: int, options: list) -> bool:
+    if (options is None) or (not len(options) > 0):
+        return False
+
+    # 如果是填空题或者主观，设置第一个选项为正确选项
+    if question_type in [3, 4]:
+        options[0]["isCorrect"] = True
+
+    for i in options:
+        option: Option = Option(question_id=question_id, option_text=i["text"], is_correct=i["isCorrect"])
+        db.session.add(option)
+
+    return True
+
+
 @admin.route("/addQuestion", methods=["POST"])
 @login_required
 @required_role("admin")
 def add_question():
+    try:
+        req_data = request.json
+        if req_data is None:
+            raise ValueError("数据为空")
+
+        question: Question = Question(
+            req_data["survey"],
+            req_data["title"],
+            req_data["type"],
+            req_data["score"],
+        )
+
+        db.session.add(question)
+        db.session.flush()
+
+        options = req_data["options"]
+
+        res = add_question_options(question.id, question.question_type, options)
+        if not res:
+            raise ValueError("选项数据无效")
+
+        # 添加图片
+        img_list = req_data.get("img_list", [])
+        add_question_images(question.id, img_list)
+
+        db.session.commit()
+        return jsonify({"code": 0, "desc": "添加题目成功"})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"code": 1, "desc": e})
+
+
+@admin.route("/editQuestion", methods=["POST"])
+@login_required
+@required_role("admin")
+def edit_question():
     req_data = request.json
+
     if req_data is None:
-        return jsonify({"code": 1, "desc": "失败"})
+        return jsonify({"code": 1, "desc": "请求数据为空"})
 
-    question: Question = Question(
-        req_data["survey"],
-        req_data["title"],
-        req_data["type"],
-        req_data["score"],
-    )
+    question_id = req_data.get("id")
 
-    options = req_data["options"]
+    if not question_id:
+        return jsonify({"code": 1, "desc": "缺少题目 ID"})
 
-    if (options is None) or (not len(options) > 0):
-        return jsonify({"code": 1, "desc": "失败"})
+    question: Question | None = Question.query.get(question_id)
 
-    db.session.add(question)
+    if question is None:
+        return jsonify({"code": 1, "desc": "题目不存在"})
+
+    # 更新题目基本信息
+    question.survey_id = req_data["survey"]
+    question.question_text = req_data["title"]
+    question.question_type = req_data["type"]
+    question.score = req_data["score"]
+
+    # 处理选项数据
+    options = req_data.get("options")
+    Option.query.filter_by(question_id=question_id).delete()
+    res = add_question_options(question.id, question.question_type, options)
+    if not res:
+        db.session.rollback()
+        return jsonify({"code": 1, "desc": "选项数据无效"})
+
+    # 处理图片数据
+    img_list = req_data.get("img_list", [])
+    QuestionImgURL.query.filter_by(question_id=question_id).delete()
+    add_question_images(question_id, img_list)
+
     db.session.commit()
 
-    img_list: list = req_data["img_list"]
-    for item in img_list:
-        img: QuestionImgURL = QuestionImgURL(question.id, item["alt"], item["data"])
-        db.session.add(img)
-    db.session.commit()
-
-    # 如果是填空题或者判断题，设置第一个选项为正确选项
-    if question.question_type in [3, 4]:
-        options[0]["isCorrect"] = True
-
-    for i in options:
-        option: Option = Option(question.id, i["text"], i["isCorrect"])
-        db.session.add(option)
-    db.session.commit()
-    return jsonify({"code": 0, "desc": "成功"})
+    return jsonify({"code": 0, "desc": "修改题目成功"})
 
 
 @admin.route("/delQuestion", methods=["POST"])
@@ -125,7 +186,7 @@ def del_question():
 
         # 提交事务
         db.session.commit()
-        return jsonify({"code": 0, "desc": "删除成功"})
+        return jsonify({"code": 0, "desc": "删除题目成功"})
 
     except Exception as e:
         # 处理其他异常
