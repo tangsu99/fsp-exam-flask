@@ -7,7 +7,7 @@ from myapp.db_model import (
     Question,
     QuestionCategory,
     QuestionImgURL,
-    QuestionType,
+    SurveySlot,
     Response,
     ResponseDetail,
     ResponseScore,
@@ -671,55 +671,28 @@ def set_score():
     return jsonify({"code": 1, "desc": "缺少信息！"})
 
 
-@admin.route("/question_type", methods=["GET"])
-@login_required
-@required_role("admin")
-def get_all_question_type():
-    res: list[QuestionType] = QuestionType.query.all()
-
-    res_data = {
-        "code": 0,
-        "desc": "成功! ",
-        "list": [],
-    }
-
-    for i in res:
-        res_data["list"].append(
-            {
-                "id": i.id,
-                "typeName": i.type_name,
-                "surveyId": i.survey_id,
-            }
-        )
-
-    return jsonify(res_data)
-
-
-@admin.route("/question_type", methods=["PUT"])
+# 设置,改完还要改问卷的状态
+@admin.route("/set_slot", methods=["PUT"])
 @login_required
 @required_role("admin")
 def set_question_type():
     req_data = request.json
     if req_data:
-        id_ = req_data.get("id")
-        survey_id = req_data.get("surveyId")
-        type_name = req_data.get("typeName")
+        slot_id = req_data.get("id")
+        survey_id = req_data.get("mountedSID")
+        if id and survey_id:
+            if Survey.query.get(slot_id) is None:
+                return jsonify({"code": 1, "desc": "未找到问卷！"})
 
-        if Survey.query.get(id_) is None:
-            return jsonify({"code": 1, "desc": "未找到问卷！"})
+            slot: SurveySlot | None = SurveySlot.query.get(slot_id)
+            if slot is None:
+                return jsonify({"code": 1, "desc": "未找到插槽！"})
 
-        res: QuestionType | None = QuestionType.query.filter_by(id=id_).first()
-        if res is None:
-            return jsonify({"code": 1, "desc": "未找到类型！"})
-        res.type_name = type_name
-        res.survey_id = survey_id
+            slot.mounted_survey_id = survey_id
 
-        db.session.commit()
+            db.session.commit()
 
-        res_data = {
-            "code": 0,
-            "desc": "成功! ",
-        }
+            return jsonify({"code": 0, "desc": f"修改{slot.slot_name}插槽成功"})
 
-        return jsonify(res_data)
-    return jsonify("wtf")
+        return jsonify({"code": 1, "desc": "缺少信息！"})
+    return jsonify({"code": 1, "desc": "缺少信息！"})

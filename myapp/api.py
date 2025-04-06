@@ -1,5 +1,5 @@
 from flask import Blueprint, jsonify, request
-from flask_login import current_user, login_required
+from flask_login import current_user
 from typing import cast, Optional
 from myapp import db
 from myapp.db_model import User, Whitelist
@@ -12,7 +12,7 @@ api = Blueprint("api", __name__)
 @token_check()
 def whitelist():
     data = request.get_json()
-    result: Whitelist = Whitelist.query.filter_by(player_uuid=data.get("uuid")).first()
+    result: Whitelist | None = Whitelist.query.filter_by(player_uuid=data.get("uuid")).first()
     if result is not None:
         if result.player_name != data.get("name"):
             result.player_name = data.get("name")
@@ -21,14 +21,9 @@ def whitelist():
         if result.wl_user.status != 1:
             jsonify({"code": 3, "desc": "账户状态异常！"})
 
-        res = {
-            "code": 0,
-            "desc": "在白名单中",
-            "uuid": result.player_uuid,
-            "name": result.player_name
-        }
+        res = {"code": 0, "desc": "在白名单中", "uuid": result.player_uuid, "name": result.player_name}
         print(type(result.user_id))
-        if result.user_id is None :
+        if result.user_id is None:
             res["code"] = 2
             res["desc"] = "未绑定账户"
         return jsonify(res)
