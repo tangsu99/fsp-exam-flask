@@ -59,10 +59,11 @@ def add_survey():
     if request.json:
         name = request.json["name"]
         description = request.json["description"]
-        survey: Survey = Survey(name, description)
-        db.session.add(survey)
-        db.session.commit()
-        return jsonify({"code": 0, "desc": "成功"})
+        if name and description:
+            survey: Survey = Survey(name, description)
+            db.session.add(survey)
+            db.session.commit()
+            return jsonify({"code": 0, "desc": "成功"})
     return jsonify({"code": 1, "desc": "失败"})
 
 
