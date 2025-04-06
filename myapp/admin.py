@@ -1,7 +1,7 @@
 from flask import Blueprint, jsonify, request
 from flask_login import login_required
 
-from myapp import db
+from myapp import db, survey
 from myapp.db_model import (
     Option,
     Question,
@@ -671,7 +671,6 @@ def set_score():
     return jsonify({"code": 1, "desc": "缺少信息！"})
 
 
-# 设置,改完还要改问卷的状态
 @admin.route("/set_slot", methods=["PUT"])
 @login_required
 @required_role("admin")
@@ -679,8 +678,8 @@ def set_question_type():
     req_data = request.json
     if req_data:
         slot_id = req_data.get("id")
-        survey_id = req_data.get("mountedSID")
-        if id and survey_id:
+        new_survey_id = req_data.get("mountedSID")
+        if slot_id and new_survey_id:
             if Survey.query.get(slot_id) is None:
                 return jsonify({"code": 1, "desc": "未找到问卷！"})
 
@@ -688,11 +687,23 @@ def set_question_type():
             if slot is None:
                 return jsonify({"code": 1, "desc": "未找到插槽！"})
 
-            slot.mounted_survey_id = survey_id
+            old_mounted_survey_id = slot.mounted_survey_id
+            old_mounted_survey: Survey | None = Survey.query.get(old_mounted_survey_id)
+            new_mounted_survey: Survey | None = Survey.query.get(new_survey_id)
 
-            db.session.commit()
+            if new_mounted_survey:
+                # 旧问卷找不到了无所谓
+                if old_mounted_survey:
+                    old_mounted_survey.status = 0
 
-            return jsonify({"code": 0, "desc": f"修改{slot.slot_name}插槽成功"})
+                slot.mounted_survey_id = new_survey_id
 
+                new_mounted_survey.status = 1
+
+                db.session.commit()
+
+                return jsonify({"code": 0, "desc": f"修改{slot.slot_name}插槽成功"})
+
+            return jsonify({"code": 1, "desc": "问卷不存在"})
         return jsonify({"code": 1, "desc": "缺少信息！"})
     return jsonify({"code": 1, "desc": "缺少信息！"})
