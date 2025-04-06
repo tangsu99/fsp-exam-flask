@@ -56,7 +56,7 @@ def all_question():
 @login_required
 @required_role("admin")
 def add_survey():
-    if request.json:
+    if request.json and "name" in request.json and "description" in request.json:
         name = request.json["name"]
         description = request.json["description"]
         if name and description:
@@ -71,7 +71,7 @@ def add_survey():
 @login_required
 @required_role("admin")
 def mod_survey():
-    if request.json:
+    if request.json and "sid" in request.json:
         sid = request.json["sid"]
         name = request.json["name"]
         description = request.json["description"]
