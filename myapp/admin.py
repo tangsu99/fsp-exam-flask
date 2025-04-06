@@ -1,3 +1,5 @@
+from functools import wraps
+from typing import Optional, Callable, TypeVar, cast
 from flask import Blueprint, jsonify, request
 from flask_login import login_required
 
@@ -18,6 +20,31 @@ from myapp.db_model import (
 from myapp.utils import check_password, required_role
 
 admin = Blueprint("admin", __name__)
+
+
+F = TypeVar("F", bound=Callable)
+
+
+def validate_json(required_fields: Optional[list[str]] = None) -> Callable[[F], F]:
+    def decorator(f: F) -> F:
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            if not request.json:
+                return jsonify({"code": 1, "desc": "Invalid JSON data"}), 400
+
+            # 将 request.json 的类型缩小为 dict
+            req_data = cast(dict, request.json)
+
+            if required_fields:
+                missing_fields = [field for field in required_fields if field not in req_data]
+                if missing_fields:
+                    return jsonify({"code": 1, "desc": f"Missing fields: {', '.join(missing_fields)}"}), 400
+
+            return f(*args, **kwargs)
+
+        return cast(F, decorated_function)
+
+    return decorator
 
 
 @admin.route("/")
@@ -671,10 +698,30 @@ def set_score():
     return jsonify({"code": 1, "desc": "缺少信息！"})
 
 
-@admin.route("/set_slot", methods=["PUT"])
+@admin.route("/add_slot", methods=["POST"])
 @login_required
 @required_role("admin")
-def set_question_type():
+@validate_json(required_fields=["slotName", "mountedSID"])
+def add_slot():
+    slot_name: str = request.json["slotName"]
+    mounted_survey_id: int = request.json["mountedSID"]
+
+    mounted_survey: Survey | None = Survey.query.get(mounted_survey_id)
+    if mounted_survey is None:
+        return jsonify({"code": 1, "desc": "挂载的问卷不存在"})
+    mounted_survey.status = 1
+
+    slot: SurveySlot = SurveySlot(slot_name=slot_name, survey_id=mounted_survey_id)
+
+    db.session.add(slot)
+    db.session.commit()
+    return jsonify({"code": 0, "desc": "新建插槽成功"})
+
+
+@admin.route("/set_slot", methods=["POST"])
+@login_required
+@required_role("admin")
+def set_slot():
     req_data = request.json
     if req_data:
         slot_id = req_data.get("id")
@@ -707,3 +754,32 @@ def set_question_type():
             return jsonify({"code": 1, "desc": "问卷不存在"})
         return jsonify({"code": 1, "desc": "缺少信息！"})
     return jsonify({"code": 1, "desc": "缺少信息！"})
+
+
+@admin.route("/del_slot", methods=["POST"])
+@login_required
+@required_role("admin")
+@validate_json(required_fields=["id"])
+def del_slot():
+    slot_id: str = request.json["id"]
+    try:
+        # 直接通过主键获取问题
+        slot = SurveySlot.query.get(slot_id)
+        if slot is None:
+            return jsonify({"code": 0, "desc": "要删除的插槽不存在"})
+
+        old_mounted_survey_id = slot.mounted_survey_id
+        old_mounted_survey: Survey | None = Survey.query.get(old_mounted_survey_id)
+
+        if old_mounted_survey:
+            old_mounted_survey.status = 0
+
+        db.session.delete(slot)
+        db.session.commit()
+        return jsonify({"code": 0, "desc": "删除插槽成功"})
+
+    except Exception as e:
+        # 处理其他异常
+        db.session.rollback()
+        print(f"An error occurred while deleting the question: {e}")
+        return jsonify({"code": 1, "desc": "出现错误"})
