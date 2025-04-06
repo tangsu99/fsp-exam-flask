@@ -1,7 +1,7 @@
 from flask import Blueprint, jsonify, request
 from flask_login import login_required
 
-from myapp import db, survey
+from myapp import db
 from myapp.db_model import (
     Option,
     Question,
@@ -507,7 +507,7 @@ def get_responses():
 @required_role("admin")
 def get_survey(sid: int):
     # 查询指定问卷
-    survey = Survey.query.get(sid)
+    survey: Survey | None = Survey.query.get(sid)
     if not survey:
         return jsonify({"code": 1, "desc": "未找到问卷"}), 404
     # 构建问卷数据结构
@@ -582,7 +582,7 @@ def get_detail(resp_id: int):
     if res is None:
         return jsonify({"code": 1, "desc": "信息不足"}), 404
 
-    survey = Survey.query.get(res.survey_id)
+    survey: Survey | None = Survey.query.get(res.survey_id)
 
     if not survey:
         return jsonify({"code": 1, "desc": "未找到问卷"}), 404
@@ -594,8 +594,8 @@ def get_detail(resp_id: int):
         "create_time": survey.create_time,
         "status": survey.status,
         "questions": [],
-        "type": survey.type[0].type_name,
     }
+
     # 查询问卷中的所有题目
     for question in survey.questions:
         response_score: ResponseScore | None = ResponseScore.query.filter_by(
