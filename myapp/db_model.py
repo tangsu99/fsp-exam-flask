@@ -36,18 +36,13 @@ class Survey(db.Model):
     create_time: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.now(timezone.utc)
     )  # 问卷创建时间，默认为当前时间
-    status: Mapped[int] = mapped_column(
-        Integer, nullable=False
-    )  # 问卷状态，不允许为空，如0-未发布，1-已发布，2-已结束等
+    status: Mapped[int] = mapped_column(Integer, nullable=False)  # 问卷状态，不允许为空，0：未挂载，1：已挂载
     questions: Mapped[list["Question"]] = relationship(
         "Question", backref="survey", lazy="select", cascade="all, delete"
     )  # 与问题表建立一对多关系，级联删除
     response: Mapped[list["Response"]] = relationship(
         "Response", backref="survey_res", lazy="select", cascade="all, delete"
     )  # 与答卷表建立一对多关系，级联删除
-    type: Mapped[list["QuestionType"]] = relationship(
-        "QuestionType", backref="survey_q", lazy="select", cascade="all, delete"
-    )
 
     def __init__(self, name: str, description: str, status: int = 0):
         self.name = name
@@ -307,15 +302,15 @@ class Token(db.Model):
         self.expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
 
 
-class QuestionType(db.Model):
-    __tablename__ = "question_type"
+class SurveySlot(db.Model):
+    __tablename__ = "survey_slot"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    type_name: Mapped[str] = mapped_column(String(25), nullable=False)
-    survey_id: Mapped[int] = mapped_column(Integer, ForeignKey("surveys.id"), nullable=False)
+    slot_name: Mapped[str] = mapped_column(String(25), nullable=False)
+    mounted_survey_id: Mapped[int] = mapped_column(Integer, ForeignKey("surveys.id"), nullable=False)
 
-    def __init__(self, type_name: str, survey_id: int):
-        self.type_name = type_name
-        self.survey_id = survey_id
+    def __init__(self, slot_name: str, survey_id: int):
+        self.slot_name = slot_name
+        self.mounted_survey_id = survey_id
 
 
 class RegistrationLimit(db.Model):

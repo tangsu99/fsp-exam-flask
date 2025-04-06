@@ -9,7 +9,7 @@ from myapp.db_model import (
     Option,
     Question,
     QuestionCategory,
-    QuestionType,
+    SurveySlot,
     Response,
     ResponseDetail,
     ResponseScore,
@@ -19,6 +19,29 @@ from myapp.db_model import (
 )
 
 survey = Blueprint("survey", __name__)
+
+
+@survey.route("/get_slots", methods=["GET"])
+@login_required
+def get_all_question_type():
+    slots: list[SurveySlot] = SurveySlot.query.all()
+
+    res_data = {
+        "code": 0,
+        "desc": "成功! ",
+        "list": [],
+    }
+
+    for slot in slots:
+        res_data["list"].append(
+            {
+                "id": slot.id,
+                "slotName": slot.slot_name,
+                "mountedSID": slot.mounted_survey_id,
+            }
+        )
+
+    return jsonify(res_data)
 
 
 @survey.route("/survey/<int:sid>", methods=["GET"])
@@ -88,6 +111,7 @@ def check_survey():
 @login_required
 def start_survey():
     user: User = cast(User, current_user)
+
     # 检查用户是否有未完成的答卷
     existing_response = user.responses
     res: Response | None = awa(existing_response)
@@ -95,27 +119,30 @@ def start_survey():
         return jsonify({"code": 1, "desc": "您有未完成问卷！", "response": res.survey_id})
 
     data = request.get_json()
-    type_ = data["playerType"]
-    question_type = QuestionType.query.filter_by(type_name=type_).first()
-    if question_type is None:
+
+    if "slotID" not in data:
+        return jsonify({"code": 4, "desc": "缺少插槽 ID"}), 400
+
+    choice_slot_id: int = data["slotID"]
+    survey_slot = SurveySlot.query.filter_by(id=choice_slot_id).first()
+
+    if survey_slot is None:
         return jsonify({"code": 4, "desc": "未找到指定的问卷类型！"}), 400
 
-    mc_name = data.get("playerName")  # Minecraft 名称
-    mc_uuid = data.get("playerUUID")  # Minecraft UUID
+    mc_name: str = data.get("playerName")  # Minecraft 名称
+    mc_uuid: str = data.get("playerUUID")  # Minecraft UUID
 
-    wl = Whitelist.query.filter_by(player_uuid=mc_uuid).first()
-    if wl is not None:
+    is_in_whitelist = Whitelist.query.filter_by(player_uuid=mc_uuid).first()
+    if is_in_whitelist:
         return jsonify({"code": 2, "desc": "此玩家存在已有白名单! "})
 
-    survey = question_type.survey_q
-
-    if not all([survey, mc_name, mc_uuid]):
+    if not mc_name or not mc_uuid:
         return jsonify({"code": 1, "desc": "字段无效！"}), 400
 
     # 创建新的答卷
     new_response = Response(
         user_id=user.id,
-        survey_id=survey.id,
+        survey_id=survey_slot.mounted_survey_id,
         player_name=mc_name,
         player_uuid=mc_uuid,
     )
