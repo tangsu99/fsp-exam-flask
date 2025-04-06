@@ -59,7 +59,6 @@ def get_survey(sid: int):
         "create_time": survey.create_time,
         "status": survey.status,
         "questions": [],
-        "type": survey.type[0].type_name,
     }
     # 查询问卷中的所有题目
     for question in survey.questions:
@@ -120,29 +119,21 @@ def start_survey():
 
     data = request.get_json()
 
-    if "slotID" not in data:
-        return jsonify({"code": 4, "desc": "缺少插槽 ID"}), 400
+    sid: int = data.get("sid")
+    mc_name: str = data.get("playerName")
+    mc_uuid: str = data.get("playerUUID")
 
-    choice_slot_id: int = data["slotID"]
-    survey_slot = SurveySlot.query.filter_by(id=choice_slot_id).first()
-
-    if survey_slot is None:
-        return jsonify({"code": 4, "desc": "未找到指定的问卷类型！"}), 400
-
-    mc_name: str = data.get("playerName")  # Minecraft 名称
-    mc_uuid: str = data.get("playerUUID")  # Minecraft UUID
+    if not sid or not mc_name or not mc_uuid:
+        return jsonify({"code": 1, "desc": "缺少信息！"})
 
     is_in_whitelist = Whitelist.query.filter_by(player_uuid=mc_uuid).first()
     if is_in_whitelist:
         return jsonify({"code": 2, "desc": "此玩家存在已有白名单! "})
 
-    if not mc_name or not mc_uuid:
-        return jsonify({"code": 1, "desc": "字段无效！"}), 400
-
     # 创建新的答卷
     new_response = Response(
         user_id=user.id,
-        survey_id=survey_slot.mounted_survey_id,
+        survey_id=sid,
         player_name=mc_name,
         player_uuid=mc_uuid,
     )
