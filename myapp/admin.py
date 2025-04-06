@@ -1,6 +1,5 @@
 from flask import Blueprint, jsonify, request
 from flask_login import login_required
-from sqlalchemy import null
 
 from myapp import db
 from myapp.db_model import (
@@ -63,8 +62,36 @@ def add_survey():
             survey: Survey = Survey(name, description)
             db.session.add(survey)
             db.session.commit()
-            return jsonify({"code": 0, "desc": "成功"})
-    return jsonify({"code": 1, "desc": "失败"})
+            return jsonify({"code": 0, "desc": "问卷创建成功"})
+    return jsonify({"code": 1, "desc": "问卷删除失败"})
+
+
+@admin.route("/delSurvey", methods=["POST"])
+@login_required
+@required_role("admin")
+def del_survey():
+    req_data = request.json
+    if req_data is None:
+        return jsonify({"code": 1, "desc": "缺少数据"})
+
+    if type(req_data) is not int:
+        return jsonify({"code": 1, "desc": "数据不符"})
+
+    try:
+        survey: Survey | None = db.session.get(Survey, req_data)
+
+        if survey is None:
+            return jsonify({"code": 0, "desc": "要删除的问卷不存在"})
+
+        db.session.delete(survey)
+
+        db.session.commit()
+        return jsonify({"code": 0, "desc": "删除问卷成功"})
+
+    except Exception as e:
+        db.session.rollback()
+        print(f"An error occurred while deleting the question: {e}")
+        return jsonify({"code": 1, "desc": "出现错误"})
 
 
 @admin.route("/modSurvey", methods=["POST"])
