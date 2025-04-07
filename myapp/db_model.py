@@ -192,6 +192,7 @@ class Response(db.Model):
     survey_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("surveys.id", ondelete="CASCADE"), nullable=False
     )  # 所答问卷id，外键，关联问卷表，级联删除
+    survey_name: Mapped[str] = mapped_column(String(200), nullable=True)  # 问卷当时的名称
     response_time: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.now(timezone.utc)
     )  # 答卷时间，默认为当前时间
@@ -205,9 +206,10 @@ class Response(db.Model):
         "ResponseScore", backref="response_s", lazy="select", cascade="all, delete"
     )
 
-    def __init__(self, user_id: int, survey_id: int, player_name: str, player_uuid: str):
+    def __init__(self, user_id: int, survey_id: int, survey_name: str, player_name: str, player_uuid: str):
         self.user_id = user_id
         self.survey_id = survey_id
+        self.survey_name = survey_name
         self.player_name = player_name
         self.player_uuid = player_uuid
 
