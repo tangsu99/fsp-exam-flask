@@ -6,6 +6,7 @@ from flask_login import current_user, login_required
 from mj_api import get_player_uuid
 from myapp import db
 from myapp.db_model import Guarantee, User, Whitelist
+from myapp.validate_json import validate_json
 
 guarantee = Blueprint("guarantee", __name__)
 
@@ -15,60 +16,76 @@ def get_ago_time() -> datetime:
     return time
 
 
-@guarantee.route("/request", methods=["POST"])
-@login_required
-def _request():
-    data = request.get_json()
-    response_data = {"code": 0, "desc": "担保请求提交成功", "state": "success"}
-    wl_result = Whitelist.query.filter_by(player_uuid=data["playerUUID"]).first()
-    # 在白名单中
-    if wl_result is not None:
-        response_data["desc"] = "已存在白名单"
-        response_data["state"] = "alreadyExists"
-        return jsonify(response_data)
+def checkGuarantor(info: dict) -> dict:
+    wl_result = Whitelist.query.filter_by(player_uuid=info["player_uuid"]).first()
+
+    if wl_result is None:
+        return {"code": 1, "desc": "担保人不属于白名单成员，无法担保！"}
+
+    user_result = User.query.get(wl_result.user_id)
+    if user_result.status != 1:
+        return {"code": 1, "desc": "担保人账户状态异常，无法担保！"}
+
+    return {"code": 0, "guarantor_id": user_result.id}
+
+
+def checkApplicant(info: dict) -> dict:
+    wl_result = Whitelist.query.filter_by(player_uuid=info["player_uuid"]).first()
+
+    if wl_result:
+        return {"code": 1, "desc": "你已经是白名单成员"}
+
     ten_minutes_ago = get_ago_time()
+
     g_result = Guarantee.query.filter(
-        Guarantee.player_uuid == data["playerUUID"],
+        Guarantee.player_uuid == info["player_uuid"],
         Guarantee.create_time >= ten_minutes_ago,
     ).all()
-    if len(g_result) != 0:
-        response_data["desc"] = "担保请求未过期"
-        response_data["state"] = "requestExists"
-        response_data["guaranteeId"] = g_result[0].id
-        return jsonify(response_data)
-    _res = get_player_uuid(data["playerName"])
-    if _res is None:
-        response_data["desc"] = "未找到此玩家"
-        response_data["state"] = "inconsistentInfo"
-        return jsonify(response_data)
-    name: str = _res[0]
-    uuid: str = _res[1]
-    # 验证
-    if name.lower() != data["playerName"].lower() or uuid != data["playerUUID"].replace(
-        "-", ""
-    ):
-        response_data["desc"] = "未找到此玩家"
-        response_data["state"] = "inconsistentInfo"
-        return jsonify(response_data)
-    g_wl_result: User | None = User.query.filter(
-        User.user_qq == data["guaranteeQQ"]
-    ).first()
-    if g_wl_result is None:
-        response_data["desc"] = "未找到此担保人"
-        response_data["state"] = "unknownGuarantor"
-        return jsonify(response_data)
-    elif g_wl_result.status != 1:
-        response_data["desc"] = "担保人白名单异常"
-        response_data["state"] = "unknownGuarantor"
-        return jsonify(response_data)
 
-    # 存
+    if len(g_result) != 0:
+        return {"code": 1, "desc": "存在未过期的担保！"}
+
+    # 前端已经验证过了，感觉这段代码不需要
+    # _res = get_player_uuid(info["playerName"])
+    #
+    # if _res is None:
+    #     return {"code": 1, "desc": "被担保玩家名不存在"}
+
+    return {"code": 0}
+
+
+@guarantee.route("/request", methods=["POST"])
+@login_required
+@validate_json(required_fields=["userInfo", "guarantorInfo"])
+def _request():
+    applicant_info = {
+        "player_name": request.json["userInfo"]["playerName"],
+        "player_uuid": request.json["userInfo"]["playerUUID"],
+    }
+
+    guarantor_info = {
+        "player_name": request.json["guarantorInfo"]["playerName"],
+        "player_uuid": request.json["guarantorInfo"]["playerUUID"],
+    }
+
+    checkGuarantorRes = checkGuarantor(guarantor_info)
+
+    if checkGuarantorRes["code"] == 1:
+        return jsonify(checkGuarantorRes)
+
+    guarantor_id = checkGuarantorRes["guarantor_id"]
+
+    checkApplicantRes = checkApplicant(applicant_info)
+
+    if checkApplicantRes["code"] == 1:
+        return jsonify(checkApplicantRes)
+
     _guarantee = Guarantee(
-        g_wl_result.id, current_user.get_id(), data["playerName"], data["playerUUID"]
+        guarantor_id, current_user.get_id(), applicant_info["player_name"], applicant_info["player_uuid"]
     )
     db.session.add(_guarantee)
     db.session.commit()
-    return jsonify(response_data)
+    return jsonify({"code": 0, "desc": "担保请求提交成功，担保有效期1小时，过期后失效"})
 
 
 @guarantee.route("/query", methods=["GET"])
