@@ -41,18 +41,11 @@ def response():
         questionnaire: list = Question.query.filter_by(survey_id=res.survey_id).all()
         full_score = sum(question.score for question in questionnaire)
 
-        # 确保 survey_res 和 type 数据加载正确
-        survey_res: Survey = res.survey_res  # type: ignore
-        if survey_res and survey_res.type:
-            survey_type = survey_res.type[0].type_name if survey_res.type[0] else "Unknown"
-        else:
-            survey_type = "Unknown"
-
         # 构造返回数据
         response_data.append(
             {
                 "id": res.id,
-                "type": survey_type,
+                "survey_name": res.survey_name,
                 "responseTime": res.response_time,
                 "state": res.is_reviewed,
                 "get_score": total_score,

@@ -120,10 +120,11 @@ def start_survey():
     data = request.get_json()
 
     sid: int = data.get("sid")
+    slot_name: str = data.get("slot_name")
     mc_name: str = data.get("playerName")
     mc_uuid: str = data.get("playerUUID")
 
-    if not sid or not mc_name or not mc_uuid:
+    if not sid or not slot_name or not mc_name or not mc_uuid:
         return jsonify({"code": 1, "desc": "缺少信息！"})
 
     is_in_whitelist = Whitelist.query.filter_by(player_uuid=mc_uuid).first()
@@ -134,6 +135,7 @@ def start_survey():
     new_response = Response(
         user_id=user.id,
         survey_id=sid,
+        survey_name=slot_name,
         player_name=mc_name,
         player_uuid=mc_uuid,
     )
