@@ -5,6 +5,7 @@ from flask_login import login_required
 
 from myapp import db
 from myapp.db_model import (
+    Guarantee,
     Option,
     Question,
     QuestionCategory,
@@ -783,3 +784,36 @@ def del_slot():
         db.session.rollback()
         print(f"An error occurred while deleting the question: {e}")
         return jsonify({"code": 1, "desc": "出现错误"})
+
+
+
+@admin.route("/guarantee/get", methods=["GET"])
+@login_required
+@required_role("admin")
+def get_guarantee():
+    page = request.args.get("page", 1, type=int)  # 获取页码，默认为 1
+    per_page = request.args.get("size", 10, type=int)  # 获取每页条数，默认为 10
+
+    pagination = Guarantee.query.paginate(page=page, per_page=per_page, error_out=False)
+
+    result_list = []
+
+    for item in pagination.items:
+        result_list.append({
+            "id": item.id,
+            "guarantee_id": item.guarantee_id,
+            "applicant_id": item.applicant_id,
+            "player_name": item.player_name,
+            "status": item.status,
+            "create_time": item.create_time
+        })
+    response_data = {
+        "code": 0,
+        "desc": "yes",
+        "list": result_list,
+        "page": pagination.page,
+        "size": pagination.per_page,
+        "total": pagination.total,
+    }
+    return jsonify(response_data)
+
