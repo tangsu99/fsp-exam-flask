@@ -257,24 +257,24 @@ class Guarantee(db.Model):
     applicant_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)  # 申请人id，不允许为空
     player_name: Mapped[str] = mapped_column(String(25), nullable=False)  # 被担保人ID，不允许为空
     player_uuid: Mapped[str] = mapped_column(String(36), nullable=False)  # 被担保人UUID，不允许为空
-    status: Mapped[int] = mapped_column(Integer, nullable=False, default=0)  # 担保状态
-    create_time: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.now(timezone.utc)
-    )  # 担保记录创建时间，默认为当前时间
-
+    status: Mapped[int] = mapped_column(Integer, nullable=False, default=0)  # 担保状态, 0 待同意，1 已同意，2 已拒绝
+    create_time: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    expiration_time: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     def __init__(
         self,
         guarantee_id: int,
         applicant_id: int,
         player_name: str,
         player_uuid: str,
-        status: int = 0,
+        create_time: datetime,
+        expiration_time: datetime
     ):
         self.guarantee_id = guarantee_id
         self.applicant_id = applicant_id
         self.player_name = player_name
         self.player_uuid = player_uuid
-        self.status = status
+        self.create_time = create_time
+        self.expiration_time = expiration_time
 
 
 class Whitelist(db.Model):

@@ -801,11 +801,12 @@ def get_guarantee():
     for item in pagination.items:
         result_list.append({
             "id": item.id,
-            "guarantee_id": item.guarantee_id,
-            "applicant_id": item.applicant_id,
+            "guarantor_username": item.guarantor.username,
+            "applicant_username": item.applicant.username,
             "player_name": item.player_name,
             "status": item.status,
-            "create_time": item.create_time
+            "create_time": item.create_time,
+            "expiration_time": item.expiration_time
         })
     response_data = {
         "code": 0,

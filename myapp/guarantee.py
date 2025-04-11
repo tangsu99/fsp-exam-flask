@@ -1,4 +1,5 @@
 from datetime import datetime, timezone, timedelta
+from jsonschema import validate, ValidationError
 
 from flask import Blueprint, jsonify, request
 from flask_login import current_user, login_required
@@ -54,10 +55,24 @@ def checkApplicant(info: dict) -> dict:
     return {"code": 0}
 
 
+def returnData(i: Guarantee):
+    return {
+        "uid": i.applicant.id,
+        "id": i.id,
+        "username": i.applicant.username,
+        "userQQ": i.applicant.user_qq,
+        "avatar": i.applicant.avatar,
+        "playerName": i.player_name,
+        "playerUUID": i.player_uuid,
+        "createTime": i.create_time,
+        "expirationTime": i.expiration_time,
+        "status": i.status,
+    }
+
 @guarantee.route("/request", methods=["POST"])
 @login_required
 @validate_json(required_fields=["userInfo", "guarantorInfo"])
-def _request():
+def add_guarantee():
     applicant_info = {
         "player_name": request.json["userInfo"]["playerName"],
         "player_uuid": request.json["userInfo"]["playerUUID"],
@@ -81,16 +96,21 @@ def _request():
         return jsonify(checkApplicantRes)
 
     _guarantee = Guarantee(
-        guarantor_id, current_user.get_id(), applicant_info["player_name"], applicant_info["player_uuid"]
+        guarantor_id,
+        current_user.get_id(),
+        applicant_info["player_name"],
+        applicant_info["player_uuid"], 
+        datetime.now(timezone.utc),
+        datetime.now(timezone.utc) + timedelta(hours=1),
     )
     db.session.add(_guarantee)
     db.session.commit()
     return jsonify({"code": 0, "desc": "担保请求提交成功，担保有效期1小时，过期后失效"})
 
 
-@guarantee.route("/query", methods=["GET"])
+@guarantee.route("/query_all", methods=["GET"])
 @login_required
-def query():
+def query_all():
     response_data = {
         "code": 0,
         "desc": "yes",
@@ -107,15 +127,59 @@ def query():
     return jsonify(response_data)
 
 
-def returnData(i: Guarantee):
-    return {
-        "uid": i.applicant.id,
-        "id": i.id,
-        "username": i.applicant.username,
-        "userQQ": i.applicant.user_qq,
-        "avatar": i.applicant.avatar,
-        "playerName": i.player_name,
-        "playerUUID": i.player_uuid,
-        "createTime": i.create_time,
-        "status": i.status,
+@guarantee.route("/action", methods=["POST"])
+@login_required
+def guarantee_user_action():
+    schema = {
+        "type": "object",
+        "properties": {
+            "id": {"type": "number"},
+            "action": {"type": "string"},
+        },
+        "required": ["id", "action"]
     }
+    try:
+        validate(instance=request.json, schema=schema)
+        # 处理合法数据的逻辑
+        id: int = request.json["id"] # pyright: ignore
+        action: str = request.json["action"] # pyright: ignore
+
+        def is_expired(create_time: str, expiration_time: str) -> bool:
+            # 定义时间格式
+            time_format = "%Y-%m-%d %H:%M:%S.%f"  # 包含微秒的时间格式
+
+            # 解析时间字符串为 datetime 对象
+            create_datetime = datetime.strptime(create_time, time_format)
+            expiration_datetime = datetime.strptime(expiration_time, time_format)
+
+            # 计算时间差
+            time_difference = expiration_datetime - create_datetime
+
+            # 判断时间差是否超过 1 小时（1小时 = 3600秒）
+            return time_difference.total_seconds() > 3600
+
+        _guarantee: Guarantee | None = Guarantee.query.get(id)
+        if _guarantee and not is_expired(str(_guarantee.create_time), str(_guarantee.expiration_time)):
+            if action == "reject":
+                _guarantee.status = 2
+                db.session.commit()
+                return jsonify({"code": 0, "desc": "担保已拒绝！"})
+
+            elif action == "accept":
+                wl = Whitelist.query.filter_by(player_uuid=_guarantee.player_uuid).first()
+                if wl is not None:
+                    return jsonify({"code": 1, "desc": "此玩家存在已有白名单! "})
+
+                db.session.add(Whitelist(_guarantee.applicant_id, _guarantee.player_name, _guarantee.player_uuid))
+                _guarantee.status = 1
+                db.session.commit()
+                return jsonify({"code": 0, "desc": "担保成功！白名单已添加"})
+
+            else:
+                return jsonify({"code": 1, "desc": "未知操作"})
+        else:
+            return jsonify({"code": 1, "desc": "担保不存在或过期"})
+
+    except ValidationError:
+        return jsonify({"code": 1, "desc": "数据有误"})
+
