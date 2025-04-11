@@ -91,7 +91,7 @@ def add_survey():
             db.session.add(survey)
             db.session.commit()
             return jsonify({"code": 0, "desc": "问卷创建成功"})
-    return jsonify({"code": 1, "desc": "问卷删除失败"})
+    return jsonify({"code": 1, "desc": "缺少数据"})
 
 
 @admin.route("/delSurvey", methods=["POST"])
