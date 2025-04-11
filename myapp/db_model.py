@@ -257,7 +257,7 @@ class Guarantee(db.Model):
     applicant_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)  # 申请人id，不允许为空
     player_name: Mapped[str] = mapped_column(String(25), nullable=False)  # 被担保人ID，不允许为空
     player_uuid: Mapped[str] = mapped_column(String(36), nullable=False)  # 被担保人UUID，不允许为空
-    status: Mapped[int] = mapped_column(Integer, nullable=False)  # 担保状态
+    status: Mapped[int] = mapped_column(Integer, nullable=False, default=0)  # 担保状态
     create_time: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.now(timezone.utc)
     )  # 担保记录创建时间，默认为当前时间
