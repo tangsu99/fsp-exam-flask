@@ -479,14 +479,27 @@ def del_user():
 def get_surveys():
     result = Survey.query.all()
     response_data = {"code": 0, "desc": "yes", "list": []}
-    for i in result:
+    for _survey in result:
+        # 获取状态为未完成和未批改的问卷的 数量
+        not_completed_count = Response.query.filter(
+            Response.survey_id == _survey.id,
+            Response.is_completed == 0
+        ).count()
+
+        not_reviewed_count = Response.query.filter(
+            Response.survey_id == _survey.id,
+            Response.is_reviewed == 0
+        ).count()
+
         response_data["list"].append(
             {
-                "id": i.id,
-                "name": i.name,
-                "description": i.description,
-                "createTime": i.create_time,
-                "status": i.status,
+                "id": _survey.id,
+                "name": _survey.name,
+                "description": _survey.description,
+                "createTime": _survey.create_time,
+                "status": _survey.status,
+                "notCompletedCount": not_completed_count,
+                "notReviewedCount": not_reviewed_count,
             }
         )
     return jsonify(response_data)
