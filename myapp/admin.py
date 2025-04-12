@@ -1,4 +1,5 @@
 from functools import wraps
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Callable, TypeVar, cast
 from flask import Blueprint, jsonify, request
 from flask_login import login_required
@@ -288,7 +289,7 @@ def whitelist():
     # 构造返回数据
     response_data = {"code": 0, "desc": "success", "list": []}
     for i in result:
-        response_data["list"].append({"id": i.id, "uid": i.user_id, "name": i.player_name, "uuid": i.player_uuid})
+        response_data["list"].append({"id": i.id, "username": i.wl_user.username, "name": i.player_name, "uuid": i.player_uuid})
 
     # 添加分页信息
     response_data["page"] = pagination.page
@@ -296,22 +297,6 @@ def whitelist():
     response_data["total"] = pagination.total
 
     return jsonify(response_data)
-
-
-# @admin.route("/whitelist", methods=["POST"])
-# @login_required
-# @required_role("admin")
-# def add_whitelist():
-#     req_data = request.json
-#     if req_data is None:
-#         return jsonify({"desc": "错误!"})
-#     for i in req_data:
-#         name = i.get("name")
-#         uuid = i.get("uuid")
-#         wl = Whitelist(name=name, uuid=uuid)
-#         db.session.add(wl)
-#     db.session.commit()
-#     return jsonify({"desc": "成功!"})
 
 
 @admin.route("/users", methods=["GET"])
@@ -473,6 +458,25 @@ def del_user():
     return jsonify({"code": 1, "desc": "缺少信息"})
 
 
+# survey.py 有一个一模一样的函数
+def is_survey_response_expired(survey_response: Response) -> bool:
+    VALIDITY_PERIOD = timedelta(hours=24) # 有效期为 24h
+
+    # 只判断未完成的问卷，已完成的问卷不存在“过期”的说法
+    if survey_response.is_completed is False:
+        create_time = survey_response.create_time
+        create_datetime = create_time.replace(tzinfo=timezone.utc)
+        current_datetime = datetime.now(timezone.utc)
+        expired_datetime = create_datetime + VALIDITY_PERIOD
+        if expired_datetime < current_datetime:
+            survey_response.is_completed = True
+            survey_response.is_reviewed = 2
+            db.session.commit()
+            return True
+    return False
+
+
+
 @admin.route("/surveys", methods=["GET"])
 @login_required
 @required_role("admin")
@@ -480,11 +484,13 @@ def get_surveys():
     result = Survey.query.all()
     response_data = {"code": 0, "desc": "yes", "list": []}
     for _survey in result:
-        # 获取状态为未完成和未批改的问卷的 数量
-        not_completed_count = Response.query.filter(
-            Response.survey_id == _survey.id,
-            Response.is_completed == 0
-        ).count()
+        not_completed_count: int = 0
+        survey_response_list = Response.query.filter_by(id=_survey.id).all()
+
+        for i in survey_response_list:
+            expired = is_survey_response_expired(i)
+            if expired is False and i.is_completed is False:
+                not_completed_count += 1
 
         not_reviewed_count = Response.query.filter(
             Response.survey_id == _survey.id,
@@ -524,6 +530,9 @@ def get_responses():
         "total": pagination.total,
     }
     for i in result:
+        # 刷新一下是否过期
+        is_survey_response_expired(i)
+
         scores = ResponseScore.query.filter_by(response_id=i.id).all()
         total_score = sum(score.score for score in scores)  # 计算总分
         response_data["list"].append(
@@ -592,6 +601,9 @@ def get_survey(sid: int):
 @login_required
 @required_role("admin")
 def reviewed_response():
+    """
+    设置是否通过该答卷
+    """
     req_data = request.json
     if req_data:
         rid = req_data.get("response")
@@ -604,6 +616,8 @@ def reviewed_response():
         if status not in [0, 1, 2]:
             return jsonify({"code": 4, "desc": "未知状态！"})
         resp.is_reviewed = status
+        # 设置审核状态后，强制将问卷设置为已完成的
+        resp.is_completed = True
         wl = Whitelist.query.filter_by(player_uuid=resp.player_uuid).first()
         if wl is not None:
             db.session.commit()

@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import cast
 
 from flask import Blueprint, jsonify, request
@@ -47,19 +47,33 @@ def get_all_question_type():
 @survey.route("/survey/<int:sid>", methods=["GET"])
 @login_required
 def get_survey(sid: int):
+    user: User = cast(User, current_user)
+
     # 查询指定问卷
     survey = Survey.query.get(sid)
     if not survey:
         return jsonify({"code": 1, "desc": "未找到问卷"}), 404
     # 构建问卷数据结构
+    create_time = None
+    ddl = None
+   
+    existing_response_list = user.responses
+    for i in existing_response_list:
+        if i.is_completed is False:
+            create_time = i.create_time
+
+    ddl = create_time + timedelta(hours=24)
+
     survey_data = {
         "id": survey.id,
         "name": survey.name,
         "description": survey.description,
-        "create_time": survey.create_time,
+        "create_time": create_time,
+        "ddl": ddl,
         "status": survey.status,
         "questions": [],
     }
+
     # 查询问卷中的所有题目
     for question in survey.questions:
         question_data = {
@@ -85,10 +99,31 @@ def get_survey(sid: int):
     return jsonify(survey_data)
 
 
-def awa(response):
-    for i in response:
+
+# admin.py 有一个一模一样的函数
+def is_survey_response_expired(survey_response: Response) -> bool:
+    VALIDITY_PERIOD = timedelta(hours=24) # 有效期为 24h
+
+    # 只判断未完成的问卷，已完成的问卷不存在“过期”的说法
+    if survey_response.is_completed is False:
+        create_time = survey_response.create_time
+        create_datetime = create_time.replace(tzinfo=timezone.utc)
+        current_datetime = datetime.now(timezone.utc)
+        expired_datetime = create_datetime + VALIDITY_PERIOD
+        if expired_datetime < current_datetime:
+            survey_response.is_completed = True
+            survey_response.is_reviewed = 2
+            db.session.commit()
+            return True
+    return False
+
+def incomplete_survey_exist(response_list) -> Response | None:
+    for i in response_list:
         if i.is_completed is False:
-            return i
+            expired = is_survey_response_expired(i)
+            if expired is False:
+                return i
+
     return None
 
 
@@ -97,13 +132,14 @@ def awa(response):
 def check_survey():
     user: User = cast(User, current_user)
     # 检查用户是否有未完成的答卷
-    existing_response = user.responses
-    res: Response | None = awa(existing_response)
+    existing_response_list = user.responses
+    res = incomplete_survey_exist(existing_response_list)
 
-    if res is None:
-        return jsonify({"code": 0, "desc": "暂无问卷! "})
+    if res:
+        return jsonify({"code": 1, "desc": "您有未完成问卷！", "response": res.survey_id})
 
-    return jsonify({"code": 1, "desc": "您有未完成问卷！", "response": res.survey_id})
+    return jsonify({"code": 0, "desc": "暂无问卷! "})
+
 
 
 @survey.route("/start_survey", methods=["POST"])
@@ -112,9 +148,10 @@ def start_survey():
     user: User = cast(User, current_user)
 
     # 检查用户是否有未完成的答卷
-    existing_response = user.responses
-    res: Response | None = awa(existing_response)
-    if res is not None:
+    existing_response_list = user.responses
+    res: Response | None = incomplete_survey_exist(existing_response_list)
+
+    if res:
         return jsonify({"code": 1, "desc": "您有未完成问卷！", "response": res.survey_id})
 
     data = request.get_json()
@@ -206,9 +243,10 @@ def make_answer_details(
 def complete_survey():
     data = request.get_json()
     user: User = cast(User, current_user)
-    res: Response | None = awa(user.responses)
+    res: Response | None = incomplete_survey_exist(user.responses)
     if res is None:
         return jsonify({"code": 1, "desc": "问卷未找到！"}), 400
+
     response_id: int = res.id  # 答卷ID
 
     # 客观题分数
