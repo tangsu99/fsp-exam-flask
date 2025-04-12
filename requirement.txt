@@ -4,6 +4,7 @@ Flask>=3.1.0
 Flask-Cors>=5.0.0
 Flask-Login==0.6.3
 Flask-Mail
+PyMySQL
 Flask-SQLAlchemy==3.1.1
 SQLAlchemy>=2.0.0
 Flask-Migrate
