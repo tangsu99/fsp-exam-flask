@@ -4,17 +4,11 @@ from jsonschema import validate, ValidationError
 from flask import Blueprint, jsonify, request
 from flask_login import current_user, login_required
 
-from mj_api import get_player_uuid
 from myapp import db
 from myapp.db_model import Guarantee, User, Whitelist
 from myapp.validate_json import validate_json
 
 guarantee = Blueprint("guarantee", __name__)
-
-
-def get_ago_time() -> datetime:
-    time: datetime = datetime.now(timezone.utc) - timedelta(minutes=10)
-    return time
 
 
 def checkGuarantor(info: dict) -> dict:
@@ -36,21 +30,15 @@ def checkApplicant(info: dict) -> dict:
     if wl_result:
         return {"code": 1, "desc": "你已经是白名单成员"}
 
-    ten_minutes_ago = get_ago_time()
-
+    ten_minutes_ago = datetime.now(timezone.utc) - timedelta(hours=1)
     g_result = Guarantee.query.filter(
         Guarantee.player_uuid == info["player_uuid"],
         Guarantee.create_time >= ten_minutes_ago,
+        Guarantee.status == 0,
     ).all()
 
     if len(g_result) != 0:
         return {"code": 1, "desc": "存在未过期的担保！"}
-
-    # 前端已经验证过了，感觉这段代码不需要
-    # _res = get_player_uuid(info["playerName"])
-    #
-    # if _res is None:
-    #     return {"code": 1, "desc": "被担保玩家名不存在"}
 
     return {"code": 0}
 
@@ -99,7 +87,7 @@ def add_guarantee():
         guarantor_id,
         current_user.get_id(),
         applicant_info["player_name"],
-        applicant_info["player_uuid"], 
+        applicant_info["player_uuid"],
         datetime.now(timezone.utc),
         datetime.now(timezone.utc) + timedelta(hours=1),
     )
@@ -144,22 +132,13 @@ def guarantee_user_action():
         id: int = request.json["id"] # pyright: ignore
         action: str = request.json["action"] # pyright: ignore
 
-        def is_expired(create_time: str, expiration_time: str) -> bool:
-            # 定义时间格式
-            time_format = "%Y-%m-%d %H:%M:%S.%f"  # 包含微秒的时间格式
-
-            # 解析时间字符串为 datetime 对象
-            create_datetime = datetime.strptime(create_time, time_format)
-            expiration_datetime = datetime.strptime(expiration_time, time_format)
-
-            # 计算时间差
-            time_difference = expiration_datetime - create_datetime
-
-            # 判断时间差是否超过 1 小时（1小时 = 3600秒）
-            return time_difference.total_seconds() > 3600
+        def is_expired(expiration_time: datetime) -> bool:
+            expiration_time = expiration_time.replace(tzinfo=timezone.utc)
+            current_datetime = datetime.now(timezone.utc)
+            return current_datetime > expiration_time
 
         _guarantee: Guarantee | None = Guarantee.query.get(id)
-        if _guarantee and not is_expired(str(_guarantee.create_time), str(_guarantee.expiration_time)):
+        if _guarantee and not is_expired(_guarantee.expiration_time):
             if action == "reject":
                 _guarantee.status = 2
                 db.session.commit()

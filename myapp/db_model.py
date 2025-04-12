@@ -62,7 +62,7 @@ class Question(db.Model):
         Integer, nullable=False
     )  # 问题类型，不允许为空，如1-单选，2-多选，3-填空，4-简答等
     score: Mapped[float] = mapped_column(Float, nullable=False)  # 问题分值，不允许为空
-    sequence: Mapped[Optional[int]] = mapped_column(Integer)  # 问题排序，值越大排越前面，可为空
+    logical_deletion: Mapped[bool] = mapped_column(Boolean ,default=False)  # 问题排序，值越大排越前面，可为空
     create_time: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.now(timezone.utc)
     )  # 问题创建时间，默认为当前时间
@@ -183,7 +183,7 @@ class Response(db.Model):
     __tablename__ = "responses"  # 指定表名
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)  # 主键，答卷唯一标识，自增
     is_completed: Mapped[bool] = mapped_column(Boolean, default=False)  # 完成状态，默认为False（未完成）
-    is_reviewed: Mapped[int] = mapped_column(Integer, default=0)  # 阅卷状态，默认为False（未阅卷）
+    is_reviewed: Mapped[int] = mapped_column(Integer, default=0)  # 阅卷状态，0 待审核 1 已通过 2 已拒绝
     player_name: Mapped[str] = mapped_column(String(25), nullable=False)
     player_uuid: Mapped[str] = mapped_column(String(36), nullable=False)
     user_id: Mapped[int] = mapped_column(
