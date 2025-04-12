@@ -56,28 +56,29 @@ def admin_index():
     return jsonify({"desc": "admin"})
 
 
-@admin.route("/AllQuestion")
-@login_required
-@required_role("admin")
-def all_question():
-    result = Question.query.all()
-    response_data = {"code": 0, "desc": "yes", "list": []}
-    data = []
-    for i in result:
-        options = []
-        for option in i.options:
-            options.append({"text": option.option_text, "answer": option.is_correct})
-        data.append(
-            {
-                "id": i.id,
-                "title": i.question_text,
-                "type": i.question_type,
-                "score": i.score,
-                "options": options,
-            }
-        )
-        response_data["list"] = data
-    return jsonify(response_data)
+# 现在分问卷了，获取全部题目应该没意义了
+# @admin.route("/AllQuestion")
+# @login_required
+# @required_role("admin")
+# def all_question():
+#     result = Question.query.all()
+#     response_data = {"code": 0, "desc": "yes", "list": []}
+#     data = []
+#     for i in result:
+#         options = []
+#         for option in i.options:
+#             options.append({"text": option.option_text, "answer": option.is_correct})
+#         data.append(
+#             {
+#                 "id": i.id,
+#                 "title": i.question_text,
+#                 "type": i.question_type,
+#                 "score": i.score,
+#                 "options": options,
+#             }
+#         )
+#         response_data["list"] = data
+#     return jsonify(response_data)
 
 
 @admin.route("/addSurvey", methods=["POST"])
@@ -261,8 +262,8 @@ def del_question():
         if question is None:
             return jsonify({"code": 0, "desc": "题目不存在"})
 
-        # 删除问题
-        db.session.delete(question)
+        # 逻辑删除问题
+        question.logical_deletion = True
 
         # 提交事务
         db.session.commit()
@@ -571,6 +572,10 @@ def get_survey(sid: int):
     }
     # 查询问卷中的所有题目
     for question in survey.questions:
+        # 不返回被逻辑删除的题目
+        if question.logical_deletion:
+            continue
+
         question_data = {
             "id": question.id,
             "title": question.question_text,
@@ -661,6 +666,10 @@ def get_detail(resp_id: int):
         details: list[ResponseDetail] = ResponseDetail.query.filter_by(
             question_id=question.id, response_id=resp_id
         ).all()
+
+        # 如果题目被逻辑删除，并且用户未作答，则不显示
+        if question.logical_deletion and len(details) == 0:
+            continue
 
         score = 0
         user_selected_option: list[int] = []

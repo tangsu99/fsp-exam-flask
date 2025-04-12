@@ -62,7 +62,7 @@ class Question(db.Model):
         Integer, nullable=False
     )  # 问题类型，不允许为空，如1-单选，2-多选，3-填空，4-简答等
     score: Mapped[float] = mapped_column(Float, nullable=False)  # 问题分值，不允许为空
-    logical_deletion: Mapped[bool] = mapped_column(Boolean ,default=False)  # 问题排序，值越大排越前面，可为空
+    logical_deletion: Mapped[bool] = mapped_column(Boolean ,default=False)  # 逻辑删除
     create_time: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.now(timezone.utc)
     )  # 问题创建时间，默认为当前时间

@@ -76,6 +76,10 @@ def get_survey(sid: int):
 
     # 查询问卷中的所有题目
     for question in survey.questions:
+        # 不返回被逻辑删除的题目
+        if question.logical_deletion:
+            continue
+
         question_data = {
             "id": question.id,
             "title": question.question_text,
