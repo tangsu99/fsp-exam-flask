@@ -62,7 +62,7 @@ class Question(db.Model):
         Integer, nullable=False
     )  # 问题类型，不允许为空，如1-单选，2-多选，3-填空，4-简答等
     score: Mapped[float] = mapped_column(Float, nullable=False)  # 问题分值，不允许为空
-    logical_deletion: Mapped[bool] = mapped_column(Boolean ,default=False)  # 逻辑删除
+    logical_deletion: Mapped[bool] = mapped_column(Boolean ,default=False, nullable=True)  # 逻辑删除
     create_time: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.now(timezone.utc)
     )  # 问题创建时间，默认为当前时间
@@ -75,6 +75,7 @@ class Question(db.Model):
     response_details: Mapped[list["ResponseDetail"]] = relationship(
         "ResponseDetail", backref="question_r_d", lazy="select", cascade="all, delete"
     )
+    display_order: Mapped[int] = mapped_column(Integer, nullable=False)
 
     def __init__(
         self,
@@ -205,6 +206,7 @@ class Response(db.Model):
     response_score: Mapped[list["ResponseScore"]] = relationship(
         "ResponseScore", backref="response_s", lazy="select", cascade="all, delete"
     )
+    archive_score: Mapped[float] = mapped_column(Float, nullable=True)
 
     def __init__(self, user_id: int, survey_id: int, survey_name: str, player_name: str, player_uuid: str):
         self.user_id = user_id
