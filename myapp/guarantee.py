@@ -17,7 +17,10 @@ def checkGuarantor(info: dict) -> dict:
     if wl_result is None:
         return {"code": 1, "desc": "担保人不属于白名单成员，无法担保！"}
 
-    user_result = User.query.get(wl_result.user_id)
+    user_result: User | None = User.query.get(wl_result.user_id)
+    if user_result is None:
+        return {"code": 1, "desc": "担保人账户不存在"}
+
     if user_result.status != 1:
         return {"code": 1, "desc": "担保人账户状态异常，无法担保！"}
 
@@ -45,11 +48,11 @@ def checkApplicant(info: dict) -> dict:
 
 def returnData(i: Guarantee):
     return {
-        "uid": i.applicant.id,
+        "uid": i.applicant.id, # type: ignore
         "id": i.id,
-        "username": i.applicant.username,
-        "userQQ": i.applicant.user_qq,
-        "avatar": i.applicant.avatar,
+        "username": i.applicant.username, # type: ignore
+        "userQQ": i.applicant.user_qq, # type: ignore
+        "avatar": i.applicant.avatar, # type: ignore
         "playerName": i.player_name,
         "playerUUID": i.player_uuid,
         "createTime": i.create_time,
@@ -62,13 +65,13 @@ def returnData(i: Guarantee):
 @validate_json(required_fields=["userInfo", "guarantorInfo"])
 def add_guarantee():
     applicant_info = {
-        "player_name": request.json["userInfo"]["playerName"],
-        "player_uuid": request.json["userInfo"]["playerUUID"],
+        "player_name": request.json["userInfo"]["playerName"], # type: ignore
+        "player_uuid": request.json["userInfo"]["playerUUID"], # type: ignore
     }
 
     guarantor_info = {
-        "player_name": request.json["guarantorInfo"]["playerName"],
-        "player_uuid": request.json["guarantorInfo"]["playerUUID"],
+        "player_name": request.json["guarantorInfo"]["playerName"], # type: ignore
+        "player_uuid": request.json["guarantorInfo"]["playerUUID"], # type: ignore
     }
 
     checkGuarantorRes = checkGuarantor(guarantor_info)

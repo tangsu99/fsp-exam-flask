@@ -44,7 +44,7 @@ def logout():
         token: str | None = request.headers.get("Authorization")
         if token and token.startswith("Bearer "):
             token = token.replace("Bearer ", "", 1)
-        tk: Token = Token.query.filter_by(token=token).first()
+        tk: Token | None = Token.query.filter_by(token=token).first()
         if tk is None:
             return jsonify({"code": 4, "desc": "Token not found"})
         db.session.delete(tk)
@@ -60,10 +60,15 @@ def register():
         return jsonify({"code": 1, "desc": "请求数据错误"})
 
     # 获取客户端IP
-    client_ip = request.headers.get('X-Forwarded-For', request.remote_addr).split(',')[0]
+    client_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
+
+    if client_ip is None:
+        return jsonify({"code": 1, "desc": "无法获取用户IP"})
+
+    client_ip_split = client_ip.split(',')[0]
 
     # 检查IP注册限制
-    if check_ip_registration_limit(client_ip):
+    if check_ip_registration_limit(client_ip_split):
         return jsonify({"code": 5, "desc": "该IP注册次数过多，请稍后再试!"})
 
     username = req_data.get("username")
@@ -106,7 +111,7 @@ def register():
             "avatar": user.avatar,
             "isAdmin": user.role == "admin",
         })
-    except Exception as e:
+    except Exception:
         db.session.rollback()
         return jsonify({"code": 5, "desc": "注册失败，请稍后再试"})
 
@@ -136,17 +141,27 @@ def check_login():
 
 @auth.route('/findPassword', methods=["POST"])
 def find_password():
-    client_ip = request.headers.get('X-Forwarded-For', request.remote_addr).split(',')[0]
-    if check_ip_registration_limit(client_ip):
-        return jsonify({"code": 5, "desc": "该IP请求次数过多，请稍后再试!"})
+    client_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
 
-    username = request.json.get('username')
-    qq = request.json.get('userQQ')
-    user = User.query.filter_by(user_qq=qq, username=username).first()
-    if not user:
-        return jsonify({"code": 4, "desc": "未找到用户!"}), 404
-    Thread(target=send_reset_password, args=(user,), ).start()
-    return jsonify({"code": 0, "desc": "发送成功！请查找邮箱!"})
+    if client_ip is None:
+        return jsonify({"code": 1, "desc": "无法获取用户IP"})
+
+    client_ip_split = client_ip.split(',')[0]
+
+    # 检查IP注册限制
+    if check_ip_registration_limit(client_ip_split):
+        return jsonify({"code": 5, "desc": "该IP注册次数过多，请稍后再试!"})
+
+    if request.json:
+        username = request.json.get('username')
+        qq = request.json.get('userQQ')
+        user = User.query.filter_by(user_qq=qq, username=username).first()
+        if not user:
+            return jsonify({"code": 4, "desc": "未找到用户!"}), 404
+        Thread(target=send_reset_password, args=(user,), ).start()
+        return jsonify({"code": 0, "desc": "发送成功！请查找邮箱!"})
+
+    return jsonify({"code": 5, "desc": "缺少数据"})
 
 
 @auth.route('/findPassword', methods=["PUT"])
@@ -154,17 +169,24 @@ def find_password_set():
     token = ResetPasswordToken.query.filter_by(token=request.args.get('token', '')).first()
     if not token:
         return jsonify({"code": 4, "desc": "无效token!"}), 404
+
     data = request.json
-    password = data.get('password')
-    if not check_password(password):
-        return jsonify({"code": 2, "desc": "密码不合法!"})
-    user: User | None = token.user_r_p_t
-    if not user:
-        return jsonify({"code": 4, "desc": "未找到用户!"}), 404
-    user.set_password(password)
-    db.session.delete(token)
-    db.session.commit()
-    return jsonify({"code": 0, "desc": "修改成功！"})
+    if data:
+        password = data.get('password')
+        if not check_password(password):
+            return jsonify({"code": 2, "desc": "密码不合法!"})
+
+        user: User | None = token.user_r_p_t
+        if not user:
+            return jsonify({"code": 4, "desc": "未找到用户!"}), 404
+
+        user.set_password(password)
+        db.session.delete(token)
+        db.session.commit()
+
+        return jsonify({"code": 0, "desc": "修改成功！"})
+
+    return jsonify({"code": 2, "desc": "缺少数据"})
 
 
 def send_reset_password(user):
