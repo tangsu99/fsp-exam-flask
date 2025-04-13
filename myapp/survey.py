@@ -56,7 +56,7 @@ def get_survey(sid: int):
     # 构建问卷数据结构
     create_time = None
     ddl = None
-   
+
     existing_response_list = user.responses
     for i in existing_response_list:
         if i.is_completed is False:
@@ -81,6 +81,7 @@ def get_survey(sid: int):
             continue
 
         question_data = {
+            "display_order": question.display_order,
             "id": question.id,
             "title": question.question_text,
             "type": question.question_type,
