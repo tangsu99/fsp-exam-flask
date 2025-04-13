@@ -55,6 +55,11 @@ def admin_index():
 #     return jsonify(response_data)
 
 
+def is_survey_mounted(survey_id: int) -> bool:
+    res = SurveySlot.query.filter_by(mounted_survey_id=survey_id).count()
+    return True if res else False
+
+
 @admin.route("/addSurvey", methods=["POST"])
 @login_required
 @required_role("admin")
@@ -424,9 +429,8 @@ def del_user():
         if not user:
             return jsonify({"code": 2, "desc": "用户不存在！"}), 404
 
-        # 删除用户，逻辑删除
+        # 逻辑删除用户
         user.status = 4
-        # db.session.delete(user)
         db.session.commit()
 
         return jsonify({"code": 0, "desc": "用户删除成功！"})
@@ -472,13 +476,16 @@ def get_surveys():
             Response.is_reviewed == 0
         ).count()
 
+        m = is_survey_mounted(_survey.id)
+        status = 1 if m else 0
+
         response_data["list"].append(
             {
                 "id": _survey.id,
                 "name": _survey.name,
                 "description": _survey.description,
                 "createTime": _survey.create_time,
-                "status": _survey.status,
+                "status": status,
                 "notCompletedCount": not_completed_count,
                 "notReviewedCount": not_reviewed_count,
             }
@@ -546,15 +553,16 @@ def get_survey(sid: int):
     survey: Survey | None = Survey.query.get(sid)
     if not survey:
         return jsonify({"code": 1, "desc": "未找到问卷"}), 404
-    # 构建问卷数据结构
+
     survey_data = {
         "id": survey.id,
         "name": survey.name,
         "description": survey.description,
         "create_time": survey.create_time,
-        "status": survey.status,
+        # "status": status, 好像没用
         "questions": [],
     }
+
     # 查询问卷中的所有题目
     for question in survey.questions:
         # 不返回被逻辑删除的题目
@@ -655,7 +663,7 @@ def get_detail(resp_id: int):
         "name": survey.name,
         "description": survey.description,
         "create_time": survey.create_time,
-        "status": survey.status,
+        # "status": survey.status, 好像用不到
         "questions": [],
     }
 
@@ -752,7 +760,6 @@ def add_slot():
     mounted_survey: Survey | None = Survey.query.get(mounted_survey_id)
     if mounted_survey is None:
         return jsonify({"code": 1, "desc": "挂载的问卷不存在"})
-    mounted_survey.status = 1
 
     slot: SurveySlot = SurveySlot(slot_name=slot_name, survey_id=mounted_survey_id)
 
@@ -777,19 +784,10 @@ def set_slot():
             if slot is None:
                 return jsonify({"code": 1, "desc": "未找到插槽！"})
 
-            old_mounted_survey_id = slot.mounted_survey_id
-            old_mounted_survey: Survey | None = Survey.query.get(old_mounted_survey_id)
             new_mounted_survey: Survey | None = Survey.query.get(new_survey_id)
 
             if new_mounted_survey:
-                # 旧问卷找不到了无所谓
-                if old_mounted_survey:
-                    old_mounted_survey.status = 0
-
                 slot.mounted_survey_id = new_survey_id
-
-                new_mounted_survey.status = 1
-
                 db.session.commit()
 
                 return jsonify({"code": 0, "desc": f"修改{slot.slot_name}插槽成功"})
@@ -810,12 +808,6 @@ def del_slot():
         slot = SurveySlot.query.get(slot_id)
         if slot is None:
             return jsonify({"code": 0, "desc": "要删除的插槽不存在"})
-
-        old_mounted_survey_id = slot.mounted_survey_id
-        old_mounted_survey: Survey | None = Survey.query.get(old_mounted_survey_id)
-
-        if old_mounted_survey:
-            old_mounted_survey.status = 0
 
         db.session.delete(slot)
         db.session.commit()
