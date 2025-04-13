@@ -572,6 +572,7 @@ def get_survey(sid: int):
             continue
 
         question_data = {
+            "display_order" : question.display_order,
             "id": question.id,
             "title": question.question_text,
             "type": question.question_type,
@@ -579,6 +580,7 @@ def get_survey(sid: int):
             "img_list": [],
             "options": [],
         }
+
         for img in question.img_list:
             question_data["img_list"].append({"id": img.id, "alt": img.img_alt, "data": img.img_data})
 
@@ -691,6 +693,7 @@ def get_detail(resp_id: int):
             score = response_score.score
 
         question_data = {
+            "display_order": question.display_order,
             "id": question.id,
             "title": question.question_text,
             "type": question.question_type,
