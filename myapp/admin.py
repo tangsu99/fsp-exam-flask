@@ -1,6 +1,4 @@
-from functools import wraps
 from datetime import datetime, timedelta, timezone
-from typing import Optional, Callable, TypeVar, cast
 from flask import Blueprint, jsonify, request
 from flask_login import login_required
 
@@ -20,33 +18,9 @@ from myapp.db_model import (
     Whitelist,
 )
 from myapp.utils import check_password, required_role
+from myapp.validate_json import validate_json
 
 admin = Blueprint("admin", __name__)
-
-
-F = TypeVar("F", bound=Callable)
-
-
-def validate_json(required_fields: Optional[list[str]] = None) -> Callable[[F], F]:
-    def decorator(f: F) -> F:
-        @wraps(f)
-        def decorated_function(*args, **kwargs):
-            if not request.json:
-                return jsonify({"code": 1, "desc": "Invalid JSON data"}), 400
-
-            # 将 request.json 的类型缩小为 dict
-            req_data = cast(dict, request.json)
-
-            if required_fields:
-                missing_fields = [field for field in required_fields if field not in req_data]
-                if missing_fields:
-                    return jsonify({"code": 1, "desc": f"Missing fields: {', '.join(missing_fields)}"}), 400
-
-            return f(*args, **kwargs)
-
-        return cast(F, decorated_function)
-
-    return decorator
 
 
 @admin.route("/")
@@ -740,8 +714,8 @@ def set_score():
 @required_role("admin")
 @validate_json(required_fields=["slotName", "mountedSID"])
 def add_slot():
-    slot_name: str = request.json["slotName"]
-    mounted_survey_id: int = request.json["mountedSID"]
+    slot_name: str = request.json["slotName"] # type: ignore
+    mounted_survey_id: int = request.json["mountedSID"] # type: ignore
 
     mounted_survey: Survey | None = Survey.query.get(mounted_survey_id)
     if mounted_survey is None:
@@ -798,7 +772,7 @@ def set_slot():
 @required_role("admin")
 @validate_json(required_fields=["id"])
 def del_slot():
-    slot_id: str = request.json["id"]
+    slot_id: str = request.json["id"] # type: ignore
     try:
         # 直接通过主键获取问题
         slot = SurveySlot.query.get(slot_id)
