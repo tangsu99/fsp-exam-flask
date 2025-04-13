@@ -90,10 +90,12 @@ def del_survey():
         survey: Survey | None = db.session.get(Survey, req_data)
 
         if survey is None:
-            return jsonify({"code": 0, "desc": "要删除的问卷不存在"})
+            return jsonify({"code": 1, "desc": "要删除的问卷不存在"})
+
+        if is_survey_mounted(survey.id):
+            return jsonify({"code": 1, "desc": "不能删除已发布的问卷！"})
 
         db.session.delete(survey)
-
         db.session.commit()
         return jsonify({"code": 0, "desc": "删除问卷成功"})
 
