@@ -692,6 +692,9 @@ def get_detail(resp_id: int):
 @login_required
 @required_role("admin")
 def set_score():
+    """
+    批改某个题目，前端提供题目ID，答卷ID，和分数
+    """
     req_data = request.json
     if req_data:
         score = req_data.get("score")
@@ -705,7 +708,7 @@ def set_score():
         else:
             db.session.add(ResponseScore(score, question_id, response_id))
         db.session.commit()
-        return jsonify({"code": 0, "desc": "更改成功！"})
+        return jsonify({"code": 0, "desc": "批改成功！"})
     return jsonify({"code": 1, "desc": "缺少信息！"})
 
 
