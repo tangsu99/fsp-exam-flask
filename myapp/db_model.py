@@ -36,7 +36,7 @@ class Survey(db.Model):
     create_time: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.now(timezone.utc)
     )  # 问卷创建时间，默认为当前时间
-    status: Mapped[int] = mapped_column(Integer, nullable=False)  # 问卷状态，不允许为空，0：未挂载，1：已挂载
+    status: Mapped[int] = mapped_column(Integer, nullable=False)  # 问卷状态，！！！已废弃字段！！！
     questions: Mapped[list["Question"]] = relationship(
         "Question", backref="survey", lazy="select", cascade="all, delete"
     )  # 与问题表建立一对多关系，级联删除
