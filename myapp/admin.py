@@ -490,6 +490,9 @@ def get_surveys():
 @login_required
 @required_role("admin")
 def get_responses():
+    """
+    查询答卷列表
+    """
     page = request.args.get("page", 1, type=int)  # 获取页码，默认为 1
     per_page = request.args.get("size", 10, type=int)  # 获取每页条数，默认为 10
 
@@ -508,8 +511,16 @@ def get_responses():
         # 刷新一下是否过期
         is_survey_response_expired(i)
 
-        scores = ResponseScore.query.filter_by(response_id=i.id).all()
-        total_score = sum(score.score for score in scores)  # 计算总分
+        total_score: float = 0
+
+        # 如果是被批改完的卷子，就直接调取总分，否则计算一遍
+        if i.archive_score is None:
+            scores = ResponseScore.query.filter_by(response_id=i.id).all()
+            total_score = sum(score.score for score in scores)  # 计算总分
+
+        else:
+            total_score = i.archive_score
+
         response_data["list"].append(
             {
                 "id": i.id,
@@ -586,32 +597,50 @@ def reviewed_response():
     req_data = request.json
     if req_data:
         rid = req_data.get("response")
-        status = req_data.get("status")
+        status: int = req_data.get("status")
+
         resp: Response | None = Response.query.get(rid)
+
         if resp is None:
             return jsonify({"code": 1, "desc": "未找到! "})
+
         if resp.is_reviewed:
             return jsonify({"code": 1, "desc": "已被审核! "})
+
         if status not in [0, 1, 2]:
             return jsonify({"code": 4, "desc": "未知状态！"})
-        resp.is_reviewed = status
+
         # 设置审核状态后，强制将问卷设置为已完成的
         resp.is_completed = True
-        wl = Whitelist.query.filter_by(player_uuid=resp.player_uuid).first()
-        if wl is not None:
-            db.session.commit()
-            return jsonify({"code": 0, "desc": "此玩家存在已有白名单! "})
-        db.session.add(Whitelist(resp.user_id, resp.player_name, resp.player_uuid))
+        resp.is_reviewed = status
+
+        # 已审核的问卷不可再批分，向归档分数字段添加分数，优化查询答卷列表时的速度
+        scores = ResponseScore.query.filter_by(response_id=rid).all()
+        total_score: float = sum(score.score for score in scores)  # 计算总分
+        resp.archive_score = total_score
+
+        # 为通过的用户添加白名单
+        if status == 1:
+            wl = Whitelist.query.filter_by(player_uuid=resp.player_uuid).first()
+            if wl is not None:
+                db.session.commit()
+                return jsonify({"code": 0, "desc": "此玩家存在已有白名单! "})
+
+            db.session.add(Whitelist(resp.user_id, resp.player_name, resp.player_uuid))
+
         db.session.commit()
-        return jsonify({"code": 0, "desc": "通过! "})
-    return jsonify({"code": 4, "desc": "错误! "})
+        return jsonify({"code": 0, "desc": "操作成功"})
+
+    return jsonify({"code": 4, "desc": "缺少数据! "})
 
 
 @admin.route("/detail/<int:resp_id>", methods=["GET"])
 @login_required
 @required_role("admin")
 def get_detail(resp_id: int):
-    # 查询指定问卷
+    """
+    查询指定问卷
+    """
     res: Response | None = Response.query.get(resp_id)
     if res is None:
         return jsonify({"code": 1, "desc": "信息不足"}), 404
