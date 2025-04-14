@@ -134,10 +134,7 @@ def add_question_images(question_id: int, img_list: list) -> None:
         db.session.add(img)
 
 
-def add_question_options(question_id: int, question_type: int, options: list) -> bool:
-    if (options is None) or (not len(options) > 0):
-        return False
-
+def add_question_options(question_id: int, question_type: int, options: list) -> None:
     # 如果是填空题或者主观，设置第一个选项为正确选项
     if question_type in [3, 4]:
         options[0]["isCorrect"] = True
@@ -146,43 +143,48 @@ def add_question_options(question_id: int, question_type: int, options: list) ->
         option: Option = Option(question_id=question_id, option_text=i["text"], is_correct=i["isCorrect"])
         db.session.add(option)
 
-    return True
-
 
 @admin.route("/addQuestion", methods=["POST"])
 @login_required
 @required_role("admin")
 def add_question():
-    try:
-        req_data = request.json
-        if req_data is None:
-            raise ValueError("数据为空")
+    """
+    添加题目 API
+    前端提供问卷ID、题目标题、类型、分数、选项和排序 ID 六个参数
+    排序 ID 为 0 代表题目加入到末尾，其他值则为插入
+    """
+    req_data = request.json
+    if req_data is None:
+        return jsonify({"code": 1, "desc": "数据为空！"})
 
-        question: Question = Question(
-            req_data["survey"],
-            req_data["title"],
-            req_data["type"],
-            req_data["score"],
+    options = req_data["options"]
+    if (options is None) or (not len(options) > 0):
+        return jsonify({"code": 1, "desc": "至少有一个选项！"})
+
+    if req_data["display_order"] == 0:
+        question: Question = Question.append_question(
+            survey_id=req_data["survey"],
+            question_text=req_data["title"],
+            question_type=req_data["type"],
+            score=req_data["score"],
+        )
+    else:
+        question: Question = Question.insert_question(
+            survey_id=req_data["survey"],
+            question_text=req_data["title"],
+            question_type=req_data["type"],
+            score=req_data["score"],
+            target_display_order=req_data["display_order"]
         )
 
-        db.session.add(question)
-        db.session.flush()
+    add_question_options(question.id, question.question_type, options)
 
-        options = req_data["options"]
+    # 添加图片
+    img_list = req_data.get("img_list", [])
+    add_question_images(question.id, img_list)
 
-        res = add_question_options(question.id, question.question_type, options)
-        if not res:
-            raise ValueError("选项数据无效")
-
-        # 添加图片
-        img_list = req_data.get("img_list", [])
-        add_question_images(question.id, img_list)
-
-        db.session.commit()
-        return jsonify({"code": 0, "desc": "添加题目成功"})
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({"code": 1, "desc": e})
+    db.session.commit()
+    return jsonify({"code": 0, "desc": "添加题目成功"})
 
 
 @admin.route("/editQuestion", methods=["POST"])
@@ -213,10 +215,7 @@ def edit_question():
     # 处理选项数据
     options = req_data.get("options")
     Option.query.filter_by(question_id=question_id).delete()
-    res = add_question_options(question.id, question.question_type, options)
-    if not res:
-        db.session.rollback()
-        return jsonify({"code": 1, "desc": "选项数据无效"})
+    add_question_options(question.id, question.question_type, options)
 
     # 处理图片数据
     img_list = req_data.get("img_list", [])
@@ -245,6 +244,9 @@ def del_question():
 
         # 逻辑删除问题
         question.logical_deletion = True
+
+        # 保险起见，把排序设置为0
+        question.display_order = 0
 
         # 提交事务
         db.session.commit()
