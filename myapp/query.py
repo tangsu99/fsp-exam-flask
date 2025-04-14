@@ -23,6 +23,9 @@ def index():
 @query.route("/response", methods=["GET"])
 @login_required
 def response():
+    """
+    用户考试查询API
+    """
     user: User = cast(User, current_user)
 
     top_10_responses = (
@@ -35,9 +38,19 @@ def response():
 
     response_data: list = []
     for res in top_10_responses:
-        answer_sheet: list = ResponseScore.query.filter_by(response_id=res.id).all()
-        total_score = sum(question.score for question in answer_sheet)  # 计算总分
+        # 计算得分是多少
+        # 如果是被批改完的卷子，就直接调取总分，否则计算一遍
+        total_score: float = 0
 
+        if res.archive_score is None:
+            scores = ResponseScore.query.filter_by(response_id=res.id).all()
+            total_score = sum(score.score for score in scores)  # 计算总分
+
+        else:
+            total_score = res.archive_score
+
+
+        # 计算满分是多少
         questionnaire: list = Question.query.filter_by(survey_id=res.survey_id).all()
         full_score = sum(question.score for question in questionnaire)
 
