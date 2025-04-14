@@ -3,7 +3,7 @@ from enum import Enum, unique
 from typing import Optional
 
 from flask_login import UserMixin
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from myapp import bcrypt, db
@@ -82,12 +82,78 @@ class Question(db.Model):
         survey_id: int,
         question_text: str,
         question_type: int,
-        score: int,
+        score: float,
+        display_order: int | None = None,
     ):
         self.survey_id = survey_id
         self.question_text = question_text
         self.question_type = question_type
         self.score = score
+
+        if display_order is None:
+            max_display_order = (
+                    db.session.query(func.max(Question.display_order))
+                    .filter_by(survey_id=survey_id, logical_deletion=False)
+                    .scalar()
+            )
+            self.display_order = (max_display_order or 0) + 1
+        else:
+            self.display_order = display_order
+
+    @classmethod
+    def append_question(cls, survey_id: int, question_text: str, question_type: int, score: float):
+        new_question = cls(
+            survey_id=survey_id,
+            question_text=question_text,
+            question_type=question_type,
+            score=score,
+        )
+        db.session.add(new_question)
+        db.session.commit()
+
+        # 返回新建的实例
+        return new_question
+
+
+    @classmethod
+    def insert_question(cls, survey_id: int, question_text: str, question_type: int, score: float, target_display_order: int):
+        """
+        在指定位置插入一个问题，并调整后续问题的顺序。
+
+        :param survey_id: 所属问卷 ID
+        :param question_text: 问题内容
+        :param question_type: 问题类型
+        :param score: 问题分值
+        :param target_display_order: 目标插入位置
+        :return: 新建的 Question 实例
+        """
+        # 获取目标位置及之后的所有问题
+        questions_to_shift = (
+            db.session.query(Question)
+            .filter(
+                Question.survey_id == survey_id,
+                Question.display_order >= target_display_order,
+                Question.logical_deletion == False
+            )
+            .order_by(Question.display_order.desc()) # 从后往前更新，避免冲突
+            .all()
+        )
+
+        for question in questions_to_shift:
+            question.display_order +=1
+
+        new_question = cls(
+            survey_id=survey_id,
+            question_text=question_text,
+            question_type=question_type,
+            score=score,
+            display_order=target_display_order,
+        )
+        db.session.add(new_question)
+        db.session.commit()
+
+        # 返回新建的实例
+        return new_question
 
 
 # 问题图片表模型
