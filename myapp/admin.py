@@ -270,13 +270,21 @@ def sort_survey_question():
     order_list : None | list[dict[str, int]] = request.json
     if order_list is None or type(order_list) is not list:
         return jsonify({"code": 1, "desc": "缺少数据或数据错误"})
-    
+
+    origin_order_set = set()
+    new_order_set = set()
+
     for i in order_list:
         question : None | Question = Question.query.get(i["id"])
         if question is None or question.logical_deletion is True:
                 return jsonify({"code": 1, "desc": "不存在ID为{i.id}的题目"})
-
+        origin_order_set.add(question.display_order)
+        new_order_set.add(i["display_order"])
         question.display_order = i["display_order"];
+
+    # 保险起见
+    if origin_order_set != new_order_set:
+        return jsonify({"code": 1, "desc": "数据错误"})
 
     db.session.commit()
     return jsonify({"code": 0, "desc": "排序成功"})
