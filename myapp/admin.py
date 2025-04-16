@@ -259,6 +259,29 @@ def del_question():
         return jsonify({"code": 1, "desc": "出现错误"})
 
 
+@admin.route("/sortSurveyQuestions", methods=["POST"])
+@login_required
+@required_role("admin")
+def sort_survey_question():
+    """
+    编辑问卷排序模式提交排序API
+    前端提供一个order_map 列表，列表元素数据格式：{ id: question_id, display_order: display_order}
+    """
+    order_list : None | list[dict[str, int]] = request.json
+    if order_list is None or type(order_list) is not list:
+        return jsonify({"code": 1, "desc": "缺少数据或数据错误"})
+    
+    for i in order_list:
+        question : None | Question = Question.query.get(i["id"])
+        if question is None or question.logical_deletion is True:
+                return jsonify({"code": 1, "desc": "不存在ID为{i.id}的题目"})
+
+        question.display_order = i["display_order"];
+
+    db.session.commit()
+    return jsonify({"code": 0, "desc": "排序成功"})
+
+
 @admin.route("/whitelist", methods=["GET"])
 @login_required
 @required_role("admin")
