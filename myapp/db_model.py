@@ -4,6 +4,7 @@ from typing import Optional
 
 from flask_login import UserMixin
 from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, func
+from sqlalchemy.dialects.mysql import LONGTEXT
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from myapp import bcrypt, db
@@ -164,7 +165,7 @@ class QuestionImgURL(db.Model):
         Integer, ForeignKey("questions.id", ondelete="CASCADE"), nullable=False
     )  # 所属问题id，外键，关联问题表，级联删除
     img_alt: Mapped[str] = mapped_column(String(200))  # 图片alt，允许为空
-    img_data: Mapped[str] = mapped_column(Text, nullable=False)  # 图片数据，URL 或者 Base64 编码的图片，不允许为空
+    img_data: Mapped[str] = mapped_column(LONGTEXT, nullable=False)  # 图片数据，URL 或者 Base64 编码的图片，不允许为空
     create_time: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.now(timezone.utc)
     )  # 选项创建时间，默认为当前时间
@@ -182,7 +183,7 @@ class Option(db.Model):
     question_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("questions.id", ondelete="CASCADE"), nullable=False
     )  # 所属问题id，外键，关联问题表，级联删除
-    option_text: Mapped[str] = mapped_column(String(200), nullable=False)  # 选项内容，不允许为空
+    option_text: Mapped[str] = mapped_column(Text, nullable=False)  # 选项内容，不允许为空
     is_correct: Mapped[Optional[bool]] = mapped_column(Boolean)  # 是否为正确选项，对于有标准答案的题目，可为空
     create_time: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.now(timezone.utc)
