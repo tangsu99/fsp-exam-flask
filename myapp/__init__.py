@@ -63,8 +63,6 @@ def create_app():
 
     login_manager.init_app(app)
     db.init_app(app)
-    from myapp.config import Config
-    my_config = Config()
     migrate.init_app(app, db)
     bcrypt.init_app(app)
     mail.init_app(app)
@@ -73,7 +71,8 @@ def create_app():
 
     with app.app_context():
         db.create_all()
-
+    from .config import Config
+    my_config = Config()
     my_config.init_app(app, db)
 
     # 导入蓝图

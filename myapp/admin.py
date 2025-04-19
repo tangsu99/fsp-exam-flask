@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 from flask import Blueprint, jsonify, request
 from flask_login import login_required
 
-from myapp import db
+from myapp import db, my_config
 from myapp.db_model import (
     Guarantee,
     Option,
@@ -23,36 +23,26 @@ from myapp.validate_json import validate_json
 admin = Blueprint("admin", __name__)
 
 
-@admin.route("/")
+@admin.route("/config", methods=["GET"])
 @login_required
 @required_role("admin")
-def admin_index():
-    return jsonify({"desc": "admin"})
+def get_config():
+    key = request.args.get('key')
+    if key is None:
+        return jsonify({"code": 0, "desc": "tangsu is lazy!", 'list': my_config.get_all()})
+    return jsonify({"code": 0, "desc": "tangsu is lazy!", 'value': my_config.get(key)})
 
 
-# 现在分问卷了，获取全部题目应该没意义了
-# @admin.route("/AllQuestion")
-# @login_required
-# @required_role("admin")
-# def all_question():
-#     result = Question.query.all()
-#     response_data = {"code": 0, "desc": "yes", "list": []}
-#     data = []
-#     for i in result:
-#         options = []
-#         for option in i.options:
-#             options.append({"text": option.option_text, "answer": option.is_correct})
-#         data.append(
-#             {
-#                 "id": i.id,
-#                 "title": i.question_text,
-#                 "type": i.question_type,
-#                 "score": i.score,
-#                 "options": options,
-#             }
-#         )
-#         response_data["list"] = data
-#     return jsonify(response_data)
+@admin.route("/config", methods=["POST"])
+@login_required
+@required_role("admin")
+def add_config():
+    data = request.get_json()
+    if not data or "key" not in data or "value" not in data or "type" not in data:
+        return jsonify({"code": 1, "desc": "数据不合法!"})
+
+    my_config.set(data["key"], data["value"], data["type"])
+    return jsonify({"code": 0, "desc": "tangsu is lazy!"})
 
 
 def is_survey_mounted(survey_id: int) -> bool:
@@ -280,7 +270,7 @@ def sort_survey_question():
                 return jsonify({"code": 1, "desc": "不存在ID为{i.id}的题目"})
         origin_order_set.add(question.display_order)
         new_order_set.add(i["display_order"])
-        question.display_order = i["display_order"];
+        question.display_order = i["display_order"]
 
     # 保险起见
     if origin_order_set != new_order_set:
