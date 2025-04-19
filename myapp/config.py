@@ -2,7 +2,6 @@ from attr.converters import to_bool
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 
-from myapp import db
 from myapp.db_model import ConfigModel
 
 DEFAULT_CONFIG = [
@@ -79,28 +78,38 @@ class Config:
                 })
 
     def get(self, key: str):
-        val = self.type(self.__get_item(key, self.__config))
-        if val is not None:
-            return val
-        return self.type(self.__get_default(key))
+        res = self.__get_item(key, self.__config)
+        if res is None:
+            return None
+        return self.type(res)
 
     def get_all(self):
         if self.__config == 0:
             self.__resync_config()
-        result = []
-        for i in self.__config:
-            result.append({
-                'key': i.key,
-                'value': i.value,
-                'type': i.type,
-            })
-        return result
+        return self.__config
 
     def set(self, key, value, type_):
-        return self.app
+        if self.get(key) is None:
+            self.__config.append({
+                'key': key,
+                'value': value,
+                'type': type_,
+            })
+            self.db.session.add(ConfigModel(key, value, type_))
+        else:
+            self.set__(key, value, type_)
+            conf: ConfigModel = ConfigModel.query.filter(ConfigModel.key == key)
+            conf.value = value
+            conf.type = type_
+        self.db.session.commit()
+        return 0
 
-    def __get_default(self, key: str):
-        return self.__get_item(key, DEFAULT_CONFIG)
+    def set__(self, key, value, type_):
+        for i in self.__config:
+            if i['key'] == key:
+                i['value'] = value
+                i['type'] = type_
+                return
 
     @staticmethod
     def __get_item(key: str, config):
@@ -122,6 +131,7 @@ class Config:
 
 
 def init_config():
+    from myapp import db
     for item in DEFAULT_CONFIG:
         db.session.add(ConfigModel(item.get('key'), item.get('value'), item.get('type')))
     db.session.commit()
