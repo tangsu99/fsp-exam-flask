@@ -14,6 +14,7 @@ from myapp.mail import reset_password_mail
 
 login_manager: LoginManager = LoginManager()
 db: SQLAlchemy = SQLAlchemy()
+my_config = None
 migrate = Migrate()
 bcrypt: Bcrypt = Bcrypt()
 mail: Mail = Mail()
@@ -26,6 +27,7 @@ def create_app():
     load_dotenv()
     app = Flask(__name__)
     global APP
+    global my_config
     APP = app
     app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL")  # 测试数据库
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
@@ -61,6 +63,8 @@ def create_app():
 
     login_manager.init_app(app)
     db.init_app(app)
+    from myapp.config import Config
+    my_config = Config()
     migrate.init_app(app, db)
     bcrypt.init_app(app)
     mail.init_app(app)
@@ -69,6 +73,8 @@ def create_app():
 
     with app.app_context():
         db.create_all()
+
+    my_config.init_app(app, db)
 
     # 导入蓝图
     from myapp.admin import admin
@@ -91,6 +97,12 @@ def create_app():
     @app.route("/")
     def hello():
         return "Hello world!\nHello Flask!"
+
+    @app.route("/test/<string:key>", methods=["GET"])
+    def test(key: str):
+        return jsonify({
+            'data': my_config.get(key)
+        })
 
     # 未授权的用户重定向到登录页面
     @login_manager.unauthorized_handler

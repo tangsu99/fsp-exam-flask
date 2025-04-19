@@ -406,3 +406,28 @@ class ResetPasswordToken(db.Model):
         self.user_id = user_id
         self.token = token
         self.expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
+
+
+# 配置表模型
+class ConfigModel(db.Model):
+    __tablename__ = "config"
+    key: Mapped[str] = mapped_column(String(100), primary_key=True)
+    value: Mapped[str] = mapped_column(String(256), nullable=False)
+    type: Mapped[str] = mapped_column(String(10), nullable=False)
+    create_time: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=datetime.now(timezone.utc),
+        server_default=func.now()
+    )
+    update_time: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=datetime.now(timezone.utc),
+        onupdate=datetime.now(timezone.utc),
+        server_default=func.now(),
+        server_onupdate=func.now()
+    )
+
+    def __init__(self, key: str, value: str, type_: str):
+        self.key = key
+        self.value = value
+        self.type = type_
