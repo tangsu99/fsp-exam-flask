@@ -14,6 +14,18 @@
 pip install -r requirement.txt
 cp .env.example .env
 ```
+数据库使用`MySQL`，驱动采用`PyMySQL`，编辑`.env`配置数据库连接地址
+```
+# DATABASE_URL=mysql+pymysql://<user>:<password>@<host>:<port>/<database>
+# <user>:       用户名
+# <password>:   密码
+# <host>:       地址
+# <port>:       端口
+# <database>:   数据库名
+
+# 示例
+DATABASE_URL=mysql+pymysql://root:123456@localhost:3306/fsp_exam
+```
 
 ## Database
 
