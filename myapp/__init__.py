@@ -98,12 +98,6 @@ def create_app():
     def hello():
         return "Hello world!\nHello Flask!"
 
-    @app.route("/test/<string:key>", methods=["GET"])
-    def test(key: str):
-        return jsonify({
-            'data': my_config.get(key)
-        })
-
     # 未授权的用户重定向到登录页面
     @login_manager.unauthorized_handler
     def unauthorized():
