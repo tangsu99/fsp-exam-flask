@@ -77,6 +77,23 @@ class Config:
                     'type': i.type,
                 })
 
+    def resync_flask_config(self):
+        self.app.config["SECRET_KEY"] = self.get("SECRET_KEY")  # 用于安全签名session
+        self.app.config["SESSION_PROTECTION"] = None  # 禁用会话保护
+        self.app.config["API_TOKEN"] = self.get("API_TOKEN")
+        # cors
+        self.app.config["ALLOWED_ORIGINS"] = self.get('ALLOWED_ORIGINS').split(',')
+        # mail
+        self.app.config['MAIL_SERVER'] = self.get('MAIL_SERVER')  # 邮件服务器地址
+        self.app.config['MAIL_PORT'] = self.get('MAIL_PORT')  # 邮件服务器端口
+        self.app.config['MAIL_USE_SSL'] = self.get('MAIL_USE_SSL')  # 启用SSL
+        self.app.config['MAIL_USERNAME'] = self.get('MAIL_USERNAME')  # 发件人邮箱
+        self.app.config['MAIL_PASSWORD'] = self.get('MAIL_PASSWORD')  # 邮箱授权码/密码？？
+        self.app.config['MAIL_DEFAULT_SENDER'] = self.get('MAIL_DEFAULT_SENDER')  # 默认发件人
+
+        # 重置密码页面
+        self.app.config['RESET_PASSWORD_URL'] = self.get('RESET_PASSWORD_URL')  # 默认发件人
+
     def get(self, key: str):
         res = self.__get_item(key, self.__config)
         if res is None:

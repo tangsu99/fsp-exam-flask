@@ -30,50 +30,51 @@ def create_app():
     global my_config
     APP = app
     app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL")  # 测试数据库
-    app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-    app.config["SECRET_KEY"] = os.getenv("SECRET_KEY")  # 用于安全签名session
-    app.config["SESSION_PROTECTION"] = None  # 禁用会话保护
-    app.config["API_TOKEN"] = os.getenv("API_TOKEN")
-    # cors
-    allowed_origins = os.getenv('ALLOWED_ORIGINS', '').split(',')
-    # mail
-    app.config['MAIL_SERVER'] = os.getenv('MAIL_SERVER', 'smtp.qq.com')  # 邮件服务器地址
-    app.config['MAIL_PORT'] = os.getenv('MAIL_PORT', 465)  # 邮件服务器端口
-    app.config['MAIL_USE_SSL'] = os.getenv('MAIL_USE_SSL', True)  # 启用SSL
-    app.config['MAIL_USERNAME'] = os.getenv('MAIL_USERNAME', 'your_email@qq.com')  # 发件人邮箱
-    app.config['MAIL_PASSWORD'] = os.getenv('MAIL_PASSWORD', 'your_auth_password')  # 邮箱授权码/密码？？
-    app.config['MAIL_DEFAULT_SENDER'] = os.getenv('MAIL_DEFAULT_SENDER', 'your_email@qq.com')  # 默认发件人
-
-    # 重置密码页面
-    app.config['RESET_PASSWORD_URL'] = os.getenv('RESET_PASSWORD_URL', 'http://localhost:5173/#/reset_password?token=')  # 默认发件人
-
-    cors.init_app(
-        app=app,
-        resources={
-            r"/*": {
-                "origins": allowed_origins,
-                "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-                "allow_headers": ["Content-Type", "Authorization"]
-            }
-        },
-    )
+    # app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+    # app.config["SECRET_KEY"] = os.getenv("SECRET_KEY")  # 用于安全签名session
+    # app.config["SESSION_PROTECTION"] = None  # 禁用会话保护
+    # app.config["API_TOKEN"] = os.getenv("API_TOKEN")
+    # # cors
+    # allowed_origins = os.getenv('ALLOWED_ORIGINS', '').split(',')
+    # # mail
+    # app.config['MAIL_SERVER'] = os.getenv('MAIL_SERVER', 'smtp.qq.com')  # 邮件服务器地址
+    # app.config['MAIL_PORT'] = os.getenv('MAIL_PORT', 465)  # 邮件服务器端口
+    # app.config['MAIL_USE_SSL'] = os.getenv('MAIL_USE_SSL', True)  # 启用SSL
+    # app.config['MAIL_USERNAME'] = os.getenv('MAIL_USERNAME', 'your_email@qq.com')  # 发件人邮箱
+    # app.config['MAIL_PASSWORD'] = os.getenv('MAIL_PASSWORD', 'your_auth_password')  # 邮箱授权码/密码？？
+    # app.config['MAIL_DEFAULT_SENDER'] = os.getenv('MAIL_DEFAULT_SENDER', 'your_email@qq.com')  # 默认发件人
+    #
+    # # 重置密码页面
+    # app.config['RESET_PASSWORD_URL'] = os.getenv('RESET_PASSWORD_URL', 'http://localhost:5173/#/reset_password?token=')  # 默认发件人
 
     app.template_folder = "../templates"
     app.static_folder = "../static"
 
     login_manager.init_app(app)
     db.init_app(app)
-    migrate.init_app(app, db)
-    bcrypt.init_app(app)
-    mail.init_app(app)
 
     from myapp.db_model import Token
-
     with app.app_context():
         db.create_all()
+
     from .config import Config
     my_config = Config()
     my_config.init_app(app, db)
+    my_config.resync_flask_config()
+
+    cors.init_app(
+        app=app,
+        resources={
+            r"/*": {
+                "origins": app.config["ALLOWED_ORIGINS"],
+                "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+                "allow_headers": ["Content-Type", "Authorization"]
+            }
+        },
+    )
+    migrate.init_app(app, db)
+    bcrypt.init_app(app)
+    mail.init_app(app)
 
     # 导入蓝图
     from myapp.admin import admin
