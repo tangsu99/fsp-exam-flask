@@ -100,6 +100,9 @@ class Config:
             return None
         return self.type(res)
 
+    def get_item(self, key: str):
+        return self.__get_item(key, self.__config)
+
     def get_all(self):
         if self.__config == 0:
             self.__resync_config()

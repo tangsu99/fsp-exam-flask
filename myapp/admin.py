@@ -30,13 +30,13 @@ def get_config():
     key = request.args.get('key')
     if key is None:
         return jsonify({"code": 0, "desc": "tangsu is lazy!", 'list': my_config.get_all()})
-    return jsonify({"code": 0, "desc": "tangsu is lazy!", 'value': my_config.get(key)})
+    return jsonify({"code": 0, "desc": "tangsu is lazy!", 'value': my_config.get_item(key)})
 
 
 @admin.route("/config", methods=["POST"])
 @login_required
 @required_role("admin")
-def add_config():
+def set_config():
     data = request.get_json()
     if not data or "key" not in data or "value" not in data or "type" not in data:
         return jsonify({"code": 1, "desc": "数据不合法!"})
