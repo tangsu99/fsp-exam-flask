@@ -35,7 +35,13 @@ def whitelist():
 def add_whitelist():
     user: User = cast(User, current_user)
     data = request.get_json()
-    db.session.add(Whitelist(user.id, data["name"], data["uuid"]))
+    db.session.add(Whitelist(
+        user_id=user.id,
+        player_name=data["name"],
+        player_uuid=data["uuid"],
+        source=2,
+        auditor_uid=user.id
+    ))
     db.session.commit()
     return jsonify({"code": 0, "desc": "成功"})
 

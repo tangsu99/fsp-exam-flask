@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 from flask import Blueprint, jsonify, request
-from flask_login import login_required
+from flask_login import login_required, current_user
 
 from myapp import db, my_config
 from myapp.db_model import (
@@ -294,7 +294,22 @@ def whitelist():
     # 构造返回数据
     response_data = {"code": 0, "desc": "success", "list": []}
     for i in result:
-        response_data["list"].append({"id": i.id, "username": i.wl_user.username, "name": i.player_name, "uuid": i.player_uuid})
+
+        auditor : None | User = User.query.get(i.auditor_uid)
+        if auditor is None:
+            auditor_name = "该用户不存在"
+        else:
+            auditor_name= auditor.username
+
+        response_data["list"].append({
+            "id": i.id,
+            "username": i.wl_user.username,
+            "name": i.player_name,
+            "uuid": i.player_uuid,
+            "source": i.source,
+            "auditor_name": auditor_name,
+            "created_at": i.created_at
+        })
 
     # 添加分页信息
     response_data["page"] = pagination.page
@@ -661,7 +676,13 @@ def reviewed_response():
                 db.session.commit()
                 return jsonify({"code": 0, "desc": "此玩家存在已有白名单! "})
 
-            db.session.add(Whitelist(resp.user_id, resp.player_name, resp.player_uuid))
+            db.session.add(Whitelist(
+                    user_id=resp.user_id,
+                    player_name=resp.player_name,
+                    player_uuid=resp.player_uuid,
+                    source=0,
+                    auditor_uid=current_user.id
+            ))
 
         db.session.commit()
         return jsonify({"code": 0, "desc": "操作成功"})
