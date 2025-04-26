@@ -122,6 +122,7 @@ class Config:
             conf.value = value
             conf.type = type_
         self.db.session.commit()
+        self.resync_flask_config()
         return 0
 
     def set__(self, key, value, type_):
