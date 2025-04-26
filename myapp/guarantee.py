@@ -152,7 +152,14 @@ def guarantee_user_action():
                 if wl is not None:
                     return jsonify({"code": 1, "desc": "此玩家存在已有白名单! "})
 
-                db.session.add(Whitelist(_guarantee.applicant_id, _guarantee.player_name, _guarantee.player_uuid))
+                db.session.add(Whitelist(
+                        user_id=_guarantee.applicant_id,
+                        player_name=_guarantee.player_name,
+                        player_uuid=_guarantee.player_uuid,
+                        source=1,
+                        auditor_uid=current_user.id
+                ))
+
                 _guarantee.status = 1
                 db.session.commit()
                 return jsonify({"code": 0, "desc": "担保成功！白名单已添加"})

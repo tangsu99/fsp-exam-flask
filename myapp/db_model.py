@@ -352,11 +352,20 @@ class Whitelist(db.Model):
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=True, default=None)
     player_name: Mapped[str] = mapped_column(String(25), nullable=False)
     player_uuid: Mapped[str] = mapped_column(String(36), nullable=False)
+    auditor_uid: Mapped[int] = mapped_column(Integer, nullable=False)
+    source: Mapped[int] = mapped_column(Integer, nullable=False) # 0 代表考试，1代表担保，2代表其他
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=datetime.now(timezone.utc),
+        server_default=func.now()
+    )
 
-    def __init__(self, user_id: int, player_name: str, player_uuid: str):
+    def __init__(self, user_id: int, player_name: str, player_uuid: str, source: int, auditor_uid: int):
         self.user_id = user_id
         self.player_name = player_name
         self.player_uuid = player_uuid
+        self.source = source
+        self.auditor_uid = auditor_uid
 
 
 class Token(db.Model):
