@@ -118,7 +118,7 @@ class Config:
             self.db.session.add(ConfigModel(key, value, type_))
         else:
             self.set__(key, value, type_)
-            conf: ConfigModel = ConfigModel.query.filter(ConfigModel.key == key)
+            conf: ConfigModel = ConfigModel.query.filter(ConfigModel.key == key).first()
             conf.value = value
             conf.type = type_
         self.db.session.commit()
