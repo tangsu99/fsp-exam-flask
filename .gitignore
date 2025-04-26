@@ -8,3 +8,5 @@ log/
 instance/
 
 .env
+
+.idea/dataSources.xml
