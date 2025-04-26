@@ -252,6 +252,7 @@ class Response(db.Model):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)  # 主键，答卷唯一标识，自增
     is_completed: Mapped[bool] = mapped_column(Boolean, default=False)  # 完成状态，默认为False（未完成）
     is_reviewed: Mapped[int] = mapped_column(Integer, default=0)  # 阅卷状态，0 待审核 1 已通过 2 已拒绝
+    reviewer_uid: Mapped[int] = mapped_column(Integer, nullable=True)
     player_name: Mapped[str] = mapped_column(String(25), nullable=False)
     player_uuid: Mapped[str] = mapped_column(String(36), nullable=False)
     user_id: Mapped[int] = mapped_column(

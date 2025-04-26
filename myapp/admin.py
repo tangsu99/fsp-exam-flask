@@ -568,6 +568,13 @@ def get_responses():
         else:
             total_score = i.archive_score
 
+
+        reviewer : None | User = User.query.get(i.reviewer_uid)
+        if reviewer is None:
+            reviewer_name = "该用户不存在"
+        else:
+            reviewer_name= reviewer.username
+
         response_data["list"].append(
             {
                 "id": i.id,
@@ -580,6 +587,7 @@ def get_responses():
                 "surveyId": i.survey_res.id,
                 "responseTime": i.response_time,
                 "createTime": i.create_time,
+                "reviewer_name": reviewer_name,
             }
         )
     return jsonify(response_data)
@@ -661,8 +669,9 @@ def reviewed_response():
             return jsonify({"code": 4, "desc": "未知状态！"})
 
         # 设置审核状态后，强制将问卷设置为已完成的
-        resp.is_completed = True
         resp.is_reviewed = status
+        resp.reviewer_uid = current_user.id
+        resp.is_completed = True
 
         # 已审核的问卷不可再批分，向归档分数字段添加分数，优化查询答卷列表时的速度
         scores = ResponseScore.query.filter_by(response_id=rid).all()
