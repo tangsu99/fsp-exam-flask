@@ -437,14 +437,24 @@ def set_user():
         # 更新用户信息
         if username:
             user.username = username
+
         if password is not None and check_password(password):
             user.set_password(password)
+
         if user_qq:
             user.user_qq = user_qq
+
         if role:
             user.role = role
+
         if status is not None:
             user.status = status
+
+            # 如果用户被封禁或临时封禁，删除名下白名单，如果之后被解封，需要重新考取白名单资格，系统不会自动恢复
+            if status in (2, 3):
+                wl = user.whitelist
+                for item in wl:
+                    db.session.delete(item)
 
         db.session.commit()
 
