@@ -35,7 +35,7 @@ class Survey(db.Model):
     name: Mapped[str] = mapped_column(String(200), nullable=False)  # 问卷名称，不允许为空
     description: Mapped[Optional[str]] = mapped_column(Text)  # 问卷描述，可为空
     create_time: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.now(timezone.utc)
+        DateTime, default=func.now(), server_default=func.now()
     )  # 问卷创建时间，默认为当前时间
     status: Mapped[int] = mapped_column(Integer, nullable=False)  # 问卷状态，！！！已废弃字段！！！
     questions: Mapped[list["Question"]] = relationship(
@@ -65,7 +65,7 @@ class Question(db.Model):
     score: Mapped[float] = mapped_column(Float, nullable=False)  # 问题分值，不允许为空
     logical_deletion: Mapped[bool] = mapped_column(Boolean ,default=False, nullable=True)  # 逻辑删除
     create_time: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.now(timezone.utc)
+        DateTime, default=func.now(), server_default=func.now()
     )  # 问题创建时间，默认为当前时间
     img_list: Mapped[list["QuestionImgURL"]] = relationship(
         "QuestionImgURL", backref="question_images_backref", lazy="select", cascade="all ,delete"
@@ -103,6 +103,9 @@ class Question(db.Model):
 
     @classmethod
     def append_question(cls, survey_id: int, question_text: str, question_type: int, score: float):
+        """
+        在末尾插入题目
+        """
         new_question = cls(
             survey_id=survey_id,
             question_text=question_text,
@@ -167,7 +170,7 @@ class QuestionImgURL(db.Model):
     img_alt: Mapped[str] = mapped_column(String(200))  # 图片alt，允许为空
     img_data: Mapped[str] = mapped_column(LONGTEXT, nullable=False)  # 图片数据，URL 或者 Base64 编码的图片，不允许为空
     create_time: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.now(timezone.utc)
+        DateTime, default=func.now(), server_default=func.now()
     )  # 选项创建时间，默认为当前时间
 
     def __init__(self, question_id: int, img_alt: str, img_data: str):
@@ -186,7 +189,7 @@ class Option(db.Model):
     option_text: Mapped[str] = mapped_column(Text, nullable=False)  # 选项内容，不允许为空
     is_correct: Mapped[Optional[bool]] = mapped_column(Boolean)  # 是否为正确选项，对于有标准答案的题目，可为空
     create_time: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.now(timezone.utc)
+        DateTime, default=func.now(), server_default=func.now()
     )  # 选项创建时间，默认为当前时间
 
     def __init__(self, question_id: int, option_text: str, is_correct: bool = False):
@@ -198,14 +201,13 @@ class Option(db.Model):
 # 用户表模型
 class User(UserMixin, db.Model):
     __tablename__ = "users"  # 指定表名
-
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)  # 主键，用户唯一标识，自增
     username: Mapped[str] = mapped_column(String(100), nullable=False)  # 用户名，不允许为空
     user_qq: Mapped[str] = mapped_column(String(25), nullable=False)
     password: Mapped[str] = mapped_column(String(100), nullable=False)  # 密码，不允许为空
     role: Mapped[str] = mapped_column(String(100))  # 用户角色，如普通用户、管理员等，可为空
     addtime: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.now(timezone.utc)
+        DateTime, default=func.now(), server_default=func.now()
     )  # 用户新增时间，默认为当前时间
     avatar: Mapped[str] = mapped_column(String(500), default=DEFAULT_AVATAR)
     status: Mapped[int] = mapped_column(
@@ -228,7 +230,6 @@ class User(UserMixin, db.Model):
     responses: Mapped[list["Response"]] = relationship(
         "Response", backref="user", lazy="select", cascade="all, delete"
     )  # 与答卷表建立一对多关系，级联删除
-
     reset_password_token: Mapped[list["ResetPasswordToken"]] = relationship(
         "ResetPasswordToken", backref="user_r_p_t", lazy="select", cascade="all, delete"
     )
@@ -263,10 +264,10 @@ class Response(db.Model):
     )  # 所答问卷id，外键，关联问卷表，级联删除
     survey_name: Mapped[str] = mapped_column(String(200), nullable=True)  # 问卷当时的名称
     response_time: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.now(timezone.utc)
+        DateTime, default=func.now(), server_default=func.now()
     )  # 答卷时间，默认为当前时间
     create_time: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.now(timezone.utc)
+        DateTime, default=func.now(), server_default=func.now()
     )  # 答卷记录创建时间，默认为当前时间
     response_details: Mapped[list["ResponseDetail"]] = relationship(
         "ResponseDetail", backref="response_d", lazy="select", cascade="all, delete"
@@ -311,7 +312,7 @@ class ResponseDetail(db.Model):
         String(500), nullable=False
     )  # 用户答案，对于选择题存储选项id，对于简答题存储答案文本，不允许为空
     create_time: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.now(timezone.utc)
+        DateTime, default=func.now(), server_default=func.now()
     )  # 答题详情创建时间，默认为当前时间
 
     def __init__(self, response_id: int, question_id: int, answer: str):
@@ -357,7 +358,7 @@ class Whitelist(db.Model):
     source: Mapped[int] = mapped_column(Integer, nullable=False) # 0 代表考试，1代表担保，2代表其他
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
-        default=datetime.now(timezone.utc),
+        default=func.now(),
         server_default=func.now()
     )
 
@@ -373,7 +374,7 @@ class Token(db.Model):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
     token: Mapped[str] = mapped_column(String(256), unique=True, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), server_default=func.now())
     expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     is_revoked: Mapped[bool] = mapped_column(Boolean, default=False)
 
@@ -396,10 +397,9 @@ class SurveySlot(db.Model):
 
 class RegistrationLimit(db.Model):
     __tablename__ = "registration_limits"
-
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     ip: Mapped[str] = mapped_column(String(45), nullable=False)  # 支持IPv6的最大长度
-    register_time = db.Column(db.DateTime, default=datetime.now(timezone.utc))
+    register_time = db.Column(db.DateTime, default=func.now(), server_default=func.now())
     def __init__(self, ip):
         self.ip = ip
 
@@ -408,7 +408,7 @@ class ResetPasswordToken(db.Model):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
     token: Mapped[str] = mapped_column(String(256), unique=True, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), server_default=func.now())
     expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     is_revoked: Mapped[bool] = mapped_column(Boolean, default=False)
 
@@ -426,13 +426,13 @@ class ConfigModel(db.Model):
     type: Mapped[str] = mapped_column(String(10), nullable=False)
     create_time: Mapped[datetime] = mapped_column(
         DateTime,
-        default=datetime.now(timezone.utc),
+        default=func.now(),
         server_default=func.now()
     )
     update_time: Mapped[datetime] = mapped_column(
         DateTime,
-        default=datetime.now(timezone.utc),
-        onupdate=datetime.now(timezone.utc),
+        default=func.now(),
+        onupdate=func.now(),
         server_default=func.now(),
         server_onupdate=func.now()
     )
