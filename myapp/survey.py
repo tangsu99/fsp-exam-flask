@@ -53,17 +53,18 @@ def get_survey(sid: int):
     survey = Survey.query.get(sid)
     if not survey:
         return jsonify({"code": 1, "desc": "未找到问卷"}), 404
-    # 构建问卷数据结构
-    create_time = None
-    ddl = None
 
     existing_response_list = user.responses
     for i in existing_response_list:
         if i.is_completed is False:
             create_time = i.create_time
+            break
+    else:
+        return jsonify({"code": 1, "desc": "错误"})
 
     ddl = create_time + timedelta(hours=24)
 
+    # 构建问卷数据结构
     survey_data = {
         "id": survey.id,
         "name": survey.name,

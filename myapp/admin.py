@@ -577,12 +577,12 @@ def get_responses():
         else:
             total_score = i.archive_score
 
-
         reviewer : None | User = User.query.get(i.reviewer_uid)
+
         if reviewer is None:
             reviewer_name = "该用户不存在"
         else:
-            reviewer_name= reviewer.username
+            reviewer_name = reviewer.username
 
         response_data["list"].append(
             {
@@ -594,8 +594,8 @@ def get_responses():
                 "survey": i.survey_res.name,
                 "score": total_score,
                 "surveyId": i.survey_res.id,
-                "responseTime": i.response_time,
                 "createTime": i.create_time,
+                "responseTime": i.response_time,
                 "reviewer_name": reviewer_name,
             }
         )
