@@ -18,7 +18,6 @@ from myapp.db_model import (
     Whitelist,
 )
 from myapp.utils import check_password, required_role
-from myapp.validate_json import validate_json
 
 admin = Blueprint("admin", __name__)
 
@@ -820,10 +819,13 @@ def set_score():
 @admin.route("/add_slot", methods=["POST"])
 @login_required
 @required_role("admin")
-@validate_json(required_fields=["slotName", "mountedSID"])
 def add_slot():
-    slot_name: str = request.json["slotName"] # type: ignore
-    mounted_survey_id: int = request.json["mountedSID"] # type: ignore
+    req_data = request.json
+    if req_data is None:
+        return jsonify({"code": 1, "desc": "缺少信息！"})
+
+    slot_name: str = req_data.get("slotName")
+    mounted_survey_id: int = req_data.get("mountedSID")
 
     mounted_survey: Survey | None = Survey.query.get(mounted_survey_id)
     if mounted_survey is None:
@@ -868,9 +870,13 @@ def set_slot():
 @admin.route("/del_slot", methods=["POST"])
 @login_required
 @required_role("admin")
-@validate_json(required_fields=["id"])
 def del_slot():
-    slot_id: str = request.json["id"] # type: ignore
+    req_data = request.json
+    if req_data is None:
+        return jsonify({"code": 1, "desc": "缺少信息！"})
+
+    slot_id: str | None = req_data.get("id")
+
     try:
         # 直接通过主键获取问题
         slot = SurveySlot.query.get(slot_id)

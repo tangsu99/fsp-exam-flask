@@ -6,7 +6,6 @@ from flask_login import current_user, login_required
 
 from myapp import db
 from myapp.db_model import Guarantee, User, Whitelist
-from myapp.validate_json import validate_json
 
 guarantee = Blueprint("guarantee", __name__)
 
@@ -62,16 +61,19 @@ def returnData(i: Guarantee):
 
 @guarantee.route("/request", methods=["POST"])
 @login_required
-@validate_json(required_fields=["userInfo", "guarantorInfo"])
 def add_guarantee():
+    req_data = request.json
+    if req_data is None:
+        return jsonify({"code": 1, "desc": "缺少信息！"})
+
     applicant_info = {
-        "player_name": request.json["userInfo"]["playerName"], # type: ignore
-        "player_uuid": request.json["userInfo"]["playerUUID"], # type: ignore
+        "player_name": req_data.get("userInfo").get("playerName"),
+        "player_uuid": req_data.get("userInfo").get("playerUUID"),
     }
 
     guarantor_info = {
-        "player_name": request.json["guarantorInfo"]["playerName"], # type: ignore
-        "player_uuid": request.json["guarantorInfo"]["playerUUID"], # type: ignore
+        "player_name": req_data.get("guarantorInfo").get("playerName"),
+        "player_uuid": req_data.get("guarantorInfo").get("playerUUID"),
     }
 
     checkGuarantorRes = checkGuarantor(guarantor_info)
