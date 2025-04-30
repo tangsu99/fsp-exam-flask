@@ -11,7 +11,7 @@ guarantee = Blueprint("guarantee", __name__)
 
 
 def checkGuarantor(info: dict) -> dict:
-    wl_result = Whitelist.query.filter_by(player_uuid=info["player_uuid"]).first()
+    wl_result = Whitelist.query.filter_by(player_uuid=info.get("player_uuid")).first()
 
     if wl_result is None:
         return {"code": 1, "desc": "担保人不属于白名单成员，无法担保！"}
@@ -27,20 +27,20 @@ def checkGuarantor(info: dict) -> dict:
 
 
 def checkApplicant(info: dict) -> dict:
-    wl_result = Whitelist.query.filter_by(player_uuid=info["player_uuid"]).first()
+    wl_result = Whitelist.query.filter_by(player_uuid=info.get("player_uuid")).first()
 
     if wl_result:
         return {"code": 1, "desc": "你已经是白名单成员"}
-
-    ten_minutes_ago = datetime.now(timezone.utc) - timedelta(hours=1)
+    
+    now = datetime.now(timezone.utc)
     g_result = Guarantee.query.filter(
-        Guarantee.player_uuid == info["player_uuid"],
-        Guarantee.create_time >= ten_minutes_ago,
+        Guarantee.player_uuid == info.get("player_uuid"),
+        Guarantee.expiration_time < now,
         Guarantee.status == 0,
     ).all()
 
     if len(g_result) != 0:
-        return {"code": 1, "desc": "存在未过期的担保！"}
+        return {"code": 1, "desc": "存在未过期的担保！个人中心担保查询里查看进度"}
 
     return {"code": 0}
 
