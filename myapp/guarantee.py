@@ -98,7 +98,7 @@ def add_guarantee():
     )
     db.session.add(_guarantee)
     db.session.commit()
-    return jsonify({"code": 0, "desc": "担保请求提交成功，担保有效期1小时，过期后失效"})
+    return jsonify({"code": 0, "desc": "提交成功，有效期1小时，超时失效，1小时内不可再申请新的担保请求，除非对方手动拒绝或同意"})
 
 
 @guarantee.route("/query_all", methods=["GET"])
