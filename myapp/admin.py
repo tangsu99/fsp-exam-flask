@@ -175,6 +175,40 @@ def add_question():
     db.session.commit()
     return jsonify({"code": 0, "desc": "添加题目成功"})
 
+@admin.route("/migrationQuestion", methods=["POST"])
+@login_required
+@required_role("admin")
+def migration_question():
+    """
+    迁移题目 API，迁移题目是指把源问卷的题目移动到目标问卷的末尾
+    前端提供目标问卷ID和题目ID
+    """
+    req_data = request.json
+    if req_data is None:
+        return jsonify({"code": 1, "desc": "数据为空！"})
+
+    target_survey_id: int | None = req_data.get("target_sid")
+    question_id: int | None = req_data.get("qid")
+
+    if target_survey_id is None or question_id is None:
+        return jsonify({"code": 1, "desc": "数据为空！"})
+
+    current_question: Question | None = Question.query.get(question_id)
+    if current_question is None:
+        return jsonify({"code": 1, "desc": "题目不存在"})
+
+
+    max_display_order = (
+        db.session.query(Question.display_order)
+        .filter(Question.survey_id == target_survey_id, Question.logical_deletion == False)
+        .order_by(Question.display_order.desc())
+        .first()
+    )
+    current_question.display_order = 1 if max_display_order is None else max_display_order.display_order + 1 # pyright: ignore
+    current_question.survey_id = target_survey_id
+    db.session.commit()
+    return jsonify({"code": 0, "desc": "迁移题目成功"})
+
 
 @admin.route("/editQuestion", methods=["POST"])
 @login_required

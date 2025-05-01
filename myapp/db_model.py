@@ -93,11 +93,12 @@ class Question(db.Model):
 
         if display_order is None:
             max_display_order = (
-                    db.session.query(func.max(Question.display_order))
-                    .filter_by(survey_id=survey_id, logical_deletion=False)
-                    .scalar()
+                db.session.query(Question.display_order)
+                .filter(Question.survey_id == survey_id, Question.logical_deletion == False)
+                .order_by(Question.display_order.desc())
+                .first()
             )
-            self.display_order = (max_display_order or 0) + 1
+            self.display_order = 1 if max_display_order is None else max_display_order.display_order + 1 # pyright: ignore
         else:
             self.display_order = display_order
 
