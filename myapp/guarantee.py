@@ -1,4 +1,4 @@
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone, timedelta, tzinfo
 from jsonschema import validate, ValidationError
 
 from flask import Blueprint, jsonify, request
@@ -8,6 +8,11 @@ from myapp import db
 from myapp.db_model import Guarantee, User, Whitelist
 
 guarantee = Blueprint("guarantee", __name__)
+
+def is_expired(expiration_time: datetime) -> bool:
+    expiration_time = expiration_time.replace(tzinfo=timezone.utc)
+    current_datetime = datetime.now(timezone.utc)
+    return current_datetime > expiration_time
 
 
 def checkGuarantor(info: dict) -> dict:
@@ -31,16 +36,18 @@ def checkApplicant(info: dict) -> dict:
 
     if wl_result:
         return {"code": 1, "desc": "你已经是白名单成员"}
-    
-    now = datetime.now(timezone.utc)
+
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+
     g_result = Guarantee.query.filter(
         Guarantee.player_uuid == info.get("player_uuid"),
-        Guarantee.expiration_time < now,
         Guarantee.status == 0,
     ).all()
 
-    if len(g_result) != 0:
-        return {"code": 1, "desc": "存在未过期的担保！个人中心担保查询里查看进度"}
+    for i in g_result:
+        # 如果有未过期的
+        if now < i.expiration_time.replace(tzinfo=None):
+            return {"code": 1, "desc": "存在未过期的担保！个人中心担保查询里查看进度"}
 
     return {"code": 0}
 
@@ -136,11 +143,6 @@ def guarantee_user_action():
         # 处理合法数据的逻辑
         id: int = request.json["id"] # pyright: ignore
         action: str = request.json["action"] # pyright: ignore
-
-        def is_expired(expiration_time: datetime) -> bool:
-            expiration_time = expiration_time.replace(tzinfo=timezone.utc)
-            current_datetime = datetime.now(timezone.utc)
-            return current_datetime > expiration_time
 
         _guarantee: Guarantee | None = Guarantee.query.get(id)
         if _guarantee and not is_expired(_guarantee.expiration_time):
