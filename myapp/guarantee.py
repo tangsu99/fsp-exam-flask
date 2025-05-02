@@ -4,7 +4,7 @@ from jsonschema import validate, ValidationError
 from flask import Blueprint, jsonify, request
 from flask_login import current_user, login_required
 
-from myapp import db
+from myapp import db, APP
 from myapp.db_model import Guarantee, User, Whitelist
 
 guarantee = Blueprint("guarantee", __name__)
@@ -95,13 +95,15 @@ def add_guarantee():
     if checkApplicantRes["code"] == 1:
         return jsonify(checkApplicantRes)
 
+    expiration = APP.config['GUARANTEE_EXPIRATION']
+
     _guarantee = Guarantee(
         guarantor_id,
         current_user.get_id(),
         applicant_info["player_name"],
         applicant_info["player_uuid"],
         datetime.now(timezone.utc),
-        datetime.now(timezone.utc) + timedelta(hours=1),
+        datetime.now(timezone.utc) + timedelta(hours=expiration),
     )
     db.session.add(_guarantee)
     db.session.commit()
