@@ -17,6 +17,7 @@ from myapp.db_model import (
     User,
     Whitelist,
 )
+from myapp.utils import is_survey_response_expired
 
 survey = Blueprint("survey", __name__)
 
@@ -104,24 +105,6 @@ def get_survey(sid: int):
         survey_data["questions"].append(question_data)
     return jsonify(survey_data)
 
-
-
-# admin.py 有一个一模一样的函数
-def is_survey_response_expired(survey_response: Response) -> bool:
-    VALIDITY_PERIOD = timedelta(hours=24) # 有效期为 24h
-
-    # 只判断未完成的问卷，已完成的问卷不存在“过期”的说法
-    if survey_response.is_completed is False:
-        create_time = survey_response.create_time
-        create_datetime = create_time.replace(tzinfo=timezone.utc)
-        current_datetime = datetime.now(timezone.utc)
-        expired_datetime = create_datetime + VALIDITY_PERIOD
-        if expired_datetime < current_datetime:
-            survey_response.is_completed = True
-            survey_response.is_reviewed = 2
-            db.session.commit()
-            return True
-    return False
 
 def incomplete_survey_exist(response_list) -> Response | None:
     for i in response_list:

@@ -1,4 +1,3 @@
-from datetime import datetime, timedelta, timezone
 from flask import Blueprint, jsonify, request
 from flask_login import login_required, current_user
 
@@ -17,7 +16,7 @@ from myapp.db_model import (
     User,
     Whitelist,
 )
-from myapp.utils import check_password, required_role
+from myapp.utils import check_password, required_role, is_survey_response_expired
 
 admin = Blueprint("admin", __name__)
 
@@ -518,25 +517,6 @@ def del_user():
 
         return jsonify({"code": 0, "desc": "用户删除成功！"})
     return jsonify({"code": 1, "desc": "缺少信息"})
-
-
-# survey.py 有一个一模一样的函数
-def is_survey_response_expired(survey_response: Response) -> bool:
-    VALIDITY_PERIOD = timedelta(hours=24) # 有效期为 24h
-
-    # 只判断未完成的问卷，已完成的问卷不存在“过期”的说法
-    if survey_response.is_completed is False:
-        create_time = survey_response.create_time
-        create_datetime = create_time.replace(tzinfo=timezone.utc)
-        current_datetime = datetime.now(timezone.utc)
-        expired_datetime = create_datetime + VALIDITY_PERIOD
-        if expired_datetime < current_datetime:
-            survey_response.is_completed = True
-            survey_response.is_reviewed = 2
-            db.session.commit()
-            return True
-    return False
-
 
 
 @admin.route("/surveys", methods=["GET"])
