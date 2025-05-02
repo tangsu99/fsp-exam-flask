@@ -45,7 +45,7 @@ def check_password(password: str) -> bool:
 
 
 def is_survey_response_expired(survey_response: Response) -> bool:
-    val = current_app.config["VALIDITY_PERIOD"]
+    val = current_app.config["RESPONSE_VALIDITY_PERIOD"]
     validity_period = timedelta(hours=val) # 有效期为 24h
 
     # 只判断未完成的问卷，已完成的问卷不存在“过期”的说法
