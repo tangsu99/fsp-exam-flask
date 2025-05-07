@@ -16,7 +16,7 @@ from myapp.db_model import (
     User,
     Whitelist,
 )
-from myapp.utils import check_password, required_role, is_survey_response_expired
+from myapp.utils import check_password, required_role, is_survey_response_expired, validate_json_required_fields
 
 admin = Blueprint("admin", __name__)
 
@@ -59,7 +59,7 @@ def add_survey():
             survey: Survey = Survey(name, description)
             db.session.add(survey)
             db.session.commit()
-            return jsonify({"code": 0, "desc": "问卷创建成功"})
+            return jsonify({"code": 0, "desc": "问卷创建成功", "surveyId": survey.id})
     return jsonify({"code": 1, "desc": "缺少数据"})
 
 
@@ -116,6 +116,79 @@ def mod_survey():
     return jsonify({"code": 1, "desc": "缺少数据"})
 
 
+def check_and_format_options(options: list)->dict:
+    option_required_fields = {
+        "text": (str, True, "option_text"),
+        "isCorrect": (int, True, "is_correct"),
+    }
+
+    return_data = []
+
+    for i in options:
+        validate_option_res: dict = validate_json_required_fields(option_required_fields, i)
+
+        if validate_option_res["success"] is False:
+            return {"success": False, "desc": "题目数据格式验证失败！"}
+
+        return_data.append(validate_option_res["data"])
+
+    return {"success": True, "data": return_data}
+
+
+def check_and_format_images(images: list)->dict:
+    image_required_fields = {
+        "alt": (str, True, "img_alt"),
+        "data": (str, True, "img_data"),
+    }
+
+    return_data = []
+
+    for i in images:
+        validate_image_res: dict = validate_json_required_fields(image_required_fields, i)
+
+        if validate_image_res["success"] is False:
+            return {"success": False, "desc": "题目数据格式验证失败！"}
+
+        return_data.append(validate_image_res["data"])
+
+    return {"success": True, "data": return_data}
+
+
+def check_and_format_questions(questions: list)->dict:
+    question_required_fields = {
+        "surveyId": (int, True, "survey_id"),
+        "type": (int, True, "type"),
+        "score": (float, True, "score"),
+        "title": (str, True, "title"),
+        "options": (list, True, "options"),
+        "img_list": (list, True, "images"),
+        "display_order": (int, True, "display_order")
+    }
+
+    return_data = []
+
+    for question_data in questions:
+        validate_res: dict = validate_json_required_fields(question_required_fields, question_data)
+        print(validate_res)
+        if validate_res["success"] is False:
+            return {"success": False, "desc": "题目数据格式验证失败！"}
+
+        if len(validate_res["data"]["options"]) == 0:
+            return {"success": False, "desc": f"标题为{validate_res["data"]["title"][:8]}...的题目至少需要一个选项！"}
+
+        validate_options_res = check_and_format_options(validate_res["data"]["options"])
+        if validate_options_res["success"] is False:
+            return {"success": False, "desc": f"标题为{validate_res["data"]["title"][:8]}...的题目选项数据格式错误！"}
+
+        validate_images_res = check_and_format_images(validate_res["data"]["images"])
+        if validate_images_res["success"] is False:
+            return {"success": False, "desc": f"标题为{validate_res["data"]["title"][:8]}...的题目图片数据格式错误！"}
+
+        return_data.append(validate_res["data"])
+
+    return {"success": True, "data": return_data}
+
+
 def add_question_images(question_id: int, img_list: list) -> None:
     for item in img_list:
         img: QuestionImgURL = QuestionImgURL(question_id=question_id, img_alt=item["alt"], img_data=item["data"])
@@ -138,38 +211,40 @@ def add_question_options(question_id: int, question_type: int, options: list) ->
 def add_question():
     """
     添加题目 API
-    前端提供问卷ID、题目标题、类型、分数、选项和排序 ID 六个参数
+    前端提供一个题目列表，每个列表元素包含：问卷ID、题目标题、类型、分数、选项和排序 ID 六个参数
     排序 ID 为 0 代表题目加入到末尾，其他值则为插入
     """
     req_data = request.json
     if req_data is None:
         return jsonify({"code": 1, "desc": "数据为空！"})
 
-    options = req_data["options"]
-    if (options is None) or (not len(options) > 0):
-        return jsonify({"code": 1, "desc": "至少有一个选项！"})
+    if not isinstance(req_data, list):
+        return jsonify({"code": 1, "desc": "数据格式不符！"})
 
-    if req_data["display_order"] == 0:
-        question: Question = Question.append_question(
-            survey_id=req_data["survey"],
-            question_text=req_data["title"],
-            question_type=req_data["type"],
-            score=req_data["score"],
-        )
-    else:
-        question: Question = Question.insert_question(
-            survey_id=req_data["survey"],
-            question_text=req_data["title"],
-            question_type=req_data["type"],
-            score=req_data["score"],
-            target_display_order=req_data["display_order"]
-        )
+    formatted_data = check_and_format_questions(req_data)
+    if formatted_data["success"] is False:
+        return jsonify({"code": 1, "desc": formatted_data["desc"]})
 
-    add_question_options(question.id, question.question_type, options)
+    print(formatted_data)
+    for question_data in formatted_data["data"]:
+        if question_data["display_order"] == 0:
+            question: Question = Question.append_question(
+                survey_id=question_data["survey_id"],
+                question_text=question_data["title"],
+                question_type=question_data["type"],
+                score=question_data["score"],
+            )
+        else:
+            question: Question = Question.insert_question(
+                survey_id=question_data["survey_id"],
+                question_text=question_data["title"],
+                question_type=question_data["type"],
+                score=question_data["score"],
+                target_display_order=question_data["display_order"]
+            )
 
-    # 添加图片
-    img_list = req_data.get("img_list", [])
-    add_question_images(question.id, img_list)
+        add_question_options(question.id, question.question_type, question_data["options"])
+        add_question_images(question.id, question_data["images"])
 
     db.session.commit()
     return jsonify({"code": 0, "desc": "添加题目成功"})

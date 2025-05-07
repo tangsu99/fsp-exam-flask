@@ -60,3 +60,35 @@ def is_survey_response_expired(survey_response: Response) -> bool:
             db.session.commit()
             return True
     return False
+
+def validate_json_required_fields(required_fields:dict, data: dict) -> dict:
+    """
+    接受数据格式模板（字典）和数据(字典）
+    数据格式模板例如：
+    required_fields = {
+        "survey": (int, True, "question_survey_id"),
+        "type": (int, True, "question_type"),
+        "score": (float, True, "question_score"),
+        "title": (str, True, "question_title"),
+        "options": (list, True, "question_options"),
+        "display_order": (int, True, "question_display_order")
+    }
+    """
+    return_data = {"success": True, "data": {}}
+    for field, (expected_type, is_required, new_field) in required_fields.items():
+        value = data.get(field)
+
+        if value is None and is_required:
+            return {"success": False}
+
+        # 分数是浮点的，如果前端传来例如5分，会被识别成int类型，如果不处理会出问题
+        if not isinstance(value, expected_type) and expected_type is float and not isinstance(value, int):
+            print("2")
+            print(f"{field=}")
+            print(f"{expected_type=}")
+            return {"success": False}
+
+        return_data["data"][new_field] = value
+
+    return return_data
+
