@@ -225,7 +225,6 @@ def add_question():
     if formatted_data["success"] is False:
         return jsonify({"code": 1, "desc": formatted_data["desc"]})
 
-    print(formatted_data)
     for question_data in formatted_data["data"]:
         if question_data["display_order"] == 0:
             question: Question = Question.append_question(
@@ -304,7 +303,7 @@ def edit_question():
         return jsonify({"code": 1, "desc": "题目不存在"})
 
     # 更新题目基本信息
-    question.survey_id = req_data["survey"]
+    question.survey_id = req_data["surveyId"]
     question.question_text = req_data["title"]
     question.question_type = req_data["type"]
     question.score = req_data["score"]
