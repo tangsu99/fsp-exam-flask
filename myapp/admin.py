@@ -935,7 +935,7 @@ def set_slot():
         slot_id = req_data.get("id")
         new_survey_id = req_data.get("mountedSID")
         if slot_id and new_survey_id:
-            if Survey.query.get(slot_id) is None:
+            if Survey.query.get(new_survey_id) is None:
                 return jsonify({"code": 1, "desc": "未找到问卷！"})
 
             slot: SurveySlot | None = SurveySlot.query.get(slot_id)
