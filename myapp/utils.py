@@ -83,9 +83,6 @@ def validate_json_required_fields(required_fields:dict, data: dict) -> dict:
 
         # 分数是浮点的，如果前端传来例如5分，会被识别成int类型，如果不处理会出问题
         if not isinstance(value, expected_type) and expected_type is float and not isinstance(value, int):
-            print("2")
-            print(f"{field=}")
-            print(f"{expected_type=}")
             return {"success": False}
 
         return_data["data"][new_field] = value
