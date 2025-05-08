@@ -174,15 +174,15 @@ def check_and_format_questions(questions: list)->dict:
             return {"success": False, "desc": "题目数据格式验证失败！"}
 
         if len(validate_res["data"]["options"]) == 0:
-            return {"success": False, "desc": f"标题为{validate_res["data"]["title"][:8]}...的题目至少需要一个选项！"}
+            return {"success": False, "desc": f'标题为{validate_res["data"]["title"][:8]}...的题目至少需要一个选项！'}
 
         validate_options_res = check_and_format_options(validate_res["data"]["options"])
         if validate_options_res["success"] is False:
-            return {"success": False, "desc": f"标题为{validate_res["data"]["title"][:8]}...的题目选项数据格式错误！"}
+            return {"success": False, "desc": f'标题为{validate_res["data"]["title"][:8]}...的题目选项数据格式错误！'}
 
         validate_images_res = check_and_format_images(validate_res["data"]["images"])
         if validate_images_res["success"] is False:
-            return {"success": False, "desc": f"标题为{validate_res["data"]["title"][:8]}...的题目图片数据格式错误！"}
+            return {"success": False, "desc": f'标题为{validate_res["data"]["title"][:8]}...的题目图片数据格式错误！'}
 
         return_data.append(validate_res["data"])
 
