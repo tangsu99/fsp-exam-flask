@@ -107,7 +107,9 @@ class Config:
         self.app.config['MAIL_DEFAULT_SENDER'] = self.get('MAIL_DEFAULT_SENDER')  # 默认发件人
 
         # 重置密码页面
-        self.app.config['RESET_PASSWORD_URL'] = self.get('RESET_PASSWORD_URL')  # 默认发件人
+        self.app.config['RESET_PASSWORD_URL'] = self.get('RESET_PASSWORD_URL')
+        # 激活页面
+        self.app.config['ACTIVATION_URL'] = self.get('ACTIVATION_URL')
 
         # 过期配置
         self.app.config['GUARANTEE_EXPIRATION'] = self.get('GUARANTEE_EXPIRATION') # 小时

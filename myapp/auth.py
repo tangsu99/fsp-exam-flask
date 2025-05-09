@@ -204,8 +204,7 @@ def req_activation():
     ).first()
     if token:
         return jsonify({"code": 1, "desc": "链接未过期请稍后尝试！"})
-    print(207, user)
-    Thread(target=send_activation_mail, args=(user, 1), ).start()
+    Thread(target=send_activation_mail, args=(user,), ).start()
     return jsonify({"code": 0, "desc": "发送成功！请查找邮箱!"})
 
 
@@ -231,9 +230,8 @@ def activation():
     return jsonify({"code": 2, "desc": "缺少数据"})
 
 
-def send_activation_mail(user, a):
+def send_activation_mail(user):
     with APP.app_context():
-        print(236, user, a)
         token = generate_token(user)
         db.session.add(ActivationToken(user.id, token))
         db.session.commit()
