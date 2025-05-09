@@ -234,6 +234,9 @@ class User(UserMixin, db.Model):
     reset_password_token: Mapped[list["ResetPasswordToken"]] = relationship(
         "ResetPasswordToken", backref="user_r_p_t", lazy="select", cascade="all, delete"
     )
+    activation_token: Mapped[list["ActivationToken"]] = relationship(
+        "ActivationToken", backref="user_active", lazy="select", cascade="all, delete"
+    )
 
     def __init__(self, username: str, user_qq: str = "1", role: str = "user"):
         self.username = username
@@ -406,6 +409,20 @@ class RegistrationLimit(db.Model):
 
 
 class ResetPasswordToken(db.Model):
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
+    token: Mapped[str] = mapped_column(String(256), unique=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=func.utc_timestamp(), server_default=func.utc_timestamp())
+    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    is_revoked: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    def __init__(self, user_id, token, expires_in=3600):
+        self.user_id = user_id
+        self.token = token
+        self.expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
+
+
+class ActivationToken(db.Model):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
     token: Mapped[str] = mapped_column(String(256), unique=True, nullable=False)
