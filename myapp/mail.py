@@ -11,7 +11,7 @@ def reset_password_mail(recipients: list[str], token: str) -> Message:
 
 def activation_mail(recipients: list[str], token: str) -> Message:
     activation_url = current_app.config["ACTIVATION_URL"]
-    msg = Message('重置密码', recipients=recipients)
+    msg = Message('账户激活', recipients=recipients)
     msg.html = render_template('mail_activation.html', url=activation_url + token)
     return msg
 
