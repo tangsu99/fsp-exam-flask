@@ -1,12 +1,13 @@
 from datetime import datetime, timezone, timedelta
 from threading import Thread
-from typing import Optional
+from typing import Optional, cast
 import jwt
 from flask import Blueprint, current_app, jsonify, request
 from flask_login import current_user, login_required, login_user
 
 from myapp import APP, db, reset_password_mail, mail
-from myapp.db_model import Token, User, Whitelist, RegistrationLimit, ResetPasswordToken
+from myapp.db_model import Token, User, Whitelist, RegistrationLimit, ResetPasswordToken, ActivationToken
+from myapp.mail import activation_mail
 from myapp.utils import check_password
 
 auth = Blueprint("auth", __name__)
@@ -185,8 +186,59 @@ def find_password_set():
         db.session.commit()
 
         return jsonify({"code": 0, "desc": "修改成功！"})
-
     return jsonify({"code": 2, "desc": "缺少数据"})
+
+
+@auth.route('/reqActivation', methods=["post"])
+@login_required
+def req_activation():
+    user: User = User.query.filter_by(username=current_user.username).first()
+    if user.status != 0:
+        if user.status == 1:
+            return jsonify({"code": 2, "desc": "账户状态正常！不需要进行激活！"})
+        return jsonify({"code": 2, "desc": "账户状态异常！无法进行激活！"})
+    token = ActivationToken.query.filter(
+        ActivationToken.user_id == user.id,
+        ActivationToken.expires_at >= datetime.now(timezone.utc),
+        ActivationToken.is_revoked != True
+    ).first()
+    if token:
+        return jsonify({"code": 1, "desc": "链接未过期请稍后尝试！"})
+    print(207, user)
+    Thread(target=send_activation_mail, args=(user, 1), ).start()
+    return jsonify({"code": 0, "desc": "发送成功！请查找邮箱!"})
+
+
+@auth.route('/activation', methods=["PUT"])
+def activation():
+    token = ActivationToken.query.filter_by(token=request.args.get('token', '')).first()
+    if not token:
+        return jsonify({"code": 4, "desc": "无效token!"}), 404
+
+    data = request.json
+    if data:
+        username = data.get('username')
+
+        user: User | None = token.user_active
+        if not user or user.username != username:
+            return jsonify({"code": 4, "desc": "未找到用户!"}), 404
+
+        user.status = 1
+        db.session.delete(token)
+        db.session.commit()
+
+        return jsonify({"code": 0, "desc": "激活成功！"})
+    return jsonify({"code": 2, "desc": "缺少数据"})
+
+
+def send_activation_mail(user, a):
+    with APP.app_context():
+        print(236, user, a)
+        token = generate_token(user)
+        db.session.add(ActivationToken(user.id, token))
+        db.session.commit()
+        msg = activation_mail([f'{user.user_qq}@qq.com'], token)
+        mail.send(msg)
 
 
 def send_reset_password(user):

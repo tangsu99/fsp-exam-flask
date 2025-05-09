@@ -22,7 +22,12 @@ DEFAULT_CONFIG = [
     },
     {
         'key': 'RESET_PASSWORD_URL',
-        'value': 'http://localhost:5173/#/reset_password?token=',
+        'value': 'http://localhost:5173/reset_password?token=',
+        'type': 'str',
+    },
+    {
+        'key': 'ACTIVATION_URL',
+        'value': 'http://localhost:5173/activation?token=',
         'type': 'str',
     },
     {
