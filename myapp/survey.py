@@ -273,12 +273,18 @@ def complete_survey():
     res.response_time = datetime.now(timezone.utc)
     db.session.commit()
 
-    Thread(target=send_survey_complete, args=(f'{user.user_qq}@qq.com', user.username, res.response_time.isoformat(), res.id), ).start()
+    Thread(target=send_survey_complete, args=(user.username, res.response_time.isoformat(), res.id), ).start()
 
     return jsonify({"code": 0, "desc": "提交成功！", "score": count_score}), 200
 
 
-def send_survey_complete(user_mail: str, username: str, response_time: str, id_: int):
+def send_survey_complete(username: str, response_time: str, id_: int):
     with APP.app_context():
-        msg = survey_complete_mail([user_mail], username, response_time, id_)
+        admins: list[User] = User.query.filter_by(role='admin').all()
+        if len(admins) == 0:
+            return
+        admin_mail = []
+        for admin in admins:
+            admin_mail.append(f'{admin.user_qq}@qq.com')
+        msg = survey_complete_mail(admin_mail, username, response_time, id_)
         mail.send(msg)
