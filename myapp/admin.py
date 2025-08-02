@@ -817,6 +817,7 @@ def get_detail(resp_id: int):
         "name": survey.name,
         "description": survey.description,
         "create_time": survey.create_time,
+        "isReviewed": res.is_reviewed,
         # "status": survey.status, 好像用不到
         "questions": [],
     }

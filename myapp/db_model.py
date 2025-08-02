@@ -426,7 +426,7 @@ class ActivationToken(db.Model):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
     token: Mapped[str] = mapped_column(String(256), unique=True, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=func.utc_timestamp(), server_default=func.utc_timestamp())
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=func.utc_timestamp())
     expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     is_revoked: Mapped[bool] = mapped_column(Boolean, default=False)
 
