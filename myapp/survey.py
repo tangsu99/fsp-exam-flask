@@ -1,10 +1,11 @@
 from datetime import datetime, timedelta, timezone
+from threading import Thread
 from typing import cast
 
 from flask import Blueprint, jsonify, request
 from flask_login import current_user, login_required
 
-from myapp import db
+from myapp import db, APP, mail
 from myapp.db_model import (
     Option,
     Question,
@@ -17,6 +18,7 @@ from myapp.db_model import (
     User,
     Whitelist,
 )
+from myapp.mail import survey_complete_mail
 from myapp.utils import is_survey_response_expired
 
 survey = Blueprint("survey", __name__)
@@ -271,4 +273,12 @@ def complete_survey():
     res.response_time = datetime.now(timezone.utc)
     db.session.commit()
 
+    Thread(target=send_survey_complete, args=(f'{user.user_qq}@qq.com', user.username, res.response_time.isoformat(), res.id), ).start()
+
     return jsonify({"code": 0, "desc": "提交成功！", "score": count_score}), 200
+
+
+def send_survey_complete(user_mail: str, username: str, response_time: str, id_: int):
+    with APP.app_context():
+        msg = survey_complete_mail([user_mail], username, response_time, id_)
+        mail.send(msg)

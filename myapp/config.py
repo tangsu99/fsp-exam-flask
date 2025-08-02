@@ -31,6 +31,11 @@ DEFAULT_CONFIG = [
         'type': 'str',
     },
     {
+        'key': 'FRONT_END_BASE_URL',
+        'value': 'http://localhost:5173',
+        'type': 'str',
+    },
+    {
         'key': 'MAIL_SERVER',
         'value': 'smtp.qq.com',
         'type': 'str',
@@ -110,6 +115,8 @@ class Config:
         self.app.config['RESET_PASSWORD_URL'] = self.get('RESET_PASSWORD_URL')
         # 激活页面
         self.app.config['ACTIVATION_URL'] = self.get('ACTIVATION_URL')
+
+        self.app.config['FRONT_END_BASE_URL'] = self.get('FRONT_END_BASE_URL')
 
         # 过期配置
         self.app.config['GUARANTEE_EXPIRATION'] = self.get('GUARANTEE_EXPIRATION') # 小时

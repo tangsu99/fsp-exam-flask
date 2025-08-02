@@ -15,3 +15,8 @@ def activation_mail(recipients: list[str], token: str) -> Message:
     msg.html = render_template('mail_activation.html', url=activation_url + token)
     return msg
 
+def survey_complete_mail(recipients: list[str], username: str, response_time: str, id_: int) -> Message:
+    url = current_app.config["FRONT_END_BASE_URL"] + '/admin/response?id=' + str(id_)
+    msg = Message('答卷完成', recipients=recipients)
+    msg.html = render_template('mail_survey_complete.html', username = username, response_time = response_time, url=url)
+    return msg
