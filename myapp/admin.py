@@ -848,7 +848,7 @@ def get_detail(resp_id: int):
             "id": question.id,
             "title": question.question_text,
             "type": question.question_type,
-            "totalScore": question.score,
+            "score": question.score,
             "userGetScore": score,
             "options": [],
             "img_list": [],
