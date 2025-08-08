@@ -1,7 +1,7 @@
 from flask import Blueprint, jsonify, request
 from flask_login import login_required, current_user
 
-from myapp import db, my_config
+from myapp import db, my_config, bcrypt
 from myapp.db_model import (
     Guarantee,
     Option,
@@ -563,7 +563,7 @@ def set_user():
                     db.session.delete(item)
 
         db.session.commit()
-
+        print(user.password)
         return jsonify({"code": 0, "desc": "用户信息更新成功！"})
     return jsonify({"code": 1, "desc": "缺少信息"}), 400
 

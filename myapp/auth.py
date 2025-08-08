@@ -85,6 +85,10 @@ def register():
     if password != re_password:
         return jsonify({"code": 2, "desc": "密码与重复密码不一致!"})
 
+    # 验证密码是否合法
+    if not check_password(password):
+        return jsonify({"code": 2, "desc": "密码不合法!"})
+
     # 检查用户名是否已存在
     if User.query.filter_by(username=username).first():
         return jsonify({"code": 3, "desc": "用户名已存在!"})
