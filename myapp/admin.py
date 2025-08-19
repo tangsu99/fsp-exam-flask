@@ -1,3 +1,4 @@
+from datetime import datetime, timezone, tzinfo
 from flask import Blueprint, jsonify, request
 from flask_login import login_required, current_user
 
@@ -447,7 +448,7 @@ def users():
                 "userQQ": user.user_qq,
                 "role": user.role,
                 "status": user.status,
-                "addtime": user.addtime.isoformat() if user.addtime else None,
+                "addtime": user.addtime.replace(tzinfo=timezone.utc).isoformat() if user.addtime else None,
                 "avatar": user.avatar,
             }
         )
@@ -482,7 +483,7 @@ def get_user():
                 "user_qq": user.user_qq,
                 "role": user.role,
                 "status": user.status,
-                "addtime": user.addtime.isoformat() if user.addtime else None,
+                "addtime": user.addtime.replace(tzinfo=timezone.utc).isoformat() if user.addtime else None,
                 "avatar": user.avatar,
             },
         }
@@ -528,6 +529,7 @@ def set_user():
         username = req_data.get("username")
         password = req_data.get("password")
         user_qq = req_data.get("userQQ")
+        registration_time = req_data.get("addtime")
         role = req_data.get("role")
         status = req_data.get("status")
 
@@ -550,6 +552,11 @@ def set_user():
         if user_qq:
             user.user_qq = user_qq
 
+        if registration_time:
+            iso_string_fixed = registration_time.replace('Z', '+00:00')
+            dt = datetime.fromisoformat(iso_string_fixed)
+            user.addtime = dt
+
         if role:
             user.role = role
 
@@ -563,7 +570,6 @@ def set_user():
                     db.session.delete(item)
 
         db.session.commit()
-        print(user.password)
         return jsonify({"code": 0, "desc": "用户信息更新成功！"})
     return jsonify({"code": 1, "desc": "缺少信息"}), 400
 
