@@ -209,7 +209,7 @@ class User(UserMixin, db.Model):
     role: Mapped[str] = mapped_column(String(100))  # 用户角色，如普通用户、管理员等，可为空
     addtime: Mapped[datetime] = mapped_column(
         DateTime, default=func.utc_timestamp(), server_default=func.utc_timestamp()
-    )  # 用户新增时间，默认为当前时间
+    )  # 用户新增时间，默认为当前时间，DB 里面是 UTC 时间
     avatar: Mapped[str] = mapped_column(String(500), default=DEFAULT_AVATAR)
     status: Mapped[int] = mapped_column(
         Integer, nullable=False, default=0
