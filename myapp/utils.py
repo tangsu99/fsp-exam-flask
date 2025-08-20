@@ -2,7 +2,7 @@ import re
 from datetime import timedelta, timezone, datetime
 from functools import wraps
 from typing import cast
-from flask import abort, current_app, request
+from flask import abort, current_app, request, jsonify
 from flask_login import current_user
 
 from myapp import db
@@ -19,6 +19,23 @@ def token_check():
             token = request.headers.get("API-Token")
             if not token or api_token != token:
                 abort(401, description="Missing API Token")
+            return f(*args, **kwargs)
+
+        return decorated_function
+
+    return decorator
+
+
+
+def status_check():
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            user: User = cast(User, current_user)
+            if user.status == 0:
+                return jsonify({"code": 3, "desc": "您的账户未激活请前往个人中心激活！"})
+            if user.status != 1:
+                return jsonify({"code": 3, "desc": "您的账户状态异常！"})
             return f(*args, **kwargs)
 
         return decorated_function

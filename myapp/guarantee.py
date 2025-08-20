@@ -6,6 +6,7 @@ from flask_login import current_user, login_required
 
 from myapp import db, APP
 from myapp.db_model import Guarantee, User, Whitelist
+from myapp.utils import status_check
 
 guarantee = Blueprint("guarantee", __name__)
 
@@ -68,6 +69,7 @@ def returnData(i: Guarantee):
 
 @guarantee.route("/request", methods=["POST"])
 @login_required
+@status_check()
 def add_guarantee():
     req_data = request.json
     if req_data is None:

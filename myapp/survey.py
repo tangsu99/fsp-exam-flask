@@ -19,7 +19,7 @@ from myapp.db_model import (
     Whitelist,
 )
 from myapp.mail import survey_complete_mail
-from myapp.utils import is_survey_response_expired
+from myapp.utils import is_survey_response_expired, status_check
 
 survey = Blueprint("survey", __name__)
 
@@ -135,6 +135,7 @@ def check_survey():
 
 @survey.route("/start_survey", methods=["POST"])
 @login_required
+@status_check()
 def start_survey():
     user: User = cast(User, current_user)
 
