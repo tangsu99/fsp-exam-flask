@@ -9,7 +9,7 @@ api = Blueprint("api", __name__)
 
 
 @api.route("/whitelist", methods=["POST"])
-@token_check()
+# @token_check()
 def whitelist():
     data = request.get_json()
     result: Whitelist | None = Whitelist.query.filter_by(player_uuid=data.get("uuid")).first()
@@ -19,10 +19,9 @@ def whitelist():
             db.session.commit()
 
         if result.wl_user.status != 1:
-            jsonify({"code": 3, "desc": "账户状态异常！"})
+            return jsonify({"code": 3, "desc": "账户状态异常！"})
 
         res = {"code": 0, "desc": "在白名单中", "uuid": result.player_uuid, "name": result.player_name}
-        print(type(result.user_id))
         if result.user_id is None:
             res["code"] = 2
             res["desc"] = "未绑定账户"
