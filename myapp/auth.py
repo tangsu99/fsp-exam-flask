@@ -6,7 +6,7 @@ from flask import Blueprint, current_app, jsonify, request
 from flask_login import current_user, login_required, login_user
 
 from myapp import APP, db, reset_password_mail, mail
-from myapp.db_model import Token, User, Whitelist, RegistrationLimit, ResetPasswordToken, ActivationToken
+from myapp.db_model import Token, User, RegistrationLimit, ResetPasswordToken, ActivationToken
 from myapp.mail import activation_mail
 from myapp.utils import check_password
 
@@ -23,6 +23,10 @@ def login():
         if user and user.check_password(password):
             login_user(user)
             token = create_token(user)
+
+            temp = current_user.whitelist
+            play_permission: bool = True if len(temp) > 0 else False
+
             return jsonify(
                 {
                     "code": 0,
@@ -30,6 +34,7 @@ def login():
                     "username": user.username,
                     "avatar": user.avatar,
                     "isAdmin": user.role == "admin",
+                    "play_permission": play_permission,
                 }
             )
         else:
@@ -129,12 +134,17 @@ def register():
 def check_login():
     if current_user.is_authenticated:
         # 用户已登录，返回用户信息
+
+        temp = current_user.whitelist
+        play_permission: bool = True if len(temp) > 0 else False
+
         return jsonify(
             {
                 "code": 0,
                 "username": current_user.username,
                 "avatar": current_user.avatar,
                 "isAdmin": current_user.role == "admin",
+                "play_permission": play_permission,
             }
         )
     else:
