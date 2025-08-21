@@ -10,6 +10,9 @@ user = Blueprint("user", __name__)
 @user.route("/getInfo")
 @login_required
 def getUserInfo():
+    temp = current_user.whitelist
+    play_permission: bool = True if len(temp) > 0 else False
+
     return jsonify(
         {
             "code": 0,
@@ -21,6 +24,7 @@ def getUserInfo():
                 "addtime": current_user.addtime,
                 "avatar": current_user.avatar,
                 "status": current_user.status,
+                "play_permission": play_permission,
             },
         }
     )
