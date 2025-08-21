@@ -1,6 +1,6 @@
 from datetime import datetime, timezone, timedelta
 from threading import Thread
-from typing import Optional, cast
+from typing import Optional
 import jwt
 from flask import Blueprint, current_app, jsonify, request
 from flask_login import current_user, login_required, login_user
@@ -93,9 +93,13 @@ def register():
     if User.query.filter_by(username=username).first():
         return jsonify({"code": 3, "desc": "用户名已存在!"})
 
-    # 检查白名单
-    if Whitelist.query.filter_by(player_name=username).first():
-        return jsonify({"code": 3, "desc": "用户名已存在!"})
+    # 检查 QQ 号是否已存在
+    if User.query.filter_by(user_qq=user_qq).first():
+        return jsonify({"code": 3, "desc": "QQ号已存在!"})
+
+    # 检查白名单，用户名不能于白名单相同
+    # if Whitelist.query.filter_by(player_name=username).first():
+    #     return jsonify({"code": 3, "desc": "用户名已存在!"})
 
     # 创建用户
     try:
@@ -196,7 +200,10 @@ def find_password_set():
 @auth.route('/reqActivation', methods=["post"])
 @login_required
 def req_activation():
-    user: User = User.query.filter_by(username=current_user.username).first()
+    user: User | None = User.query.filter_by(username=current_user.username).first()
+    if user is None:
+        return jsonify({"code": 4, "desc": "未找到用户!"}), 404
+
     if user.status != 0:
         if user.status == 1:
             return jsonify({"code": 2, "desc": "账户状态正常！不需要进行激活！"})
