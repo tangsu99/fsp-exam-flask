@@ -33,3 +33,14 @@ def survey_complete_mail(recipients: list[str], username: str, response_time: st
     mail_msg = Message('答卷完成', recipients=recipients)
     mail_msg.html = render_template('mail_survey_complete.html', username = username, response_time = response_time, url=url)
     return mail_msg
+
+def guarantee_result_mail(recipients: list[str], guarantor: str, result: bool) -> Message:
+    mail_msg = Message('担保结果', recipients=recipients)
+    mail_msg.html = render_template('mail_guarantee_result.html', guarantor = guarantor, result = result)
+    return mail_msg
+
+def survey_result_mail(recipients: list[str], score: str) -> Message:
+    url = current_app.config["FRONT_END_BASE_URL"] + '/Query/Examination'
+    mail_msg = Message('考试结果', recipients=recipients)
+    mail_msg.html = render_template('mail_survey_result.html', score = score, url = url)
+    return mail_msg

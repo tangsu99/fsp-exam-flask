@@ -98,6 +98,7 @@ class Config:
                 })
 
     def resync_flask_config(self):
+        # TODO 待优化实现
         self.app.config["SECRET_KEY"] = self.get("SECRET_KEY")  # 用于安全签名session
         self.app.config["SESSION_PROTECTION"] = None  # 禁用会话保护
         self.app.config["API_TOKEN"] = self.get("API_TOKEN")
@@ -122,10 +123,11 @@ class Config:
         self.app.config['GUARANTEE_EXPIRATION'] = self.get('GUARANTEE_EXPIRATION') # 小时
         self.app.config['RESPONSE_VALIDITY_PERIOD'] = self.get('RESPONSE_VALIDITY_PERIOD') # 小时
 
-    def get(self, key: str):
+    def get(self, key: str, default='None', type_='str'):
         res = self.__get_item(key, self.__config)
         if res is None:
-            return None
+            self.set(key, default, type_)
+            return default
         return self.type(res)
 
     def get_item(self, key: str):
