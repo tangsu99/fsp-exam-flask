@@ -7,7 +7,7 @@ from flask_login import current_user, login_required, login_user
 
 from myapp import APP, db, reset_password_mail, mail
 from myapp.db_model import Token, User, RegistrationLimit, ResetPasswordToken, ActivationToken
-from myapp.mail import activation_mail
+from myapp.mail import activation_mail, send_mail
 from myapp.utils import check_password
 
 auth = Blueprint("auth", __name__)
@@ -177,7 +177,7 @@ def find_password():
         user = User.query.filter_by(user_qq=qq, username=username).first()
         if not user:
             return jsonify({"code": 4, "desc": "未找到用户!"}), 404
-        Thread(target=send_reset_password, args=(user,), ).start()
+        send_reset_password(user)
         return jsonify({"code": 0, "desc": "发送成功！请查找邮箱!"})
 
     return jsonify({"code": 5, "desc": "缺少数据"})
@@ -225,7 +225,7 @@ def req_activation():
     ).first()
     if token:
         return jsonify({"code": 1, "desc": "链接未过期请稍后尝试！"})
-    Thread(target=send_activation_mail, args=(user,), ).start()
+    send_activation_mail(user)
     return jsonify({"code": 0, "desc": "发送成功！请查找邮箱!"})
 
 
@@ -257,7 +257,7 @@ def send_activation_mail(user):
         db.session.add(ActivationToken(user.id, token))
         db.session.commit()
         msg = activation_mail([f'{user.user_qq}@qq.com'], token)
-        mail.send(msg)
+        send_mail(APP, msg)
 
 
 def send_reset_password(user):
@@ -266,7 +266,7 @@ def send_reset_password(user):
         db.session.add(ResetPasswordToken(user.id, token))
         db.session.commit()
         msg = reset_password_mail([f'{user.user_qq}@qq.com'], token)
-        mail.send(msg)
+        send_mail(APP, msg)
 
 
 def check_ip_registration_limit(ip):
