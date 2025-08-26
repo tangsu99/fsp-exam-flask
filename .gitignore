@@ -2,6 +2,7 @@ __pycache__/
 myapp/__pycache__/
 static/chat_tmp/
 .venv/
+.idea/
 data/
 log/
 instance/
