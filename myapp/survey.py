@@ -5,7 +5,7 @@ from typing import cast
 from flask import Blueprint, jsonify, request
 from flask_login import current_user, login_required
 
-from myapp import db, APP, mail
+from myapp import db, APP
 from myapp.db_model import (
     Option,
     Question,
@@ -18,7 +18,7 @@ from myapp.db_model import (
     User,
     Whitelist,
 )
-from myapp.mail import survey_complete_mail
+from myapp.mail import survey_complete_mail, send_mail
 from myapp.utils import is_survey_response_expired, status_check
 
 survey = Blueprint("survey", __name__)
@@ -274,7 +274,7 @@ def complete_survey():
     res.response_time = datetime.now(timezone.utc)
     db.session.commit()
 
-    Thread(target=send_survey_complete, args=(user.username, res.response_time.isoformat(), res.id), ).start()
+    send_survey_complete(user.username, res.response_time.isoformat(), res.id)
 
     return jsonify({"code": 0, "desc": "提交成功！", "score": count_score}), 200
 
@@ -288,4 +288,4 @@ def send_survey_complete(username: str, response_time: str, id_: int):
         for admin in admins:
             admin_mail.append(f'{admin.user_qq}@qq.com')
         msg = survey_complete_mail(admin_mail, username, response_time, id_)
-        mail.send(msg)
+        send_mail(APP, msg)
