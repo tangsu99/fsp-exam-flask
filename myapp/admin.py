@@ -2,7 +2,7 @@ from datetime import datetime, timezone, tzinfo
 from flask import Blueprint, jsonify, request
 from flask_login import login_required, current_user
 
-from myapp import db, my_config, bcrypt
+from myapp import db, my_config, bcrypt, APP
 from myapp.db_model import (
     Guarantee,
     Option,
@@ -17,6 +17,7 @@ from myapp.db_model import (
     User,
     Whitelist,
 )
+from myapp.mail import survey_result_mail, send_mail
 from myapp.utils import check_password, required_role, is_survey_response_expired, validate_json_required_fields
 
 admin = Blueprint("admin", __name__)
@@ -671,7 +672,7 @@ def get_responses():
         else:
             total_score = i.archive_score
 
-        reviewer : None | User = User.query.get(i.reviewer_uid)
+        reviewer: None | User = User.query.get(i.reviewer_uid)
 
         if reviewer is None:
             reviewer_name = "该用户不存在"
@@ -795,6 +796,8 @@ def reviewed_response():
                     source=0,
                     auditor_uid=current_user.id
             ))
+
+        send_mail(APP, survey_result_mail([f'{resp.user.user_qq}@qq.com'], str(total_score)))
 
         db.session.commit()
         return jsonify({"code": 0, "desc": "操作成功"})
