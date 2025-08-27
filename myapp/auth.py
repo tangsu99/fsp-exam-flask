@@ -1,13 +1,12 @@
 from datetime import datetime, timezone, timedelta
-from threading import Thread
 from typing import Optional
 import jwt
 from flask import Blueprint, current_app, jsonify, request
 from flask_login import current_user, login_required, login_user
 
-from myapp import APP, db, reset_password_mail, mail
+from myapp import APP, db
 from myapp.db_model import Token, User, RegistrationLimit, ResetPasswordToken, ActivationToken
-from myapp.mail import activation_mail, send_mail
+from myapp.mail import reset_password_mail, activation_mail, send_mail
 from myapp.utils import check_password
 
 auth = Blueprint("auth", __name__)
