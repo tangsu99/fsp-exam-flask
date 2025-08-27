@@ -10,8 +10,6 @@ from flask_mail import Mail
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 
-from myapp.mail import reset_password_mail
-
 login_manager: LoginManager = LoginManager()
 db: SQLAlchemy = SQLAlchemy()
 my_config = None

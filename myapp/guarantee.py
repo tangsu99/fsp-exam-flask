@@ -6,6 +6,7 @@ from flask_login import current_user, login_required
 
 from myapp import db, APP
 from myapp.db_model import Guarantee, User, Whitelist
+from myapp.mail import guarantee_result_mail, send_mail
 from myapp.utils import status_check
 
 guarantee = Blueprint("guarantee", __name__)
@@ -109,7 +110,7 @@ def add_guarantee():
     )
     db.session.add(_guarantee)
     db.session.commit()
-    return jsonify({"code": 0, "desc": "提交成功，有效期1小时，超时失效，1小时内不可再申请新的担保请求，除非对方手动拒绝或同意"})
+    return jsonify({"code": 0, "desc": "提交成功，有效期1小时，超时失效，1小时内不可再申请新的担保请求，除非对方手动拒绝或同意，担保结果会发往您的qq邮箱。"})
 
 
 @guarantee.route("/query_all", methods=["GET"])
@@ -153,6 +154,11 @@ def guarantee_user_action():
             if action == "reject":
                 _guarantee.status = 2
                 db.session.commit()
+
+                mail_msg = guarantee_result_mail([_guarantee.applicant.user_qq + '@qq.com'],
+                                                     _guarantee.guarantor.username, False)
+                send_mail(APP, mail_msg)
+
                 return jsonify({"code": 0, "desc": "担保已拒绝！"})
 
             elif action == "accept":
@@ -170,6 +176,11 @@ def guarantee_user_action():
 
                 _guarantee.status = 1
                 db.session.commit()
+
+                mail_msg = guarantee_result_mail([_guarantee.applicant.user_qq + '@qq.com'],
+                                                     _guarantee.guarantor.username, True)
+                send_mail(APP, mail_msg)
+
                 return jsonify({"code": 0, "desc": "担保成功！白名单已添加"})
 
             else:
