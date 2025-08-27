@@ -68,7 +68,7 @@ class Question(db.Model):
         DateTime, default=func.utc_timestamp(), server_default=func.utc_timestamp()
     )  # 问题创建时间，默认为当前时间
     img_list: Mapped[list["QuestionImgURL"]] = relationship(
-        "QuestionImgURL", backref="question_images_backref", lazy="select", cascade="all ,delete"
+        "QuestionImgURL", backref="question_images_backref", lazy="select", cascade="all, delete"
     )  # 与图片表建立一对多关系，级联删除
     options: Mapped[list["Option"]] = relationship(
         "Option", backref="question", lazy="select", cascade="all, delete"

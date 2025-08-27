@@ -563,8 +563,8 @@ def set_user():
         if status is not None:
             user.status = status
 
-            # 如果用户被封禁或临时封禁，删除名下白名单，如果之后被解封，需要重新考取白名单资格，系统不会自动恢复
-            if status in (2, 3):
+            # 如果用户被封禁或临时封禁以及删除，删除名下白名单，如果之后被解封，需要重新考取白名单资格，系统不会自动恢复
+            if status in (2, 3, 4):
                 wl = user.whitelist
                 for item in wl:
                     db.session.delete(item)
