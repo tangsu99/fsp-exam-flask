@@ -123,7 +123,7 @@ class Config:
         self.app.config['GUARANTEE_EXPIRATION'] = self.get('GUARANTEE_EXPIRATION') # 小时
         self.app.config['RESPONSE_VALIDITY_PERIOD'] = self.get('RESPONSE_VALIDITY_PERIOD') # 小时
 
-    def get(self, key: str, default='None', type_='str'):
+    def get(self, key: str, default=None, type_='str'):
         res = self.__get_item(key, self.__config)
         if res is None:
             self.set(key, default, type_)
