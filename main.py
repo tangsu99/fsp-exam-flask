@@ -1,5 +1,5 @@
 from myapp import create_app, db
-from myapp.db_model import User, ConfigModel
+from myapp.db_model import User
 
 app = create_app()
 
@@ -16,10 +16,6 @@ def setup():
         db.session.add(user)
         db.session.commit()
         print('Created Admin account!')
-        if ConfigModel.query.count() == 0:
-            from myapp.config import init_config
-            init_config()
-            print('Created config!')
     else:
         print('Database is not null!')
     print('+' * LEN)
