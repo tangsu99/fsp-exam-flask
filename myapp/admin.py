@@ -1,8 +1,8 @@
-from datetime import datetime, timezone, tzinfo
+from datetime import datetime, timezone
 from flask import Blueprint, jsonify, request
 from flask_login import login_required, current_user
 
-from myapp import db, my_config, bcrypt, APP
+from myapp import db, my_config, APP
 from myapp.db_model import (
     Guarantee,
     Option,
@@ -29,7 +29,7 @@ admin = Blueprint("admin", __name__)
 def get_config():
     key = request.args.get('key')
     if key is None:
-        return jsonify({"code": 0, "desc": "tangsu is lazy!", 'list': my_config.get_all()})
+        return jsonify({"code": 0, "desc": "tangsu is lazy!", 'list': my_config.get_all_item()})
     return jsonify({"code": 0, "desc": "tangsu is lazy!", 'value': my_config.get_item(key)})
 
 
@@ -41,7 +41,7 @@ def set_config():
     if not data or "key" not in data or "value" not in data or "type" not in data:
         return jsonify({"code": 1, "desc": "数据不合法!"})
 
-    my_config.set(data["key"], data["value"], data["type"])
+    my_config.set_item(data["key"], data["value"], data["type"])
     return jsonify({"code": 0, "desc": "tangsu is lazy!"})
 
 
