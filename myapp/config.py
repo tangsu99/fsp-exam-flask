@@ -73,6 +73,15 @@ class Config:
         self.db.session.commit()
         self.__resync_flask_config()
 
+    def delete_item(self, item_key: str) -> bool:
+        conf: ConfigModel | None = ConfigModel.query.filter(ConfigModel.key == item_key).first()
+        if conf:
+            self.db.session.delete(conf)
+            self.db.session.commit()
+            self.__resync_flask_config()
+            return True
+        return False
+
     @staticmethod
     def type_conversion(item_value: str, item_type: str):
         """
