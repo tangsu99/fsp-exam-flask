@@ -23,7 +23,7 @@ from myapp.utils import check_password, required_role, is_survey_response_expire
 admin = Blueprint("admin", __name__)
 
 
-@admin.route("/config", methods=["GET"])
+@admin.route("/config/query", methods=["GET"])
 @login_required
 @required_role("admin")
 def get_config():
@@ -33,7 +33,7 @@ def get_config():
     return jsonify({"code": 0, "desc": "tangsu is lazy!", 'value': my_config.get_item(key)})
 
 
-@admin.route("/config", methods=["POST"])
+@admin.route("/config/set", methods=["POST"])
 @login_required
 @required_role("admin")
 def set_config():
@@ -43,6 +43,17 @@ def set_config():
 
     my_config.set_item(data["key"], data["value"], data["type"])
     return jsonify({"code": 0, "desc": "tangsu is lazy!"})
+
+
+@admin.route("/config/delete", methods=["POST"])
+@login_required
+@required_role("admin")
+def delete_config():
+    delete_key = str(request.get_json())
+    res = my_config.delete_item(delete_key)
+    if res:
+        return jsonify({"code": 0, "desc": "删除配置成功"})
+    return jsonify({"code": 1, "desc": "该配置项不存在"})
 
 
 def is_survey_mounted(survey_id: int) -> bool:
