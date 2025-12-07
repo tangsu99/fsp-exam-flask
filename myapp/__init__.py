@@ -74,9 +74,9 @@ def create_app():
     app.register_blueprint(survey, url_prefix="/survey")
     app.register_blueprint(guarantee, url_prefix="/guarantee")
 
-    @app.route("/")
-    def hello():
-        return "Hello world!\nHello Flask!"
+    # @app.route("/")
+    # def hello():
+    #     return "Hello world!\nHello Flask!"
 
     # 未授权的用户重定向到登录页面
     @login_manager.unauthorized_handler
