@@ -11,7 +11,7 @@
 -   Windows
 
 ```
-pip install -r requirement.txt
+uv sync # 请确保已经安装了 UV
 cp .env.example .env
 ```
 
@@ -51,7 +51,8 @@ flask --app main.py db upgrade
 -   Windows 系统开发环境：
 
     -   默认地址：http://127.0.0.1:5000
-    -   启动命令：`python ./main.py`
+    -   启动命令：`uv run ./main.py`
+    -   启动命令(虚拟环境)：`python ./main.py`
 
 -   Linux 系统生产环境：
 
