@@ -7,8 +7,8 @@ from flask_bcrypt import Bcrypt
 from flask_cors import CORS
 from flask_login import LoginManager
 from flask_mail import Mail
-from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
+from flask_sqlalchemy import SQLAlchemy
 
 login_manager: LoginManager = LoginManager()
 db: SQLAlchemy = SQLAlchemy()
@@ -36,10 +36,12 @@ def create_app():
     db.init_app(app)
 
     from myapp.db_model import Token
+
     with app.app_context():
         db.create_all()
 
     from .config import Config
+
     my_config = Config(app, db)
 
     cors.init_app(
@@ -48,7 +50,7 @@ def create_app():
             r"/*": {
                 "origins": app.config["ALLOWED_ORIGINS"],
                 "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-                "allow_headers": ["Content-Type", "Authorization"]
+                "allow_headers": ["Content-Type", "Authorization"],
             }
         },
     )
@@ -58,11 +60,12 @@ def create_app():
 
     # 导入蓝图
     from myapp.admin import admin
-    from myapp.query import query
     from myapp.api import api
     from myapp.auth import auth
-    from myapp.survey import survey
     from myapp.guarantee import guarantee
+    from myapp.query import query
+    from myapp.schematic import schematic
+    from myapp.survey import survey
     from myapp.user import user
 
     # 注册蓝图
@@ -71,12 +74,13 @@ def create_app():
     app.register_blueprint(user, url_prefix="/user")
     app.register_blueprint(admin, url_prefix="/admin")
     app.register_blueprint(query, url_prefix="/query")
+    app.register_blueprint(schematic, url_prefix="/schematic")
     app.register_blueprint(survey, url_prefix="/survey")
     app.register_blueprint(guarantee, url_prefix="/guarantee")
 
-    @app.route("/")
-    def hello():
-        return "Hello world!\nHello Flask!"
+    # @app.route("/")
+    # def hello():
+    #     return "Hello world!\nHello Flask!"
 
     # 未授权的用户重定向到登录页面
     @login_manager.unauthorized_handler
