@@ -3,14 +3,8 @@ from typing import cast
 
 from flask import Blueprint, jsonify, request
 from flask_login import current_user, login_required
-from sqlalchemy import desc
 
-from myapp import db
 from myapp.db_model import (
-    Question,
-    Response,
-    ResponseScore,
-    Survey,
     User,
 )
 
@@ -23,7 +17,8 @@ class Schematic:
     desc: str
     game_version: str
     file: bytes
-    tag: list[str] = field(default_factory=list)
+    type: str
+    tags: list[str] = field(default_factory=list)
     is_public: bool = False
 
 
@@ -50,17 +45,18 @@ def upload():
 
     original_author = user.username if request.form.get("originalAuthor") == "" else request.form.get("originalAuthor")
 
-    schematicItem = Schematic(
+    schematic_item = Schematic(
         name=request.form.get("fileName"),
         author=user.id,
         original_author=original_author,
         desc=request.form.get("desc"),
-        tag=[request.form.get("type")],
+        type=request.form.get("type"),
+        tags=request.form.get("tags").split(" "),
         is_public=is_public,
         game_version=request.form.get("gameVersion"),
         file=request.files.get("uploadFile"),
     )
 
-    print(schematicItem)
+    print(schematic_item)
 
     return jsonify({"code": 0, "desc": "投影上传成功! "})
