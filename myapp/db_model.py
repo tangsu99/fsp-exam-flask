@@ -442,6 +442,7 @@ class ConfigModel(db.Model):
     key: Mapped[str] = mapped_column(String(100), primary_key=True)
     value: Mapped[str] = mapped_column(String(256), nullable=False)
     type: Mapped[str] = mapped_column(String(10), nullable=False)
+    # description: Mapped[str] = mapped_column(String(256), nullable=True)
     create_time: Mapped[datetime] = mapped_column(
         DateTime,
         default=func.utc_timestamp(),
