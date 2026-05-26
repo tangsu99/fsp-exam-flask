@@ -490,7 +490,7 @@ class Schematics(db.Model):
     )
 
     def __repr__(self):
-        return f'<Projection {self.name}>'
+        return f'<Schematics {self.name}>'
 
 # 投影文件二进制分表
 class SchematicFiles(db.Model):
@@ -512,4 +512,4 @@ class SchematicFiles(db.Model):
     schematics: Mapped["Schematics"] = relationship(back_populates="file_data")
 
     def __repr__(self):
-        return f'<ProjectionFile for ID {self.schematic_id}>'
+        return f'<SchematicFiles for ID {self.schematic_id}>'
