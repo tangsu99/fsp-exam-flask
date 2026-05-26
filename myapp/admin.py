@@ -40,8 +40,7 @@ def set_config():
     data = request.get_json()
     if not data or "key" not in data or "value" not in data or "type" not in data:
         return jsonify({"code": 1, "desc": "数据不合法!"})
-
-    my_config.set_item(data["key"], data["value"], data["type"])
+    my_config.set_item(data["key"], data["value"], data["type"], data["description"])
     return jsonify({"code": 0, "desc": "tangsu is lazy!"})
 
 

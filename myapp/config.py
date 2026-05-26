@@ -31,7 +31,8 @@ class Config:
                     self.db.session.add(ConfigModel(
                         default_config_item['key'],
                         default_config_item['value'],
-                        default_config_item['type']
+                        default_config_item['type'],
+                        default_config_item['description']
                     ))
 
             self.db.session.commit()
@@ -51,24 +52,25 @@ class Config:
         if item is None:
             return None
 
-        return { 'key': item.key, 'value': item.value, 'type': item.type}
+        return { 'key': item.key, 'value': item.value, 'type': item.type, 'description': item.description}
 
     def get_all_item(self) -> list:
         config_list = ConfigModel.query.all()
         res = []
         for item in config_list:
-            res.append({ 'key': item.key, 'value': item.value, 'type': item.type})
+            res.append({ 'key': item.key, 'value': item.value, 'type': item.type, 'description': item.description})
 
         return res
 
-    def set_item(self, item_key: str, item_value: str, item_type:str) -> None:
+    def set_item(self, item_key: str, item_value: str, item_type:str, item_description:str) -> None:
         item_value = str(item_value) # 保险起见
         conf: ConfigModel | None = ConfigModel.query.filter(ConfigModel.key == item_key).first()
         if conf is None:
-            self.db.session.add(ConfigModel(item_key, item_value, item_type))
+            self.db.session.add(ConfigModel(item_key, item_value, item_type, item_description))
         else:
             conf.value = item_value
             conf.type = item_type
+            conf.description = item_description
 
         self.db.session.commit()
         self.__resync_flask_config()
