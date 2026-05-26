@@ -3,7 +3,7 @@ from enum import Enum, unique
 from typing import Optional
 
 from flask_login import UserMixin
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, func
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, func, LargeBinary
 from sqlalchemy.dialects.mysql import LONGTEXT
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -461,3 +461,55 @@ class ConfigModel(db.Model):
         self.value = value
         self.type = type_
         self.description = description
+
+
+# 投影信息表
+class Schematics(db.Model):
+    __tablename__ = 'schematics'
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(100), nullable=False) # 投影文件名 (30个汉字，这里设为100字符足够容纳)
+    uploader_id: Mapped[int] = mapped_column(Integer, nullable=False)  # 上传者ID
+    original_author: Mapped[str] = mapped_column(String(100), nullable=True)  # 投影原作者
+    schematic_type: Mapped[int] = mapped_column(Integer, nullable=False)  # 投影类型
+    game_version: Mapped[str] = mapped_column(String(50), nullable=False) # 投影版本
+    tag: Mapped[str] = mapped_column(String(200), nullable=True)  # 投影tag
+    description: Mapped[str] = mapped_column(Text, nullable=True)  # 投影描述
+    is_public: Mapped[bool] = mapped_column(Boolean, default=True)  # 是否公开
+    download_count: Mapped[int] = mapped_column(Integer, default=0)  # 下载量
+    file_size_KB: Mapped[int] = mapped_column(Integer, nullable=False)  # 投影大小（KB）
+    backup_link: Mapped[str] = mapped_column(String(255), nullable=True)  # 文件备用链接
+    upload_date: Mapped[datetime] = mapped_column(DateTime, default=func.utc_timestamp(), nullable=False)
+    update_date: Mapped[datetime] = mapped_column(DateTime, default=func.utc_timestamp(), onupdate=func.utc_timestamp(), nullable=False)
+
+    # 与文件分表建立一对一关系 (cascade确保删除主表时，关联的二进制文件也被删除)
+    file_data: Mapped["SchematicFiles"] = relationship(
+        back_populates="schematics",
+        cascade="all, delete-orphan",
+        uselist=False
+    )
+
+    def __repr__(self):
+        return f'<Projection {self.name}>'
+
+# 投影文件二进制分表
+class SchematicFiles(db.Model):
+    __tablename__ = 'schematic_files'
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    # 外键关联投影主表
+    schematic_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey('schematics.id'),
+        nullable=False,
+        unique=True
+    )
+
+    # 文件二进制字段 (最大512KB = 524288 Bytes)
+    file_blob: Mapped[bytes] = mapped_column(LargeBinary(524288), nullable=False)
+
+    # 反向关联回主表
+    schematics: Mapped["Schematics"] = relationship(back_populates="file_data")
+
+    def __repr__(self):
+        return f'<ProjectionFile for ID {self.schematic_id}>'
