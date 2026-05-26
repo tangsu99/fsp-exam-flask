@@ -469,7 +469,8 @@ class Schematics(db.Model):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String(100), nullable=False) # 投影文件名 (30个汉字，这里设为100字符足够容纳)
-    uploader_id: Mapped[int] = mapped_column(Integer, nullable=False)  # 上传者ID
+    uploader_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)  # 上传者ID
+    uploader: Mapped["User"] = relationship("User", backref="schematics")
     original_author: Mapped[str] = mapped_column(String(100), nullable=True)  # 投影原作者
     schematic_type: Mapped[int] = mapped_column(Integer, nullable=False)  # 投影类型
     game_version: Mapped[str] = mapped_column(String(50), nullable=False) # 投影版本
