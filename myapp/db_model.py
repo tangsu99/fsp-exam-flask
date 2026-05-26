@@ -442,7 +442,7 @@ class ConfigModel(db.Model):
     key: Mapped[str] = mapped_column(String(100), primary_key=True)
     value: Mapped[str] = mapped_column(String(256), nullable=False)
     type: Mapped[str] = mapped_column(String(10), nullable=False)
-    # description: Mapped[str] = mapped_column(String(256), nullable=True)
+    description: Mapped[str] = mapped_column(String(256), nullable=True)
     create_time: Mapped[datetime] = mapped_column(
         DateTime,
         default=func.utc_timestamp(),
@@ -456,7 +456,8 @@ class ConfigModel(db.Model):
         server_onupdate=func.utc_timestamp()
     )
 
-    def __init__(self, key: str, value: str, type_: str):
+    def __init__(self, key: str, value: str, type_: str, description: str):
         self.key = key
         self.value = value
         self.type = type_
+        self.description = description
