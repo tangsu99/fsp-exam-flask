@@ -115,3 +115,54 @@ def upload():
             db.session.rollback()
             print(f"上传出错: {e}")
             return jsonify({"code": 1, "desc": f"服务器内部错误: {str(e)}"}), 500
+
+
+@schematic.route("/query_by_type", methods=["GET"])
+@login_required
+def query_by_type():
+    """
+        投影查询API，按照投影类型查询
+    """
+
+    type_str = request.args.get("type", "", type=str)
+    try:
+        type_index = SchematicType[type_str.upper()].value
+
+    except KeyError:
+        return jsonify({"code": 1, "desc": "无效的投影类型"}), 400
+
+    page = request.args.get("page", 1, type=int)
+    per_page = min(request.args.get("per_page", 10, type=int), 100) # 最大每页100条, 默认10条
+
+    query = (db.session.query(Schematics)
+             .filter(Schematics.schematic_type == type_index)
+             .paginate(page=page, per_page=per_page, error_out=False))
+
+    schematics_list = [
+        {
+            "id": item.id,
+            "name": item.name,
+            "type": item.schematic_type,
+            "uploader": item.uploader.username,
+            "originalAuthor": item.original_author,
+            "tags": item.tag.split(" "),
+            "gameVersion": item.game_version,
+            "uploadDate": item.upload_date.strftime("%Y-%m-%d %H:%M:%S"),
+            "updateDate": item.update_date.strftime("%Y-%m-%d %H:%M:%S"),
+        }
+        for item in query.items
+    ]
+
+    return jsonify({
+        "code": 0,
+        "desc": "投影查询成功",
+        "data": {
+            "items": schematics_list,
+            "total": query.total,
+            "page": query.page,
+            "pages": query.pages,
+            "per_page": query.per_page,
+            "has_next": query.has_next,
+            "has_prev": query.has_prev
+        }
+    })
