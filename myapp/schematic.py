@@ -99,7 +99,7 @@ def upload():
         game_version: str = request.form.get("gameVersion","").strip()
         backup_link: str = request.form.get("backupLink","").strip()
 
-        if not is_white_list_url(backup_link):
+        if backup_link != "" and not is_white_list_url(backup_link):
             return jsonify({"code": 1, "desc": "该网盘不在白名单内不允许上传！"})
 
         # 获取并处理上传的文件
