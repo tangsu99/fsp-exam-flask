@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from typing import cast
 from enum import Enum
+import re
 
 from flask import Blueprint, jsonify, request
 from flask_login import current_user, login_required
@@ -35,6 +36,31 @@ class SchematicType(Enum):
     ARCHITECTURE = 2
 
 
+# 定义白名单规则列表
+# 字符串代表严格匹配前缀，字典中的 'regex' 代表正则表达式匹配
+WHITE_LIST_RULES = [
+    "https://pan.baidu.com",  # 百度网盘固定前缀
+    "https://pan.quark.cn",  # 夸克网盘固定前缀
+    {"regex": r'^https://(www\.|wws\.)?lanzou[a-z]?\.com'}  # 蓝奏云正则规则
+]
+
+
+def is_white_list_url(url):
+    """检测单个链接是否符合白名单列表中的规则"""
+    if not url:
+        return False
+
+    url = url.strip()
+
+    for rule in WHITE_LIST_RULES:
+        if isinstance(rule, str) and url.startswith(rule):
+            return True
+
+        if isinstance(rule, dict) and 'regex' in rule:
+            if re.match(rule['regex'], url):
+                return True
+    return False
+
 @schematic.route("/", methods=["GET"])
 @login_required
 def index():
@@ -65,7 +91,7 @@ def upload():
             type_index = SchematicType[type_str.upper()].value
 
         except KeyError:
-            return jsonify({"code": 1, "desc": "无效的投影类型"}), 400
+            return jsonify({"code": 1, "desc": "无效的投影类型"})
 
         tags_list: list[str]  = request.form.get("tags", "").split(" ")
         is_public_str = request.form.get("isPublic", "false")
@@ -73,10 +99,13 @@ def upload():
         game_version: str = request.form.get("gameVersion","").strip()
         backup_link: str = request.form.get("backupLink","").strip()
 
+        if not is_white_list_url(backup_link):
+            return jsonify({"code": 1, "desc": "该网盘不在白名单内不允许上传！"})
+
         # 获取并处理上传的文件
         file_storage = request.files.get("uploadFile")
         if not file_storage or file_storage.filename == '':
-            return jsonify({"code": 1, "desc": "未找到上传的文件"}), 400
+            return jsonify({"code": 1, "desc": "未找到上传的文件"})
 
         # 读取文件的二进制内容并计算大小 (KB)
         file_bytes = file_storage.read()
@@ -114,7 +143,7 @@ def upload():
             # 发生错误时回滚事务，防止脏数据
             db.session.rollback()
             print(f"上传出错: {e}")
-            return jsonify({"code": 1, "desc": f"服务器内部错误: {str(e)}"}), 500
+            return jsonify({"code": 1, "desc": f"服务器内部错误: {str(e)}"})
 
 
 @schematic.route("/query_by_type", methods=["GET"])
@@ -147,6 +176,7 @@ def query_by_type():
             "originalAuthor": item.original_author,
             "tags": item.tag.split(" "),
             "gameVersion": item.game_version,
+            "downloadCount": item.download_count,
             "uploadDate": item.upload_date.strftime("%Y-%m-%d %H:%M:%S"),
             "updateDate": item.update_date.strftime("%Y-%m-%d %H:%M:%S"),
         }
