@@ -1,4 +1,3 @@
-from dataclasses import dataclass, field
 from typing import cast
 from enum import Enum
 import re
@@ -12,19 +11,6 @@ from myapp.db_model import (
     Schematics,
     SchematicFiles,
 )
-
-
-# @dataclass
-# class Schematic:
-#     name: str
-#     author: int
-#     original_author: str
-#     desc: str
-#     game_version: str
-#     # file: bytes
-#     type: str
-#     tags: list[str] = field(default_factory=list)
-#     is_public: bool = False
 
 
 schematic = Blueprint("schematic", __name__)
@@ -150,7 +136,7 @@ def upload():
 @login_required
 def query_by_type():
     """
-        投影查询API，按照投影类型查询
+        投影查询API，按照投影类型查询，带分页功能，返回一定数量的投影缩略信息
     """
 
     type_str = request.args.get("type", "", type=str)
@@ -175,6 +161,7 @@ def query_by_type():
             "uploader": item.uploader.username,
             "originalAuthor": item.original_author,
             "tags": item.tag.split(" "),
+            "isPublic": item.is_public,
             "gameVersion": item.game_version,
             "downloadCount": item.download_count,
             "uploadDate": item.upload_date.strftime("%Y-%m-%d %H:%M:%S"),
@@ -194,5 +181,43 @@ def query_by_type():
             "per_page": query.per_page,
             "has_next": query.has_next,
             "has_prev": query.has_prev
+        }
+    })
+
+
+@schematic.route("/query_detail", methods=["GET"])
+@login_required
+def query_detail():
+    """
+        通过投影ID，在此API获取单个投影的详细信息
+    """
+
+    schematic_id = request.args.get("id", 0, type=int)
+
+    if schematic_id == 0:
+        return jsonify({"code": 1, "desc": "无效的投影ID"})
+
+    query: Schematics | None = Schematics.query.get(schematic_id)
+    if query is None:
+        return jsonify({"code": 1, "desc": "投影不存在"})
+
+    return jsonify({
+        "code": 0,
+        "desc": "投影查询成功",
+        "data": {
+            "id": query.id,
+            "name" : query.name,
+            "type": query.schematic_type,
+            "uploader" : query.uploader.username,
+            "originalAuthor" : query.original_author,
+            "tags": query.tag.split(" "),
+            "gameVersion": query.game_version,
+            "downloadCount": query.download_count,
+            "uploadDate": query.upload_date,
+            "updateDate": query.update_date,
+            "description": query.description,
+            "isPublic": query.is_public,
+            "fileSizeKB": query.file_size_KB,
+            "backupLink": query.backup_link,
         }
     })
