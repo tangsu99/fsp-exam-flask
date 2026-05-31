@@ -106,3 +106,25 @@ def validate_json_required_fields(required_fields:dict, data: dict) -> dict:
 
     return return_data
 
+
+# 定义白名单规则列表
+# 字符串代表严格匹配前缀，字典中的 'regex' 代表正则表达式匹配
+WHITE_LIST_RULES = [
+    "https://pan.baidu.com",  # 百度网盘固定前缀
+    "https://pan.quark.cn",  # 夸克网盘固定前缀
+    {"regex": r'^https://(www\.|wws\.)?lanzou[a-z]?\.com'}  # 蓝奏云正则规则
+]
+
+def is_white_list_url(url: str) -> bool:
+    """检测单个链接是否符合白名单列表中的规则"""
+
+    strip_url = url.strip()
+
+    for rule in WHITE_LIST_RULES:
+        if isinstance(rule, str) and strip_url.startswith(rule):
+            return True
+
+        if isinstance(rule, dict) and 'regex' in rule:
+            if re.match(rule['regex'], strip_url):
+                return True
+    return False

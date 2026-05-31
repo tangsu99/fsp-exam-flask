@@ -1,6 +1,6 @@
 from typing import cast
 from enum import Enum
-import re
+from myapp.utils import is_white_list_url
 
 from flask import Blueprint, jsonify, request
 from flask_login import current_user, login_required
@@ -21,31 +21,6 @@ class SchematicType(Enum):
     REDSTONE = 1
     ARCHITECTURE = 2
 
-
-# 定义白名单规则列表
-# 字符串代表严格匹配前缀，字典中的 'regex' 代表正则表达式匹配
-WHITE_LIST_RULES = [
-    "https://pan.baidu.com",  # 百度网盘固定前缀
-    "https://pan.quark.cn",  # 夸克网盘固定前缀
-    {"regex": r'^https://(www\.|wws\.)?lanzou[a-z]?\.com'}  # 蓝奏云正则规则
-]
-
-
-def is_white_list_url(url):
-    """检测单个链接是否符合白名单列表中的规则"""
-    if not url:
-        return False
-
-    url = url.strip()
-
-    for rule in WHITE_LIST_RULES:
-        if isinstance(rule, str) and url.startswith(rule):
-            return True
-
-        if isinstance(rule, dict) and 'regex' in rule:
-            if re.match(rule['regex'], url):
-                return True
-    return False
 
 @schematic.route("/", methods=["GET"])
 @login_required
@@ -151,7 +126,8 @@ def query_by_type():
 
     query = (db.session.query(Schematics)
              .filter(Schematics.schematic_type == type_index)
-             .paginate(page=page, per_page=per_page, error_out=False))
+             .paginate(page=page, per_page=per_page, error_out=False)
+            )
 
     schematics_list = [
         {
@@ -197,7 +173,10 @@ def query_detail():
     if schematic_id == 0:
         return jsonify({"code": 1, "desc": "无效的投影ID"})
 
-    query: Schematics | None = Schematics.query.get(schematic_id)
+    query: Schematics | None = (db.session.query(Schematics)
+             .get(schematic_id)
+            )
+
     if query is None:
         return jsonify({"code": 1, "desc": "投影不存在"})
 
