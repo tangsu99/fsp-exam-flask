@@ -211,9 +211,17 @@ def query_detail():
 @login_required
 def search_schematics():
     """
-        搜索投影
+        搜索投影，根据搜索文字和类型筛选
     """
     search_text = request.args.get('text', '', type=str).strip()
+
+    type_str = request.args.get("type", "", type=str)
+    try:
+        type_index = SchematicType[type_str.upper()].value
+
+    except KeyError:
+        return jsonify({"code": 1, "desc": "无效的投影类型"}), 400
+
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 10, type=int)
 
@@ -224,6 +232,7 @@ def search_schematics():
         db.session.query(Schematics)
         .options(joinedload(Schematics.uploader))  # ← 关键：JOIN 预加载
         .filter(Schematics.name.ilike(f'%{search_text}%'))
+        .filter(Schematics.schematic_type == type_index)
         .order_by(Schematics.id.desc())
         .paginate(page=page, per_page=per_page, error_out=False)
     )
@@ -241,3 +250,13 @@ def search_schematics():
             'has_prev': pagination.has_prev,
         }
     })
+
+# @schematic.route("/download", methods=["GET"])
+# @login_required
+# def download_schematic():
+#     """
+#         下载投影
+#     """
+#     schematic_id = request.args.get('id', '', type=int)
+#
+#     # 下载量更新
