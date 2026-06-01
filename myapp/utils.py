@@ -66,7 +66,7 @@ def is_survey_response_expired(survey_response: Response) -> bool:
     validity_period = timedelta(hours=val) # 有效期为 24h
 
     # 只判断未完成的问卷，已完成的问卷不存在“过期”的说法
-    if survey_response.is_completed is False:
+    if not survey_response.is_completed:
         create_time = survey_response.create_time
         create_datetime = create_time.replace(tzinfo=timezone.utc)
         current_datetime = datetime.now(timezone.utc)

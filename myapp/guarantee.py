@@ -1,4 +1,4 @@
-from datetime import datetime, timezone, timedelta, tzinfo
+from datetime import datetime, timezone, timedelta
 from jsonschema import validate, ValidationError
 
 from flask import Blueprint, jsonify, request
@@ -17,13 +17,18 @@ def is_expired(expiration_time: datetime) -> bool:
     return current_datetime > expiration_time
 
 
-def checkGuarantor(info: dict) -> dict:
-    wl_result = Whitelist.query.filter_by(player_uuid=info.get("player_uuid")).first()
+def is_player_in_whitelist(player_uuid: str) -> Whitelist | None:
+    # 如果只是判断是否存在，.count() > 0 的性能要优于 .first()
+    return db.session.query(Whitelist).filter(Whitelist.player_uuid == player_uuid).first()
 
-    if wl_result is None:
+def check_guarantor(info: dict) -> dict:
+    player_uuid = info.get("player_uuid", "")
+    player = is_player_in_whitelist(player_uuid)
+    if not player:
         return {"code": 1, "desc": "担保人不属于白名单成员，无法担保！"}
 
-    user_result: User | None = User.query.get(wl_result.user_id)
+    user_result: User | None = db.session.get(User, player.user_id)
+
     if user_result is None:
         return {"code": 1, "desc": "担保人账户不存在"}
 
@@ -33,28 +38,27 @@ def checkGuarantor(info: dict) -> dict:
     return {"code": 0, "guarantor_id": user_result.id}
 
 
-def checkApplicant(info: dict) -> dict:
-    wl_result = Whitelist.query.filter_by(player_uuid=info.get("player_uuid")).first()
+def check_applicant(info: dict) -> dict:
+    player_uuid = info.get("player_uuid", "")
 
-    if wl_result:
-        return {"code": 1, "desc": "你已经是白名单成员"}
+    if not is_player_in_whitelist(player_uuid):
+        return {"code": 1, "desc": "担保人不属于白名单成员，无法担保！"}
 
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
-
-    g_result = Guarantee.query.filter(
+    g_result = db.session.query(Guarantee).filter(
         Guarantee.player_uuid == info.get("player_uuid"),
         Guarantee.status == 0,
     ).all()
 
+
     for i in g_result:
         # 如果有未过期的
-        if now < i.expiration_time.replace(tzinfo=None):
+        if datetime.now(timezone.utc).replace(tzinfo=None) < i.expiration_time.replace(tzinfo=None):
             return {"code": 1, "desc": "存在未过期的担保！个人中心担保查询里查看进度"}
 
     return {"code": 0}
 
 
-def returnData(i: Guarantee):
+def return_data(i: Guarantee):
     return {
         "uid": i.applicant.id, # type: ignore
         "id": i.id,
@@ -86,17 +90,17 @@ def add_guarantee():
         "player_uuid": req_data.get("guarantorInfo").get("playerUUID"),
     }
 
-    checkGuarantorRes = checkGuarantor(guarantor_info)
+    check_guarantor_res = check_guarantor(guarantor_info)
 
-    if checkGuarantorRes["code"] == 1:
-        return jsonify(checkGuarantorRes)
+    if check_guarantor_res["code"] == 1:
+        return jsonify(check_guarantor_res)
 
-    guarantor_id = checkGuarantorRes["guarantor_id"]
+    guarantor_id = check_guarantor_res["guarantor_id"]
 
-    checkApplicantRes = checkApplicant(applicant_info)
+    check_applicant_res = check_applicant(applicant_info)
 
-    if checkApplicantRes["code"] == 1:
-        return jsonify(checkApplicantRes)
+    if check_applicant_res["code"] == 1:
+        return jsonify(check_applicant_res)
 
     expiration = APP.config['GUARANTEE_EXPIRATION']
 
@@ -124,11 +128,11 @@ def query_all():
     g_result = current_user.guarantees
     if len(g_result) != 0:
         for i in g_result:
-            response_data["data"]["guarantee"].append(returnData(i))
+            response_data["data"]["guarantee"].append(return_data(i))
     a_result = current_user.applicant
     if len(a_result) != 0:
         for i in a_result:
-            response_data["data"]["applicant"].append(returnData(i))
+            response_data["data"]["applicant"].append(return_data(i))
     return jsonify(response_data)
 
 
@@ -146,10 +150,10 @@ def guarantee_user_action():
     try:
         validate(instance=request.json, schema=schema)
         # 处理合法数据的逻辑
-        id: int = request.json["id"] # pyright: ignore
+        _id: int = request.json["id"] # pyright: ignore
         action: str = request.json["action"] # pyright: ignore
 
-        _guarantee: Guarantee | None = Guarantee.query.get(id)
+        _guarantee: Guarantee | None = Guarantee.query.get(_id)
         if _guarantee and not is_expired(_guarantee.expiration_time):
             if action == "reject":
                 _guarantee.status = 2
@@ -162,8 +166,7 @@ def guarantee_user_action():
                 return jsonify({"code": 0, "desc": "担保已拒绝！"})
 
             elif action == "accept":
-                wl = Whitelist.query.filter_by(player_uuid=_guarantee.player_uuid).first()
-                if wl is not None:
+                if is_player_in_whitelist(_guarantee.player_uuid):
                     return jsonify({"code": 1, "desc": "此玩家存在已有白名单! "})
 
                 db.session.add(Whitelist(
