@@ -1,9 +1,11 @@
 from typing import cast
 from enum import Enum
 from myapp.utils import is_white_list_url
+from io import BytesIO
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, send_file
 from flask_login import current_user, login_required
+from sqlalchemy import update
 from sqlalchemy.orm import joinedload
 
 from myapp import db
@@ -251,12 +253,43 @@ def search_schematics():
         }
     })
 
-# @schematic.route("/download", methods=["GET"])
-# @login_required
-# def download_schematic():
-#     """
-#         下载投影
-#     """
-#     schematic_id = request.args.get('id', '', type=int)
-#
-#     # 下载量更新
+@schematic.route("/download", methods=["GET"])
+@login_required
+def download_schematic():
+    """
+        下载投影
+    """
+    schematic_id = request.args.get('id', type=int)
+    if not schematic_id:
+        return jsonify({"code": 1, "desc": "缺少投影ID参数"}),
+
+    schematic_item = db.session.query(Schematics).filter_by(id=schematic_id).first()
+
+    if not schematic_item:
+        return jsonify({"code": 1, "desc": "投影不存在"})
+
+    if not schematic_item.is_public and schematic_item.uploader_id != current_user.id:
+        return jsonify({"code": 1, "desc": "无权下载该私有投影"})
+
+    file_record = db.session.query(SchematicFiles).filter_by(schematic_id=schematic_id).first()
+    if not file_record or not file_record.file_blob:
+        return jsonify({"code": 1, "desc": "投影文件数据缺失"})
+
+    db.session.execute(
+        update(Schematics)
+        .where(Schematics.id == schematic_id)
+        .values(download_count=Schematics.download_count + 1)
+    )
+    db.session.commit()
+
+    safe_name = f"{schematic_item.name}.litematic"
+
+    buffer = BytesIO(file_record.file_blob)
+    buffer.seek(0)
+
+    return send_file(
+        buffer,
+        mimetype="application/octet-stream",
+        as_attachment=True, # 强制浏览器将响应作为附件下载，而不是在浏览器中直接打开或预览
+        download_name=safe_name,  # Flask 2.x+ (RFC 5987 自动处理为安全的文件名)
+    )
