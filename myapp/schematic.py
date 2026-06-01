@@ -4,6 +4,7 @@ from myapp.utils import is_white_list_url
 
 from flask import Blueprint, jsonify, request
 from flask_login import current_user, login_required
+from sqlalchemy.orm import joinedload
 
 from myapp import db
 from myapp.db_model import (
@@ -23,6 +24,22 @@ class SchematicType(Enum):
 
 
 MAX_FILE_SIZE_KB : int = 500
+
+
+def to_brief_dict(self ):
+    return {
+        "id": self.id,
+        "name": self.name,
+        "type": self.schematic_type,
+        "uploader": self.uploader.username,
+        "originalAuthor": self.original_author,
+        "tags": self.tag.split(" "),
+        "isPublic": self.is_public,
+        "gameVersion": self.game_version,
+        "downloadCount": self.download_count,
+        "uploadDate": self.upload_date,
+        "updateDate": self.update_date,
+    }
 
 
 @schematic.route("/", methods=["GET"])
@@ -134,28 +151,11 @@ def query_by_type():
              .paginate(page=page, per_page=per_page, error_out=False)
             )
 
-    schematics_list = [
-        {
-            "id": item.id,
-            "name": item.name,
-            "type": item.schematic_type,
-            "uploader": item.uploader.username,
-            "originalAuthor": item.original_author,
-            "tags": item.tag.split(" "),
-            "isPublic": item.is_public,
-            "gameVersion": item.game_version,
-            "downloadCount": item.download_count,
-            "uploadDate": item.upload_date.strftime("%Y-%m-%d %H:%M:%S"),
-            "updateDate": item.update_date.strftime("%Y-%m-%d %H:%M:%S"),
-        }
-        for item in query.items
-    ]
-
     return jsonify({
         "code": 0,
         "desc": "投影查询成功",
         "data": {
-            "items": schematics_list,
+            "items": [to_brief_dict(item) for item in query.items],
             "total": query.total,
             "page": query.page,
             "pages": query.pages,
@@ -203,5 +203,41 @@ def query_detail():
             "isPublic": query.is_public,
             "fileSizeKB": query.file_size_KB,
             "backupLink": query.backup_link,
+        }
+    })
+
+
+@schematic.route("/search", methods=["GET"])
+@login_required
+def search_schematics():
+    """
+        搜索投影
+    """
+    search_text = request.args.get('text', '', type=str).strip()
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 10, type=int)
+
+    if search_text == '':
+        return jsonify({"code": 1, "desc": "请输入要搜索的内容"})
+
+    pagination = (
+        db.session.query(Schematics)
+        .options(joinedload(Schematics.uploader))  # ← 关键：JOIN 预加载
+        .filter(Schematics.name.ilike(f'%{search_text}%'))
+        .order_by(Schematics.id.desc())
+        .paginate(page=page, per_page=per_page, error_out=False)
+    )
+
+    return jsonify({
+        "code": 0,
+        "desc": "投影查询成功",
+        "data": {
+            'items': [to_brief_dict(item) for item in pagination.items],  # 假设有序列化方法
+            'total': pagination.total,
+            'page': pagination.page,
+            'per_page': pagination.per_page,
+            'pages': pagination.pages,
+            'has_next': pagination.has_next,
+            'has_prev': pagination.has_prev,
         }
     })
