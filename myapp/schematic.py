@@ -5,7 +5,7 @@ from io import BytesIO
 
 from flask import Blueprint, jsonify, request, send_file
 from flask_login import current_user, login_required
-from sqlalchemy import update
+from sqlalchemy import update, or_
 from sqlalchemy.orm import joinedload
 
 from myapp import db
@@ -150,6 +150,12 @@ def query_by_type():
 
     query = (db.session.query(Schematics)
              .filter(Schematics.schematic_type == type_index)
+             .filter(
+                or_(
+                    Schematics.is_public == True,
+                    Schematics.uploader_id == current_user.id
+                )
+            )
              .paginate(page=page, per_page=per_page, error_out=False)
             )
 
@@ -180,31 +186,32 @@ def query_detail():
     if schematic_id == 0:
         return jsonify({"code": 1, "desc": "无效的投影ID"})
 
-    query: Schematics | None = (db.session.query(Schematics)
-             .get(schematic_id)
-            )
+    schematic_item: Schematics | None = db.session.get(Schematics, schematic_id)
 
-    if query is None:
+    if schematic_item is None:
         return jsonify({"code": 1, "desc": "投影不存在"})
+
+    if schematic_item and not schematic_item.is_public and schematic_item.uploader_id != current_user.id:
+        return jsonify({"code": 1, "desc": "无权查看！"})
 
     return jsonify({
         "code": 0,
         "desc": "投影查询成功",
         "data": {
-            "id": query.id,
-            "name" : query.name,
-            "type": query.schematic_type,
-            "uploader" : query.uploader.username,
-            "originalAuthor" : query.original_author,
-            "tags": query.tag.split(" "),
-            "gameVersion": query.game_version,
-            "downloadCount": query.download_count,
-            "uploadDate": query.upload_date,
-            "updateDate": query.update_date,
-            "description": query.description,
-            "isPublic": query.is_public,
-            "fileSizeKB": query.file_size_KB,
-            "backupLink": query.backup_link,
+            "id": schematic_item.id,
+            "name" : schematic_item.name,
+            "type": schematic_item.schematic_type,
+            "uploader" : schematic_item.uploader.username,
+            "originalAuthor" : schematic_item.original_author,
+            "tags": schematic_item.tag.split(" "),
+            "gameVersion": schematic_item.game_version,
+            "downloadCount": schematic_item.download_count,
+            "uploadDate": schematic_item.upload_date,
+            "updateDate": schematic_item.update_date,
+            "description": schematic_item.description,
+            "isPublic": schematic_item.is_public,
+            "fileSizeKB": schematic_item.file_size_KB,
+            "backupLink": schematic_item.backup_link,
         }
     })
 
@@ -233,6 +240,12 @@ def search_schematics():
     pagination = (
         db.session.query(Schematics)
         .options(joinedload(Schematics.uploader))  # ← 关键：JOIN 预加载
+        .filter(
+            or_(
+                Schematics.is_public == True,
+                Schematics.uploader_id == current_user.id
+            )
+        )
         .filter(Schematics.name.ilike(f'%{search_text}%'))
         .filter(Schematics.schematic_type == type_index)
         .order_by(Schematics.id.desc())
@@ -291,5 +304,5 @@ def download_schematic():
         buffer,
         mimetype="application/octet-stream",
         as_attachment=True, # 强制浏览器将响应作为附件下载，而不是在浏览器中直接打开或预览
-        download_name=safe_name,  # Flask 2.x+ (RFC 5987 自动处理为安全的文件名)
+        download_name=safe_name, # Flask 2.x+ (RFC 5987 自动处理为安全的文件名)
     )
