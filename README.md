@@ -8,8 +8,6 @@
 
 ## 环境配置
 
--   Windows
-
 ```
 uv sync # 请确保已经安装了 UV
 cp .env.example .env

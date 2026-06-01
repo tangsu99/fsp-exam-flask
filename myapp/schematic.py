@@ -22,6 +22,9 @@ class SchematicType(Enum):
     ARCHITECTURE = 2
 
 
+MAX_FILE_SIZE_KB : int = 500
+
+
 @schematic.route("/", methods=["GET"])
 @login_required
 def index():
@@ -71,6 +74,8 @@ def upload():
         # 读取文件的二进制内容并计算大小 (KB)
         file_bytes = file_storage.read()
         file_size_kb = len(file_bytes) // 1024
+        if file_size_kb > MAX_FILE_SIZE_KB:
+            return jsonify({"code": 1, "desc": f"投影文件大小不能超过{MAX_FILE_SIZE_KB}KB！"})
 
         new_schematic = Schematics(
             name=name,
