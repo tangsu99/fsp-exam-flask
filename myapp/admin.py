@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from flask import Blueprint, jsonify, request
 from flask_login import login_required, current_user
+from sqlalchemy import select
 
 from myapp import db, my_config, APP
 from myapp.db_model import (
@@ -1007,10 +1008,13 @@ def del_slot():
 @login_required
 @required_role("admin")
 def get_guarantee():
-    page = request.args.get("page", 1, type=int)  # 获取页码，默认为 1
-    per_page = request.args.get("size", 10, type=int)  # 获取每页条数，默认为 10
+    page = request.args.get("page", 1, type=int)
+    per_page = request.args.get("size", 10, type=int)
 
-    pagination = Guarantee.query.paginate(page=page, per_page=per_page, error_out=False)
+    # stmt 是 Statement（语句） 的缩写，
+    # 在 SQLAlchemy 2.0 中特指由 select()、insert()、update()、delete() 等函数构建的 SQL 表达式对象。
+    stmt = select(Guarantee)
+    pagination = db.paginate(stmt, page=page, per_page=per_page, error_out=False)
 
     result_list = []
 
@@ -1018,12 +1022,13 @@ def get_guarantee():
         result_list.append({
             "id": item.id,
             "guarantor_username": item.guarantor.username,
-            "applicant_username": item.applicant.username,
+            "applicant_username": item.applicant_user.username,
             "player_name": item.player_name,
             "status": item.status,
             "create_time": item.create_time,
             "expiration_time": item.expiration_time
         })
+
     response_data = {
         "code": 0,
         "desc": "yes",
@@ -1032,5 +1037,6 @@ def get_guarantee():
         "size": pagination.per_page,
         "total": pagination.total,
     }
+
     return jsonify(response_data)
 

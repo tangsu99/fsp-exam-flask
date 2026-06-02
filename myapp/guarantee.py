@@ -60,11 +60,11 @@ def check_applicant(info: dict) -> dict:
 
 def return_data(i: Guarantee):
     return {
-        "uid": i.applicant.id, # type: ignore
+        "uid": i.applicant_user.id,
         "id": i.id,
-        "username": i.applicant.username, # type: ignore
-        "userQQ": i.applicant.user_qq, # type: ignore
-        "avatar": i.applicant.avatar, # type: ignore
+        "username": i.applicant_user.username,
+        "userQQ": i.applicant_user.user_qq,
+        "avatar": i.applicant_user.avatar,
         "playerName": i.player_name,
         "playerUUID": i.player_uuid,
         "createTime": i.create_time,
@@ -105,13 +105,14 @@ def add_guarantee():
     expiration = APP.config['GUARANTEE_EXPIRATION']
 
     _guarantee = Guarantee(
-        guarantor_id,
-        current_user.get_id(),
-        applicant_info["player_name"],
-        applicant_info["player_uuid"],
-        datetime.now(timezone.utc),
-        datetime.now(timezone.utc) + timedelta(hours=expiration),
+        guarantee_id=guarantor_id,
+        applicant_id=current_user.id,
+        player_name=applicant_info["player_name"],
+        player_uuid=applicant_info["player_uuid"],
+        create_time=datetime.now(timezone.utc),
+        expiration_time=datetime.now(timezone.utc) + timedelta(hours=expiration)
     )
+
     db.session.add(_guarantee)
     db.session.commit()
     return jsonify({"code": 0, "desc": "提交成功，有效期1小时，超时失效，1小时内不可再申请新的担保请求，除非对方手动拒绝或同意，担保结果会发往您的qq邮箱。"})
@@ -129,7 +130,7 @@ def query_all():
     if len(g_result) != 0:
         for i in g_result:
             response_data["data"]["guarantee"].append(return_data(i))
-    a_result = current_user.applicant
+    a_result = current_user.applicant_guarantees
     if len(a_result) != 0:
         for i in a_result:
             response_data["data"]["applicant"].append(return_data(i))
@@ -139,58 +140,60 @@ def query_all():
 @guarantee.route("/action", methods=["POST"])
 @login_required
 def guarantee_user_action():
-    schema = {
-        "type": "object",
-        "properties": {
-            "id": {"type": "number"},
-            "action": {"type": "string"},
-        },
-        "required": ["id", "action"]
-    }
-    try:
-        validate(instance=request.json, schema=schema)
-        # 处理合法数据的逻辑
-        _id: int = request.json["id"] # pyright: ignore
-        action: str = request.json["action"] # pyright: ignore
+    """
+    操作用户担保
+    """
+    data = request.get_json(silent=True) or {}
 
-        _guarantee: Guarantee | None = Guarantee.query.get(_id)
-        if _guarantee and not is_expired(_guarantee.expiration_time):
-            if action == "reject":
-                _guarantee.status = 2
-                db.session.commit()
+    _id = data.get("id")
+    action = data.get("action")
 
-                mail_msg = guarantee_result_mail([_guarantee.applicant.user_qq + '@qq.com'],
-                                                     _guarantee.guarantor.username, False)
-                send_mail(APP, mail_msg)
+    if _id is None or action is None:
+        return jsonify({"code": 1, "desc": "缺少数据！"})
 
-                return jsonify({"code": 0, "desc": "担保已拒绝！"})
+    if not isinstance(_id, int) or not isinstance(action, str):
+        return jsonify({"code": 1, "desc": "参数类型错误！"})
 
-            elif action == "accept":
-                if is_player_in_whitelist(_guarantee.player_uuid):
-                    return jsonify({"code": 1, "desc": "此玩家存在已有白名单! "})
+    _guarantee: Guarantee | None = db.session.get(Guarantee, _id)
+    if _guarantee and not is_expired(_guarantee.expiration_time):
+        if action == "reject":
+            _guarantee.status = 2
+            db.session.commit()
 
-                db.session.add(Whitelist(
-                        user_id=_guarantee.applicant_id,
-                        player_name=_guarantee.player_name,
-                        player_uuid=_guarantee.player_uuid,
-                        source=1,
-                        auditor_uid=current_user.id
-                ))
+            mail_msg = guarantee_result_mail(
+                [_guarantee.applicant_user.user_qq + '@qq.com'],
+                _guarantee.guarantor.username,
+                False
+            )
+            send_mail(APP, mail_msg)
 
-                _guarantee.status = 1
-                db.session.commit()
+            return jsonify({"code": 0, "desc": "担保已拒绝！"})
 
-                mail_msg = guarantee_result_mail([_guarantee.applicant.user_qq + '@qq.com'],
-                                                     _guarantee.guarantor.username, True)
-                send_mail(APP, mail_msg)
+        elif action == "accept":
+            if is_player_in_whitelist(_guarantee.player_uuid):
+                return jsonify({"code": 1, "desc": "此玩家存在已有白名单! "})
 
-                return jsonify({"code": 0, "desc": "担保成功！白名单已添加"})
+            db.session.add(Whitelist(
+                    user_id=_guarantee.applicant_id,
+                    player_name=_guarantee.player_name,
+                    player_uuid=_guarantee.player_uuid,
+                    source=1,
+                    auditor_uid=current_user.id
+            ))
 
-            else:
-                return jsonify({"code": 1, "desc": "未知操作"})
+            _guarantee.status = 1
+            db.session.commit()
+
+            mail_msg = guarantee_result_mail(
+                [_guarantee.applicant_user.user_qq + '@qq.com'],
+                _guarantee.guarantor.username,
+                True
+            )
+            send_mail(APP, mail_msg)
+
+            return jsonify({"code": 0, "desc": "担保成功！白名单已添加"})
+
         else:
-            return jsonify({"code": 1, "desc": "担保不存在或过期"})
-
-    except ValidationError:
-        return jsonify({"code": 1, "desc": "数据有误"})
-
+            return jsonify({"code": 1, "desc": "未知操作"})
+    else:
+        return jsonify({"code": 1, "desc": "担保不存在或过期"})

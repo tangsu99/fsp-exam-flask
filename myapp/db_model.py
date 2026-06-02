@@ -216,18 +216,25 @@ class User(UserMixin, db.Model):
     )  # 0 未激活 1 正常 2 临时封禁 3 永久封禁 4 删除
     tokens: Mapped[list["Token"]] = relationship("Token", backref="user", lazy="select")
     whitelist: Mapped[list["Whitelist"]] = relationship("Whitelist", backref="wl_user", lazy="select")
+
+    # 使用 back_populates 替代 backref
+    # back_populates 是显式双向绑定，不会在对方模型上隐式创建属性
+
+    # 担保人身份：我作为担保人的担保记录
     guarantees: Mapped[list["Guarantee"]] = relationship(
         "Guarantee",
         foreign_keys="Guarantee.guarantee_id",
-        backref="guarantor",
+        back_populates="guarantor",
         lazy="select",
     )
-    applicant: Mapped[list["Guarantee"]] = relationship(
+    # 申请人身份：我作为申请人的担保记录
+    applicant_guarantees: Mapped[list["Guarantee"]] = relationship(
         "Guarantee",
         foreign_keys="Guarantee.applicant_id",
-        backref="applicant",
+        back_populates="applicant_user",
         lazy="select",
     )
+
     responses: Mapped[list["Response"]] = relationship(
         "Response", backref="user", lazy="select", cascade="all, delete"
     )  # 与答卷表建立一对多关系，级联删除
@@ -326,30 +333,27 @@ class ResponseDetail(db.Model):
 
 
 class Guarantee(db.Model):
-    __tablename__ = "guarantees"  # 指定表名
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)  # 主键，担保唯一标识，自增
-    guarantee_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)  # 担保人id，不允许为空
-    applicant_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)  # 申请人id，不允许为空
-    player_name: Mapped[str] = mapped_column(String(25), nullable=False)  # 被担保人ID，不允许为空
-    player_uuid: Mapped[str] = mapped_column(String(36), nullable=False)  # 被担保人UUID，不允许为空
-    status: Mapped[int] = mapped_column(Integer, nullable=False, default=0)  # 担保状态, 0 待同意，1 已同意，2 已拒绝
-    create_time: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    expiration_time: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    def __init__(
-        self,
-        guarantee_id: int,
-        applicant_id: int,
-        player_name: str,
-        player_uuid: str,
-        create_time: datetime,
-        expiration_time: datetime
-    ):
-        self.guarantee_id = guarantee_id
-        self.applicant_id = applicant_id
-        self.player_name = player_name
-        self.player_uuid = player_uuid
-        self.create_time = create_time
-        self.expiration_time = expiration_time
+    __tablename__ = "guarantees"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    guarantee_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False) # 担保人id
+    applicant_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False) # 申请人id
+    player_name: Mapped[str] = mapped_column(String(25), nullable=False)  # 被担保玩家昵称
+    player_uuid: Mapped[str] = mapped_column(String(36), nullable=False)  # 被担保人UUID
+    status: Mapped[int] = mapped_column(Integer, nullable=False, default=0) # 担保状态, 0 待同意，1 已同意，2 已拒绝
+    create_time: Mapped[datetime] = mapped_column(DateTime, nullable=False) # 创建时间
+    expiration_time: Mapped[datetime] = mapped_column(DateTime, nullable=False) # 过期时间
+
+    guarantor: Mapped["User"] = relationship(
+        "User",
+        foreign_keys=[guarantee_id],
+        back_populates="guarantees",
+    )
+
+    applicant_user: Mapped["User"] = relationship(
+        "User",
+        foreign_keys=[applicant_id],
+        back_populates="applicant_guarantees",
+    )
 
 
 class Whitelist(db.Model):
@@ -469,8 +473,8 @@ class Schematics(db.Model):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String(100), nullable=False) # 投影文件名 (30个汉字，这里设为100字符足够容纳)
-    uploader_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)  # 上传者ID
-    uploader: Mapped["User"] = relationship("User", backref="schematics")
+    uploader_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)  # 上传用户ID
+    uploader: Mapped["User"] = relationship("User", backref="schematics") # 上传用户
     original_author: Mapped[str] = mapped_column(String(100), nullable=True)  # 投影原作者
     schematic_type: Mapped[int] = mapped_column(Integer, nullable=False)  # 投影类型
     game_version: Mapped[str] = mapped_column(String(50), nullable=False) # 投影版本
