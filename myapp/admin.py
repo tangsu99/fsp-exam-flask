@@ -19,7 +19,7 @@ from myapp.db_model import (
     Whitelist,
 )
 from myapp.mail import survey_result_mail, send_mail
-from myapp.utils import check_password, required_role, is_survey_response_expired, validate_json_required_fields
+from myapp.utils import check_password_format, required_role, is_survey_response_expired, validate_json_required_fields
 
 admin = Blueprint("admin", __name__)
 
@@ -519,11 +519,16 @@ def add_user():
             return jsonify({"code": 1, "desc": "缺少必填字段！"}), 400
 
         # 检查用户名是否已存在
-        if User.query.filter_by(username=username).first():
+        if db.session.query(User).filter_by(username=username).first():
             return jsonify({"code": 2, "desc": "用户名已存在！"}), 400
 
         # 创建用户
-        new_user = User(username=username, user_qq=user_qq, role=role).set_password(password)
+        new_user = User(
+            username=username,
+            user_qq=user_qq,
+            role=role
+        )
+        new_user.password =password
         db.session.add(new_user)
         db.session.commit()
 
@@ -550,7 +555,7 @@ def set_user():
             return jsonify({"code": 1, "desc": "缺少用户ID！"}), 400
 
         # 查询用户
-        user = User.query.get(user_id)
+        user: User | None = db.session.get(User, user_id)
         if not user:
             return jsonify({"code": 2, "desc": "用户不存在！"}), 404
 
@@ -558,8 +563,8 @@ def set_user():
         if username:
             user.username = username
 
-        if password is not None and check_password(password):
-            user.set_password(password)
+        if password is not None and check_password_format(password):
+            user.password = password
 
         if user_qq:
             user.user_qq = user_qq

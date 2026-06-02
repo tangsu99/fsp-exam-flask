@@ -7,7 +7,10 @@ from flask_login import current_user, login_required, login_user
 from myapp import APP, db
 from myapp.db_model import Token, User, RegistrationLimit, ResetPasswordToken, ActivationToken
 from myapp.mail import reset_password_mail, activation_mail, send_mail
-from myapp.utils import check_password
+from myapp.utils import check_password_format
+
+from sqlalchemy import or_
+from sqlalchemy.exc import IntegrityError
 
 auth = Blueprint("auth", __name__)
 
@@ -18,7 +21,7 @@ def login():
     if req_data:
         username = req_data["username"]
         password = req_data["password"]
-        user: User | None = User.query.filter_by(username=username).first()
+        user: User | None = db.session.query(User).filter_by(username=username).first()
         if user and user.check_password(password):
             login_user(user)
             token = create_token(user)
@@ -49,7 +52,7 @@ def logout():
         token: str | None = request.headers.get("Authorization")
         if token and token.startswith("Bearer "):
             token = token.replace("Bearer ", "", 1)
-        tk: Token | None = Token.query.filter_by(token=token).first()
+        tk: Token | None = db.session.query(Token).filter_by(token=token).first()
         if tk is None:
             return jsonify({"code": 4, "desc": "Token not found"})
         db.session.delete(tk)
@@ -79,7 +82,7 @@ def register():
     username = req_data.get("username")
     user_qq = req_data.get("userQQ")
     password = req_data.get("password")
-    re_password = req_data.get("repassword")
+    re_password = req_data.get("passwordAgain")
 
     # 验证必填字段
     if not all([username, password, re_password]):
@@ -90,41 +93,44 @@ def register():
         return jsonify({"code": 2, "desc": "密码与重复密码不一致!"})
 
     # 验证密码是否合法
-    if not check_password(password):
+    if not check_password_format(password):
         return jsonify({"code": 2, "desc": "密码不合法!"})
 
-    # 检查用户名是否已存在
-    if User.query.filter_by(username=username).first():
-        return jsonify({"code": 3, "desc": "用户名已存在!"})
+    existing_user = db.session.query(User).filter(
+        or_(User.username == username, User.user_qq == user_qq)
+    ).first()
 
-    # 检查 QQ 号是否已存在
-    if User.query.filter_by(user_qq=user_qq).first():
+    if existing_user:
+        if existing_user.username == username:
+            return jsonify({"code": 3, "desc": "用户名已存在!"})
         return jsonify({"code": 3, "desc": "QQ号已存在!"})
-
-    # 检查白名单，用户名不能于白名单相同
-    # if Whitelist.query.filter_by(player_name=username).first():
-    #     return jsonify({"code": 3, "desc": "用户名已存在!"})
 
     # 创建用户
     try:
-        user = User(username=username, user_qq=user_qq).set_password(password)
-        db.session.add(user)
+        new_user = User(
+            username=username,
+            user_qq=user_qq,
+        )
+
+        new_user.password = password
+
+        db.session.add(new_user)
 
         # 记录IP注册信息
         record_ip_registration(client_ip)
 
         db.session.commit()
 
-        token = create_token(user)
+        token = create_token(new_user)
         return jsonify({
             "code": 0,
             "desc": "注册成功",
             "token": token,
-            "username": user.username,
-            "avatar": user.avatar,
-            "isAdmin": user.role == "admin",
+            "username": new_user.username,
+            "avatar": new_user.avatar,
+            "isAdmin": new_user.role == "admin",
         })
-    except Exception:
+    except IntegrityError:
         db.session.rollback()
         return jsonify({"code": 5, "desc": "注册失败，请稍后再试"})
 
@@ -173,9 +179,9 @@ def find_password():
     if request.json:
         username = request.json.get('username')
         qq = request.json.get('userQQ')
-        user = User.query.filter_by(user_qq=qq, username=username).first()
+        user = db.session.query(User).filter_by(user_qq=qq, username=username).first()
         if not user:
-            return jsonify({"code": 4, "desc": "未找到用户!"}), 404
+            return jsonify({"code": 4, "desc": "未找到用户!"})
         send_reset_password(user)
         return jsonify({"code": 0, "desc": "发送成功！请查找邮箱!"})
 
@@ -184,21 +190,21 @@ def find_password():
 
 @auth.route('/findPassword', methods=["PUT"])
 def find_password_set():
-    token = ResetPasswordToken.query.filter_by(token=request.args.get('token', '')).first()
+    token = db.session.query(ResetPasswordToken).filter_by(token=request.args.get('token', '')).first()
     if not token:
-        return jsonify({"code": 4, "desc": "无效token!"}), 404
+        return jsonify({"code": 4, "desc": "无效token!"})
 
     data = request.json
     if data:
         password = data.get('password')
-        if not check_password(password):
+        if not check_password_format(password):
             return jsonify({"code": 2, "desc": "密码不合法!"})
 
         user: User | None = token.user_r_p_t
         if not user:
-            return jsonify({"code": 4, "desc": "未找到用户!"}), 404
+            return jsonify({"code": 4, "desc": "未找到用户!"})
 
-        user.set_password(password)
+        user.password = password
         db.session.delete(token)
         db.session.commit()
 
@@ -209,7 +215,7 @@ def find_password_set():
 @auth.route('/reqActivation', methods=["post"])
 @login_required
 def req_activation():
-    user: User | None = User.query.filter_by(username=current_user.username).first()
+    user: User | None = db.session.query(User).filter_by(username=current_user.username).first()
     if user is None:
         return jsonify({"code": 4, "desc": "未找到用户!"}), 404
 
@@ -217,7 +223,7 @@ def req_activation():
         if user.status == 1:
             return jsonify({"code": 2, "desc": "账户状态正常！不需要进行激活！"})
         return jsonify({"code": 2, "desc": "账户状态异常！无法进行激活！"})
-    token = ActivationToken.query.filter(
+    token = db.session.query(ActivationToken).filter(
         ActivationToken.user_id == user.id,
         ActivationToken.expires_at >= datetime.now(timezone.utc),
         ActivationToken.is_revoked != True
@@ -230,7 +236,7 @@ def req_activation():
 
 @auth.route('/activation', methods=["PUT"])
 def activation():
-    token = ActivationToken.query.filter_by(token=request.args.get('token', '')).first()
+    token = db.session.query(ActivationToken).filter_by(token=request.args.get('token', '')).first()
     if not token:
         return jsonify({"code": 4, "desc": "无效token!"}), 404
 
@@ -270,7 +276,7 @@ def send_reset_password(user):
 
 def check_ip_registration_limit(ip):
     one_hour_ago = datetime.now(timezone.utc) - timedelta(hours=1)
-    registrations = RegistrationLimit.query.filter(
+    registrations = db.session.query(RegistrationLimit).filter(
         RegistrationLimit.ip == ip,
         RegistrationLimit.register_time >= one_hour_ago
     ).count()
@@ -301,14 +307,14 @@ def create_token(user, expires_in=3600 * 24 * 7):
 
 
 def revoke_token(token):
-    token_record = Token.query.filter_by(token=token).first()
+    token_record = db.session.query(Token).filter_by(token=token).first()
     if token_record:
         token_record.is_revoked = True
         db.session.commit()
 
 
 def is_token_revoked(token):
-    token_record = Token.query.filter_by(token=token).first()
+    token_record = db.session.query(Token).filter_by(token=token).first()
     if token_record and token_record.is_revoked:
         return True
     return False

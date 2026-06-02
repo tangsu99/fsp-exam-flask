@@ -57,7 +57,7 @@ def required_role(role: str):
     return decorator
 
 
-def check_password(password: str) -> bool:
+def check_password_format(password: str) -> bool:
     return bool(PASSWORD_PATTERN.match(password))
 
 

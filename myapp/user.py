@@ -9,7 +9,7 @@ user = Blueprint("user", __name__)
 
 @user.route("/getInfo")
 @login_required
-def getUserInfo():
+def get_user_info():
     temp = current_user.whitelist
     play_permission: bool = True if len(temp) > 0 else False
 
@@ -33,20 +33,13 @@ def getUserInfo():
 @user.route("/getWhitelist")
 @login_required
 def get_whitelist():
-    temp = current_user.whitelist
-    res = {
+    return jsonify({
         "code": 0,
-        "list": [],
-    }
-    for item in temp:
-        res["list"].append(
-            {
-                "id": item.id,
-                "name": item.player_name,
-                "uuid": item.player_uuid,
-            }
-        )
-    return jsonify(res)
+        "list": [
+            {"id": i.id, "name": i.player_name, "uuid": i.player_uuid}
+            for i in current_user.whitelist
+        ],
+    })
 
 
 @user.route("/setAvatar", methods=["POST"])
@@ -71,18 +64,24 @@ def set_avatar():
         return jsonify({"code": 3, "desc": f"头像修改失败：{str(e)}"}), 500
 
 
-def update_password(uid: int, token: str, new_password: str, old_password: str) -> bool:
-    if new_password != old_password:
-        return False
+def update_password(uid: int, token: str, new_password: str):
 
-    user: User | None = User.query.get(uid)
+    user_: User | None = db.session.get(User, uid)
+    if not user_:
+        return "用户不存在"
 
-    if user:
-        token_record: Token | None = Token.query.filter_by(token=token).first()
+    if not user_.check_password(new_password):
+        return "新旧密码不能相同"
 
-        user.set_password(new_password)
-        db.session.delete(token_record)
-        db.session.commit()
-        return True
+    token_record: Token | None = db.session.query(Token).filter_by(
+        token=token, user_id=uid
+    ).first()
 
-    return False
+    if token_record is None:
+        return "?"
+
+    user.password = new_password
+
+    db.session.delete(token_record)
+    db.session.commit()
+    return "修改成功"

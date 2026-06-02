@@ -202,11 +202,11 @@ class Option(db.Model):
 # 用户表模型
 class User(UserMixin, db.Model):
     __tablename__ = "users"  # 指定表名
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)  # 主键，用户唯一标识，自增
-    username: Mapped[str] = mapped_column(String(100), nullable=False)  # 用户名，不允许为空
-    user_qq: Mapped[str] = mapped_column(String(25), nullable=False)
-    password: Mapped[str] = mapped_column(String(100), nullable=False)  # 密码，不允许为空
-    role: Mapped[str] = mapped_column(String(100))  # 用户角色，如普通用户、管理员等，可为空
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    username: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
+    user_qq: Mapped[str] = mapped_column(String(25), unique=True, nullable=False)
+    _password_hash: Mapped[str] = mapped_column("password", String(100), nullable=False) # 哈希过的密码
+    role: Mapped[str] = mapped_column(String(100), nullable=False, default="user") # 用户角色，如普通用户、管理员等
     addtime: Mapped[datetime] = mapped_column(
         DateTime, default=func.utc_timestamp(), server_default=func.utc_timestamp()
     )  # 用户新增时间，默认为当前时间，DB 里面是 UTC 时间
@@ -245,17 +245,20 @@ class User(UserMixin, db.Model):
         "ActivationToken", backref="user_active", lazy="select", cascade="all, delete"
     )
 
-    def __init__(self, username: str, user_qq: str = "1", role: str = "user"):
-        self.username = username
-        self.user_qq = user_qq
-        self.role = role
+    @property
+    def password(self) -> str:
+        """禁止直接读取密码哈希"""
+        raise AttributeError("密码不可读取！如果需要比较新旧密码是否一致，请使用 check_password() 进行校验")
 
-    def set_password(self, password) -> "User":
-        self.password = bcrypt.generate_password_hash(password).decode("utf-8")
-        return self
+    @password.setter
+    def password(self, raw_password: str) -> None:
+        """所有赋值自动哈希，内建安全逻辑"""
+        if not isinstance(raw_password, str):
+            raise TypeError("密码必须是字符串")
+        self._password_hash = bcrypt.generate_password_hash(raw_password).decode("utf-8")
 
-    def check_password(self, password) -> bool:
-        return bcrypt.check_password_hash(self.password, password)
+    def check_password(self, password: str) -> bool:
+        return bcrypt.check_password_hash(self._password_hash, password)
 
 
 # 答卷表模型
