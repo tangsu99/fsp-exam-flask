@@ -1,5 +1,4 @@
 from datetime import datetime, timezone, timedelta
-from jsonschema import validate, ValidationError
 
 from flask import Blueprint, jsonify, request
 from flask_login import current_user, login_required

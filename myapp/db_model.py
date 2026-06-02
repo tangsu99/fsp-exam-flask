@@ -339,7 +339,7 @@ class Guarantee(db.Model):
     applicant_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False) # 申请人id
     player_name: Mapped[str] = mapped_column(String(25), nullable=False)  # 被担保玩家昵称
     player_uuid: Mapped[str] = mapped_column(String(36), nullable=False)  # 被担保人UUID
-    status: Mapped[int] = mapped_column(Integer, nullable=False, default=0) # 担保状态, 0 待同意，1 已同意，2 已拒绝
+    status: Mapped[int] = mapped_column(Integer, nullable=False, default=0) # 担保状态
     create_time: Mapped[datetime] = mapped_column(DateTime, nullable=False) # 创建时间
     expiration_time: Mapped[datetime] = mapped_column(DateTime, nullable=False) # 过期时间
 
@@ -354,6 +354,17 @@ class Guarantee(db.Model):
         foreign_keys=[applicant_id],
         back_populates="applicant_guarantees",
     )
+
+    STATUS_MAP: dict[int, str] = {
+        0: "待同意",
+        1: "已同意",
+        2: "已拒绝",
+    }
+
+    @property
+    def status_text(self) -> str:
+        """获取状态的中文含义"""
+        return self.STATUS_MAP.get(self.status, "未知状态")
 
 
 class Whitelist(db.Model):
@@ -460,11 +471,8 @@ class ConfigModel(db.Model):
         server_onupdate=func.utc_timestamp()
     )
 
-    def __init__(self, key: str, value: str, type_: str, description: str):
-        self.key = key
-        self.value = value
-        self.type = type_
-        self.description = description
+    def __repr__(self):
+        return f'<config for key: {self.key}>'
 
 
 # 投影信息表
@@ -495,7 +503,8 @@ class Schematics(db.Model):
     )
 
     def __repr__(self):
-        return f'<Schematics {self.name}>'
+        return f'<Schematics for ID {self.id}>'
+
 
 # 投影文件二进制分表
 class SchematicFiles(db.Model):
