@@ -1,5 +1,4 @@
 from typing import cast
-from enum import Enum
 from myapp.utils import is_white_list_url
 from io import BytesIO
 
@@ -11,18 +10,12 @@ from sqlalchemy.orm import joinedload
 from myapp import db
 from myapp.db_model import (
     User,
-    Schematics,
-    SchematicFiles,
+    Schematic, SchematicType,
+    SchematicFile
 )
 
 
 schematic = Blueprint("schematic", __name__)
-
-
-class SchematicType(Enum):
-    OTHER = 0
-    REDSTONE = 1
-    ARCHITECTURE = 2
 
 
 MAX_FILE_SIZE_KB : int = 500
@@ -39,8 +32,8 @@ def to_brief_dict(self ):
         "isPublic": self.is_public,
         "gameVersion": self.game_version,
         "downloadCount": self.download_count,
-        "uploadDate": self.upload_date,
-        "updateDate": self.update_date,
+        "uploadDate": self.upload_date.isoformat(),
+        "updateDate": self.update_date.isoformat(),
     }
 
 
@@ -52,7 +45,7 @@ def index():
 
 @schematic.route("/upload", methods=["POST"])
 @login_required
-def upload():
+def upload_schematic():
     """
     投影上传API
     """
@@ -70,10 +63,9 @@ def upload():
 
         type_str: str = request.form.get("type", "").strip()
 
-        try:
-            type_index = SchematicType[type_str.upper()].value
+        type_enum: SchematicType | None = Schematic.type_to_enum(type_str)
 
-        except KeyError:
+        if type_enum is None:
             return jsonify({"code": 1, "desc": "无效的投影类型"})
 
         tags_list: list[str]  = request.form.get("tags", "").split(" ")
@@ -82,7 +74,7 @@ def upload():
         game_version: str = request.form.get("gameVersion","").strip()
         backup_link: str = request.form.get("backupLink","").strip()
 
-        if backup_link != "" and not is_white_list_url(backup_link):
+        if not is_white_list_url(backup_link):
             return jsonify({"code": 1, "desc": "该网盘不在白名单内不允许上传！"})
 
         # 获取并处理上传的文件
@@ -96,11 +88,11 @@ def upload():
         if file_size_kb > MAX_FILE_SIZE_KB:
             return jsonify({"code": 1, "desc": f"投影文件大小不能超过{MAX_FILE_SIZE_KB}KB！"})
 
-        new_schematic = Schematics(
+        new_schematic = Schematic(
             name=name,
             uploader_id=user.id,
             original_author=original_author,
-            schematic_type=type_index,
+            schematic_type=type_enum,
             game_version=game_version,
             tag=" ".join(tags_list), # 将列表转回字符串存入数据库
             description=desc,
@@ -115,7 +107,7 @@ def upload():
         db.session.flush()
 
         # 创建分表记录，存入二进制文件
-        new_file = SchematicFiles(
+        new_file = SchematicFile(
             schematic_id=new_schematic.id,
             file_blob=file_bytes
         )
@@ -129,6 +121,55 @@ def upload():
             db.session.rollback()
             print(f"上传出错: {e}")
             return jsonify({"code": 1, "desc": f"服务器内部错误: {str(e)}"})
+
+
+# @schematic.route("/update", methods=["POST"])
+# @login_required
+# def update_schematic():
+#     """
+#     投影编辑API
+#     """
+#     try:
+#         data = request.get_json(silent=True) or {}
+#
+#         id_: int | None = data.get("id")
+#         if id_ is None:
+#             return jsonify({"code": 1, "desc": "缺少参数ID"}), 400
+#
+#         name: str = data.get("name", "").strip()
+#         uploader: User = cast(User, current_user)
+#         original_author: str = data.get("originalAuthor", "").strip()
+#         type_str: str = data.get("type", "").strip()
+#         game_version: str = data.get("gameVersion", "").strip()
+#         tags_list: list[str] = data.get("tags", [])
+#         desc: str = data.get("desc", "").strip()
+#         is_public: bool = data.get("isPublic", False)
+#         backup_link: str = request.form.get("backupLink", "").strip()
+#         # download_count
+#         # file_size_KB
+#
+#         # update_date
+#
+#         try:
+#             type_index = SchematicType[type_str.upper()].value
+#
+#         except KeyError:
+#             return jsonify({"code": 1, "desc": "无效的投影类型"})
+#
+#
+#         if backup_link != "" and not is_white_list_url(backup_link):
+#             return jsonify({"code": 1, "desc": "该网盘不在白名单内不允许上传！"})
+#
+#         # 获取并处理上传的文件
+#         file_storage = request.files.get("uploadFile")
+#         if not file_storage or file_storage.filename == '':
+#             return jsonify({"code": 1, "desc": "未找到上传的文件"})
+#
+#         # 读取文件的二进制内容并计算大小 (KB)
+#         file_bytes = file_storage.read()
+#         file_size_kb = len(file_bytes) // 1024
+#         if file_size_kb > MAX_FILE_SIZE_KB:
+#             return jsonify({"code": 1, "desc": f"投影文件大小不能超过{MAX_FILE_SIZE_KB}KB！"})
 
 
 @schematic.route("/query_by_type", methods=["GET"])
@@ -148,12 +189,12 @@ def query_by_type():
     page = request.args.get("page", 1, type=int)
     per_page = min(request.args.get("per_page", 10, type=int), 100) # 最大每页100条, 默认10条
 
-    query = (db.session.query(Schematics)
-             .filter(Schematics.schematic_type == type_index)
+    query = (db.session.query(Schematic)
+             .filter(Schematic.schematic_type == type_index)
              .filter(
                 or_(
-                    Schematics.is_public == True,
-                    Schematics.uploader_id == current_user.id
+                    Schematic.is_public == True,
+                    Schematic.uploader_id == current_user.id
                 )
             )
              .paginate(page=page, per_page=per_page, error_out=False)
@@ -186,7 +227,7 @@ def query_detail():
     if schematic_id == 0:
         return jsonify({"code": 1, "desc": "无效的投影ID"})
 
-    schematic_item: Schematics | None = db.session.get(Schematics, schematic_id)
+    schematic_item: Schematic | None = db.session.get(Schematic, schematic_id)
 
     if schematic_item is None:
         return jsonify({"code": 1, "desc": "投影不存在"})
@@ -206,8 +247,8 @@ def query_detail():
             "tags": schematic_item.tag.split(" "),
             "gameVersion": schematic_item.game_version,
             "downloadCount": schematic_item.download_count,
-            "uploadDate": schematic_item.upload_date,
-            "updateDate": schematic_item.update_date,
+            "uploadDate": schematic_item.upload_date.isoformat(),
+            "updateDate": schematic_item.update_date.isoformat(),
             "description": schematic_item.description,
             "isPublic": schematic_item.is_public,
             "fileSizeKB": schematic_item.file_size_KB,
@@ -238,17 +279,17 @@ def search_schematics():
         return jsonify({"code": 1, "desc": "请输入要搜索的内容"})
 
     pagination = (
-        db.session.query(Schematics)
-        .options(joinedload(Schematics.uploader))  # ← 关键：JOIN 预加载
+        db.session.query(Schematic)
+        .options(joinedload(Schematic.uploader))  # ← 关键：JOIN 预加载
         .filter(
             or_(
-                Schematics.is_public == True,
-                Schematics.uploader_id == current_user.id
+                Schematic.is_public == True,
+                Schematic.uploader_id == current_user.id
             )
         )
-        .filter(Schematics.name.ilike(f'%{search_text}%'))
-        .filter(Schematics.schematic_type == type_index)
-        .order_by(Schematics.id.desc())
+        .filter(Schematic.name.ilike(f'%{search_text}%'))
+        .filter(Schematic.schematic_type == type_index)
+        .order_by(Schematic.id.desc())
         .paginate(page=page, per_page=per_page, error_out=False)
     )
 
@@ -276,7 +317,7 @@ def download_schematic():
     if not schematic_id:
         return jsonify({"code": 1, "desc": "缺少投影ID参数"}),
 
-    schematic_item = db.session.query(Schematics).filter_by(id=schematic_id).first()
+    schematic_item = db.session.query(Schematic).filter_by(id=schematic_id).first()
 
     if not schematic_item:
         return jsonify({"code": 1, "desc": "投影不存在"})
@@ -284,14 +325,14 @@ def download_schematic():
     if not schematic_item.is_public and schematic_item.uploader_id != current_user.id:
         return jsonify({"code": 1, "desc": "无权下载该私有投影"})
 
-    file_record = db.session.query(SchematicFiles).filter_by(schematic_id=schematic_id).first()
+    file_record = db.session.query(SchematicFile).filter_by(schematic_id=schematic_id).first()
     if not file_record or not file_record.file_blob:
         return jsonify({"code": 1, "desc": "投影文件数据缺失"})
 
     db.session.execute(
-        update(Schematics)
-        .where(Schematics.id == schematic_id)
-        .values(download_count=Schematics.download_count + 1)
+        update(Schematic)
+        .where(Schematic.id == schematic_id)
+        .values(download_count=Schematic.download_count + 1)
     )
     db.session.commit()
 

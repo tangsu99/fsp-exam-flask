@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta, timezone
-from enum import Enum, unique
+from enum import IntEnum, unique
 from typing import Optional
 
 from flask_login import UserMixin
@@ -12,9 +12,38 @@ from myapp import bcrypt, db
 # steve avatar, auth.py import this
 DEFAULT_AVATAR = "8667ba71-b85a-4004-af54-457a9734eed7"
 
+# 统一使用带时区的 DateTime
+# SQLite 原生不支持 TIMESTAMP WITH TIME ZONE，
+# 但 SQLAlchemy 会自动将其映射为 TEXT/CHAR 并正确处理 ISO 格式，无需担心
+TZ_AWARE_DATETIME = DateTime(timezone=True)
+
+# upload_date: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
+# update_date: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+# 上述代码对应的 DDL 应该如下
+# upload_date     datetime default CURRENT_TIMESTAMP not null,
+# update_date     datetime default CURRENT_TIMESTAMP not null on update CURRENT_TIMESTAMP,
+# SQLite 的 CURRENT_TIMESTAMP 默认返回的就是 UTC 格式字符串；MySQL/PG 返回的是服务器本地时间
+# 它们都不带时区，很麻烦，Unix 时间戳又只支持到 2038 年
+# 所以采用 Python 赋值时间比较方便
+# 这样设置的时间，存在 DB 的都是 UTC 时间的 datetime，前后端都可以直接正确处理
+# 时间发给前端的时候 .isoformat() 加不加都可以
+
+# 建议的字段设置：
+# upload_date: Mapped[datetime] = mapped_column(
+#     TZ_AWARE_DATETIME, # 定义时就显性说明带时区
+#     default=lambda: datetime.now(timezone.utc), # 每次 INSERT 时动态调用
+#     nullable=False
+# )
+#
+# update_date: Mapped[datetime] = mapped_column(
+#     TZ_AWARE_DATETIME,
+#     default=lambda: datetime.now(timezone.utc),
+#     onupdate=lambda: datetime.now(timezone.utc),
+#     nullable=False
+# )
 
 @unique
-class QuestionCategory(Enum):
+class QuestionCategory(IntEnum):
     SINGLE_CHOICE = 1
     MULTIPLE_CHOICE = 2
     FILL_IN_THE_BLANKS = 3
@@ -22,10 +51,16 @@ class QuestionCategory(Enum):
 
 
 @unique
-class GuaranteeStatus(Enum):
+class GuaranteeStatus(IntEnum):
     WAITING = 1
     REFUSE = 2
     AGREEMENT = 3
+
+
+class SchematicType(IntEnum):
+    OTHER = 0
+    REDSTONE = 1
+    ARCHITECTURE = 2
 
 
 # 问卷表模型
@@ -479,7 +514,7 @@ class ConfigModel(db.Model):
 
 
 # 投影信息表
-class Schematics(db.Model):
+class Schematic(db.Model):
     __tablename__ = 'schematics'
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -487,7 +522,7 @@ class Schematics(db.Model):
     uploader_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)  # 上传用户ID
     uploader: Mapped["User"] = relationship("User", backref="schematics") # 上传用户
     original_author: Mapped[str] = mapped_column(String(100), nullable=True)  # 投影原作者
-    schematic_type: Mapped[int] = mapped_column(Integer, nullable=False)  # 投影类型
+    schematic_type: Mapped[SchematicType] = mapped_column(Integer, nullable=False) # 投影类型
     game_version: Mapped[str] = mapped_column(String(50), nullable=False) # 投影版本
     tag: Mapped[str] = mapped_column(String(200), nullable=True)  # 投影tag
     description: Mapped[str] = mapped_column(Text, nullable=True)  # 投影描述
@@ -495,22 +530,50 @@ class Schematics(db.Model):
     download_count: Mapped[int] = mapped_column(Integer, default=0)  # 下载量
     file_size_KB: Mapped[int] = mapped_column(Integer, nullable=False)  # 投影大小（KB）
     backup_link: Mapped[str] = mapped_column(String(255), nullable=True)  # 文件备用链接
-    upload_date: Mapped[datetime] = mapped_column(DateTime, default=func.utc_timestamp(), nullable=False)
-    update_date: Mapped[datetime] = mapped_column(DateTime, default=func.utc_timestamp(), onupdate=func.utc_timestamp(), nullable=False)
+
+    upload_date: Mapped[datetime] = mapped_column(
+        TZ_AWARE_DATETIME,
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False
+    )
+
+    update_date: Mapped[datetime] = mapped_column(
+        TZ_AWARE_DATETIME,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False
+    )
 
     # 与文件分表建立一对一关系 (cascade确保删除主表时，关联的二进制文件也被删除)
-    file_data: Mapped["SchematicFiles"] = relationship(
+    file_data: Mapped["SchematicFile"] = relationship(
         back_populates="schematics",
         cascade="all, delete-orphan",
         uselist=False
     )
+
+    @staticmethod
+    def type_to_enum(type_: str | int) -> SchematicType | None:
+        """将前端传入的类型值转换为合法的枚举整数值"""
+        if isinstance(type_, str):
+            upper_val = type_.upper()
+            try:
+                return SchematicType[upper_val]
+            except KeyError:
+                return None
+        if isinstance(type_, int):
+            try:
+                return SchematicType(type_)
+            except ValueError:
+                return None
+        return None
+
 
     def __repr__(self):
         return f'<Schematics for ID {self.id}>'
 
 
 # 投影文件二进制分表
-class SchematicFiles(db.Model):
+class SchematicFile(db.Model):
     __tablename__ = 'schematic_files'
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -526,7 +589,7 @@ class SchematicFiles(db.Model):
     file_blob: Mapped[bytes] = mapped_column(LargeBinary(524288), nullable=False)
 
     # 反向关联回主表
-    schematics: Mapped["Schematics"] = relationship(back_populates="file_data")
+    schematics: Mapped["Schematic"] = relationship(back_populates="file_data")
 
     def __repr__(self):
         return f'<SchematicFiles for ID {self.schematic_id}>'

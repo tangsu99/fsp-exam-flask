@@ -119,6 +119,8 @@ def is_white_list_url(url: str) -> bool:
     """检测单个链接是否符合白名单列表中的规则"""
 
     strip_url = url.strip()
+    if strip_url == "":
+        return True
 
     for rule in WHITE_LIST_RULES:
         if isinstance(rule, str) and strip_url.startswith(rule):

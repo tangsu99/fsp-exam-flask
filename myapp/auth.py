@@ -79,10 +79,10 @@ def register():
     if check_ip_registration_limit(client_ip_split):
         return jsonify({"code": 5, "desc": "该IP注册次数过多，请稍后再试!"})
 
-    username = req_data.get("username")
-    user_qq = req_data.get("userQQ")
-    password = req_data.get("password")
-    re_password = req_data.get("passwordAgain")
+    username = req_data.get("username").strip()
+    user_qq = req_data.get("userQQ").strip()
+    password = req_data.get("password").strip()
+    re_password = req_data.get("passwordAgain").strip()
 
     # 验证必填字段
     if not all([username, password, re_password]):
