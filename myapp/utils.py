@@ -112,7 +112,7 @@ def validate_json_required_fields(required_fields:dict, data: dict) -> dict:
 WHITE_LIST_RULES = [
     "https://pan.baidu.com",  # 百度网盘固定前缀
     "https://pan.quark.cn",  # 夸克网盘固定前缀
-    {"regex": r'^https://(www\.|wws\.)?lanzou[a-z]?\.com'}  # 蓝奏云正则规则
+    {"regex":r'^https://.*lanzou[a-z]?\.com'}  # 蓝奏云正则规则
 ]
 
 def is_white_list_url(url: str) -> bool:
