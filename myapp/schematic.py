@@ -1,4 +1,4 @@
-from typing import cast
+from typing import Literal
 from myapp.utils import is_white_list_url, get_file_size
 from io import BytesIO
 
@@ -36,6 +36,25 @@ def to_brief_dict(self ):
         "updateDate": self.update_date.isoformat(),
     }
 
+def get_schematic(schematic_id: int) -> Schematic | None:
+    return db.session.get(Schematic, schematic_id)
+
+PermissionAction = Literal["detail", "download", "edit", "delete"]
+def check_user_permission(user: User, action: PermissionAction, schematic_item):
+    """
+    通用的权限校验函数
+    :param user: 当前用户对象
+    :param action: 操作类型，如 'detail', 'download', 'edit', 'share'...
+    :param schematic_item: 资源
+    """
+    if action == "detail" or action == "download":
+        return True if schematic_item.uploader_id == user.id or schematic_item.is_public else False
+
+    elif action == "edit" or action == "delete":
+        return True if schematic_item.uploader_id == user.id else False
+
+    return False
+
 
 @schematic.route("/", methods=["GET"])
 @login_required
@@ -50,14 +69,11 @@ def upload_schematic():
     投影上传API
     """
     try:
-        user: User = cast(User, current_user)
-
-        original_author_input = request.form.get("originalAuthor", "").strip()
-
         name: str = request.form.get("name","").strip()
 
+        original_author_input = request.form.get("originalAuthor", "").strip()
         # 如果前端没传原作者，默认使用当前登录用户的用户名
-        original_author: str = user.username if not original_author_input else original_author_input
+        original_author: str = current_user.username if not original_author_input else original_author_input
 
         desc: str = request.form.get("desc", "").strip()
 
@@ -88,7 +104,7 @@ def upload_schematic():
 
         new_schematic = Schematic(
             name=name,
-            uploader_id=user.id,
+            uploader_id=current_user.id,
             original_author=original_author,
             schematic_type=type_enum,
             game_version=game_version,
@@ -128,16 +144,12 @@ def update_schematic():
     投影编辑API
     """
     try:
-        id_: int = int(request.form.get("id", 0))
-        if id_ == 0:
-            return jsonify({"code": 1, "desc": "缺少参数ID"}), 400
-
-        schematic_item: Schematic | None = db.session.get(Schematic, id_)
+        schematic_id = request.form.get("id", 0, type=int)
+        schematic_item = get_schematic(schematic_id)
         if schematic_item is None:
             return jsonify({"code": 1, "desc": "投影不存在"})
 
-        uploader: User = cast(User, current_user)
-        if schematic_item.uploader_id != uploader.id:
+        if not check_user_permission(current_user, 'edit', schematic_item):
             return jsonify({"code": 1, "desc": "无权修改该投影"})
 
         name: str = request.form.get("name", "").strip()
@@ -196,7 +208,7 @@ def update_schematic():
 @login_required
 def query_by_type():
     """
-        投影查询API，按照投影类型查询，带分页功能，返回一定数量的投影缩略信息
+    投影查询API，按照投影类型查询，带分页功能，返回一定数量的投影缩略信息
     """
 
     type_: int = request.args.get("type", 0, type=int)
@@ -237,20 +249,14 @@ def query_by_type():
 @login_required
 def query_detail():
     """
-        通过投影ID，在此API获取单个投影的详细信息
+    通过投影ID，在此API获取单个投影的详细信息
     """
-
     schematic_id = request.args.get("id", 0, type=int)
-
-    if schematic_id == 0:
-        return jsonify({"code": 1, "desc": "无效的投影ID"})
-
-    schematic_item: Schematic | None = db.session.get(Schematic, schematic_id)
-
+    schematic_item = get_schematic(schematic_id)
     if schematic_item is None:
         return jsonify({"code": 1, "desc": "投影不存在"})
 
-    if schematic_item and not schematic_item.is_public and schematic_item.uploader_id != current_user.id:
+    if not check_user_permission(current_user, 'detail', schematic_item):
         return jsonify({"code": 1, "desc": "无权查看！"})
 
     return jsonify({
@@ -279,7 +285,7 @@ def query_detail():
 @login_required
 def search_schematics():
     """
-        搜索投影，根据搜索文字和类型筛选
+    搜索投影，根据搜索文字和类型筛选
     """
     search_text = request.args.get('text', '', type=str).strip()
 
@@ -323,22 +329,20 @@ def search_schematics():
         }
     })
 
+
 @schematic.route("/download", methods=["GET"])
 @login_required
 def download_schematic():
     """
-        下载投影
+    下载投影
     """
-    schematic_id = request.args.get('id', type=int)
-    if not schematic_id:
-        return jsonify({"code": 1, "desc": "缺少投影ID参数"}),
-
+    schematic_id = request.args.get('id', 0, type=int)
     schematic_item = db.session.query(Schematic).filter_by(id=schematic_id).first()
 
     if not schematic_item:
         return jsonify({"code": 1, "desc": "投影不存在"})
 
-    if not schematic_item.is_public and schematic_item.uploader_id != current_user.id:
+    if not check_user_permission(current_user, 'download', schematic_item):
         return jsonify({"code": 1, "desc": "无权下载该私有投影"})
 
     file_record = db.session.query(SchematicFile).filter_by(schematic_id=schematic_id).first()
@@ -363,3 +367,28 @@ def download_schematic():
         as_attachment=True, # 强制浏览器将响应作为附件下载，而不是在浏览器中直接打开或预览
         download_name=safe_name, # Flask 2.x+ (RFC 5987 自动处理为安全的文件名)
     )
+
+
+@schematic.route("/delete", methods=["GET"])
+@login_required
+def delete_schematic():
+    """
+    删除投影
+    """
+    schematic_id = request.args.get("id", 0, type=int)
+    schematic_item = get_schematic(schematic_id)
+    if schematic_item is None:
+        return jsonify({"code": 1, "desc": "投影不存在"})
+
+    if not check_user_permission(current_user, 'delete', schematic_item):
+        return jsonify({"code": 1, "desc": "无权删除该投影"})
+
+    try:
+        db.session.delete(schematic_item)
+        db.session.commit()
+
+        return jsonify({"code": 0, "desc": "投影删除成功"})
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"code": 1, "desc": f"服务器内部错误: {str(e)}"})
