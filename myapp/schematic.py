@@ -302,7 +302,7 @@ def search_schematics():
 
     pagination = (
         db.session.query(Schematic)
-        .options(joinedload(Schematic.uploader))  # ← 关键：JOIN 预加载
+        .options(joinedload(Schematic.uploader))  # JOIN 预加载
         .filter(
             or_(
                 Schematic.is_public == True,
@@ -319,7 +319,7 @@ def search_schematics():
         "code": 0,
         "desc": "投影查询成功",
         "data": {
-            'items': [to_brief_dict(item) for item in pagination.items],  # 假设有序列化方法
+            'items': [to_brief_dict(item) for item in pagination.items],
             'total': pagination.total,
             'page': pagination.page,
             'per_page': pagination.per_page,
