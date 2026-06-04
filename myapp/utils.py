@@ -1,3 +1,4 @@
+import os
 import re
 from datetime import timedelta, timezone, datetime
 from functools import wraps
@@ -130,3 +131,33 @@ def is_white_list_url(url: str) -> bool:
             if re.match(rule['regex'], strip_url):
                 return True
     return False
+
+
+def get_file_size(file_storage, unit='KB'):
+    """
+    获取文件对象的大小，并转换为指定单位。
+    如果计算结果向下取整后为0，则强制返回1。
+
+    :param file_storage: 文件对象（如 Flask 的 FileStorage）
+    :param unit: 目标单位，支持 'KB', 'MB', 'GB'
+    :return: 转换后的大小 (int)
+    """
+
+    original_pos = file_storage.tell()
+    file_storage.seek(0, os.SEEK_END)
+    size_bytes = file_storage.tell()
+    file_storage.seek(original_pos)
+
+    unit_factors = {
+        'KB': 1024,
+        'MB': 1024 ** 2,
+        'GB': 1024 ** 3
+    }
+
+    factor = unit_factors.get(unit.upper(), 1024)
+
+    # 向下取整
+    calculated_size = size_bytes // factor
+
+    # 如果算出来文件大小为 0 按 1 算
+    return calculated_size if calculated_size > 0 else 1

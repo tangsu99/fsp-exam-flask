@@ -1,7 +1,6 @@
 from typing import cast
-from myapp.utils import is_white_list_url
+from myapp.utils import is_white_list_url, get_file_size
 from io import BytesIO
-import os
 
 from flask import Blueprint, jsonify, request, send_file
 from flask_login import current_user, login_required
@@ -82,14 +81,7 @@ def upload_schematic():
         if not file_storage or file_storage.filename == '':
             return jsonify({"code": 1, "desc": "未找到上传的文件"})
 
-        # 读取文件的二进制内容并计算大小 (KB)
-        file_storage.seek(0, os.SEEK_END)
-        file_size_kb = file_storage.tell() // 1024
-        file_storage.seek(0)
-
-        # 小于 0KB 算它 1KB
-        if file_size_kb == 0:
-            file_size_kb = 1
+        file_size_kb = get_file_size(file_storage, 'KB')
 
         if file_size_kb > MAX_FILE_SIZE_KB:
             return jsonify({"code": 1, "desc": f"投影文件大小不能超过{MAX_FILE_SIZE_KB}KB！"})
@@ -171,13 +163,7 @@ def update_schematic():
         new_file_size_kb: int = 0
 
         if file_storage:
-            file_storage.seek(0, os.SEEK_END)
-            new_file_size_kb = file_storage.tell() // 1024
-            file_storage.seek(0)
-
-            # 小于 0KB 算它 1KB
-            if new_file_size_kb == 0:
-                new_file_size_kb = 1
+            new_file_size_kb = get_file_size(file_storage, 'KB')
 
             if new_file_size_kb > MAX_FILE_SIZE_KB:
                 return jsonify({
