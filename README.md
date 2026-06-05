@@ -1,35 +1,28 @@
 # FSP-exam-Flask
+This is the back-end part of the Minecraft server website that integrates whitelist qualification acquisition and resource center
 
-[前端地址](https://github.com/tangsu99/fsp-exam-vue)
+[Front-end](https://github.com/tangsu99/fsp-exam-vue)
 
-## 初始配置
+## Project Setup
 
--   初始管理员用户和密码写在 main.py 里，请务必修改默认密码！
+-   The initial administrator user and password are written in main.py. Please be sure to change the default password!
 
-## 环境配置
-
--   Windows
+### Environment Configuration
 
 ```
 uv sync # 请确保已经安装了 UV
 cp .env.example .env
 ```
 
-数据库使用`MySQL`，驱动采用`PyMySQL`，编辑`.env`配置数据库连接地址
-
+.env:
 ```
 # DATABASE_URL=mysql+pymysql://<user>:<password>@<host>:<port>/<database>
-# <user>:       用户名
-# <password>:   密码
-# <host>:       地址
-# <port>:       端口
-# <database>:   数据库名
 
-# 示例
+# example
 DATABASE_URL=mysql+pymysql://root:123456@localhost:3306/fsp_exam
 ```
 
-## Database
+### Database
 
 -   Initial
 
@@ -45,18 +38,17 @@ flask --app main.py db migrate -m "xxx update."
 flask --app main.py db upgrade
 ```
 
-## 运行
+## Run
 
--   在运行 Flask 应用前，请先确保 Mysql 服务已启动！
--   Windows 系统开发环境：
+-   Before running the Flask application, please ensure that the MySQL service is started!
+-   Windows system development environment:
+    -   default url：http://127.0.0.1:5000
+    -   startup command：`uv run ./main.py`
+    -   startup command(virtual environment)：`python ./main.py`
 
-    -   默认地址：http://127.0.0.1:5000
-    -   启动命令：`uv run ./main.py`
-    -   启动命令(虚拟环境)：`python ./main.py`
+-   Linux system development environment:
 
--   Linux 系统生产环境：
-
-    -   systemd 配置：
+    -   systemd config：
 
         ```text
         [Unit]
@@ -75,5 +67,5 @@ flask --app main.py db upgrade
 
         ```
 
-    -   首次：`systemctl daemon-reload`
-    -   启动：`systemctl start myflaskapp`
+    -   first：`systemctl daemon-reload`
+    -   start：`systemctl start myflaskapp`

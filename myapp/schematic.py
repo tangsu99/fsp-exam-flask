@@ -1,65 +1,60 @@
-from dataclasses import dataclass, field
-from typing import cast
-from enum import Enum
-import re
+from typing import Literal
+from myapp.utils import is_white_list_url, get_file_size
+from io import BytesIO
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, send_file
 from flask_login import current_user, login_required
+from sqlalchemy import update, or_
+from sqlalchemy.orm import joinedload
 
 from myapp import db
 from myapp.db_model import (
     User,
-    Schematics,
-    SchematicFiles,
+    Schematic, SchematicType,
+    SchematicFile
 )
-
-
-# @dataclass
-# class Schematic:
-#     name: str
-#     author: int
-#     original_author: str
-#     desc: str
-#     game_version: str
-#     # file: bytes
-#     type: str
-#     tags: list[str] = field(default_factory=list)
-#     is_public: bool = False
 
 
 schematic = Blueprint("schematic", __name__)
 
 
-class SchematicType(Enum):
-    OTHER = 0
-    REDSTONE = 1
-    ARCHITECTURE = 2
+MAX_FILE_SIZE_KB : int = 500
 
 
-# 定义白名单规则列表
-# 字符串代表严格匹配前缀，字典中的 'regex' 代表正则表达式匹配
-WHITE_LIST_RULES = [
-    "https://pan.baidu.com",  # 百度网盘固定前缀
-    "https://pan.quark.cn",  # 夸克网盘固定前缀
-    {"regex": r'^https://(www\.|wws\.)?lanzou[a-z]?\.com'}  # 蓝奏云正则规则
-]
+def to_brief_dict(self ):
+    return {
+        "id": self.id,
+        "name": self.name,
+        "type": self.schematic_type,
+        "uploader": self.uploader.username,
+        "originalAuthor": self.original_author,
+        "tags": self.tag.split(" "),
+        "isPublic": self.is_public,
+        "gameVersion": self.game_version,
+        "downloadCount": self.download_count,
+        "uploadDate": self.upload_date.isoformat(),
+        "updateDate": self.update_date.isoformat(),
+    }
 
+def get_schematic(schematic_id: int) -> Schematic | None:
+    return db.session.get(Schematic, schematic_id)
 
-def is_white_list_url(url):
-    """检测单个链接是否符合白名单列表中的规则"""
-    if not url:
-        return False
+PermissionAction = Literal["detail", "download", "edit", "delete"]
+def check_user_permission(user: User, action: PermissionAction, schematic_item):
+    """
+    通用的权限校验函数
+    :param user: 当前用户对象
+    :param action: 操作类型，如 'detail', 'download', 'edit', 'share'...
+    :param schematic_item: 资源
+    """
+    if action == "detail" or action == "download":
+        return True if schematic_item.uploader_id == user.id or schematic_item.is_public else False
 
-    url = url.strip()
+    elif action == "edit" or action == "delete":
+        return True if schematic_item.uploader_id == user.id else False
 
-    for rule in WHITE_LIST_RULES:
-        if isinstance(rule, str) and url.startswith(rule):
-            return True
-
-        if isinstance(rule, dict) and 'regex' in rule:
-            if re.match(rule['regex'], url):
-                return True
     return False
+
 
 @schematic.route("/", methods=["GET"])
 @login_required
@@ -69,37 +64,32 @@ def index():
 
 @schematic.route("/upload", methods=["POST"])
 @login_required
-def upload():
+def upload_schematic():
     """
     投影上传API
     """
     try:
-        user: User = cast(User, current_user)
+        name: str = request.form.get("name","").strip()
 
         original_author_input = request.form.get("originalAuthor", "").strip()
-
-        name: str = request.form.get("fileName","").strip()
-
         # 如果前端没传原作者，默认使用当前登录用户的用户名
-        original_author: str = user.username if not original_author_input else original_author_input
+        original_author: str = current_user.username if not original_author_input else original_author_input
 
         desc: str = request.form.get("desc", "").strip()
 
-        type_str: str = request.form.get("type", "").strip()
-
-        try:
-            type_index = SchematicType[type_str.upper()].value
-
-        except KeyError:
+        type_: str = request.form.get("type", "").strip()
+        type_enum: SchematicType | None = Schematic.type_to_enum(int(type_))
+        if type_enum is None:
             return jsonify({"code": 1, "desc": "无效的投影类型"})
 
-        tags_list: list[str]  = request.form.get("tags", "").split(" ")
+        tags_raw: str = request.form.get("tags", "").strip()
+        tag_list: list[str] = [t for t in tags_raw.split(" ") if t]
         is_public_str = request.form.get("isPublic", "false")
         is_public: bool = is_public_str.lower() == "true"
         game_version: str = request.form.get("gameVersion","").strip()
         backup_link: str = request.form.get("backupLink","").strip()
 
-        if backup_link != "" and not is_white_list_url(backup_link):
+        if not is_white_list_url(backup_link):
             return jsonify({"code": 1, "desc": "该网盘不在白名单内不允许上传！"})
 
         # 获取并处理上传的文件
@@ -107,17 +97,18 @@ def upload():
         if not file_storage or file_storage.filename == '':
             return jsonify({"code": 1, "desc": "未找到上传的文件"})
 
-        # 读取文件的二进制内容并计算大小 (KB)
-        file_bytes = file_storage.read()
-        file_size_kb = len(file_bytes) // 1024
+        file_size_kb = get_file_size(file_storage, 'KB')
 
-        new_schematic = Schematics(
+        if file_size_kb > MAX_FILE_SIZE_KB:
+            return jsonify({"code": 1, "desc": f"投影文件大小不能超过{MAX_FILE_SIZE_KB}KB！"})
+
+        new_schematic = Schematic(
             name=name,
-            uploader_id=user.id,
+            uploader_id=current_user.id,
             original_author=original_author,
-            schematic_type=type_index,
+            schematic_type=type_enum,
             game_version=game_version,
-            tag=" ".join(tags_list), # 将列表转回字符串存入数据库
+            tag=" ".join(tag_list), # 将列表转回字符串存入数据库
             description=desc,
             is_public=is_public,
             download_count=0,
@@ -130,9 +121,9 @@ def upload():
         db.session.flush()
 
         # 创建分表记录，存入二进制文件
-        new_file = SchematicFiles(
+        new_file = SchematicFile(
             schematic_id=new_schematic.id,
-            file_blob=file_bytes
+            file_blob=file_storage.read()
         )
         db.session.add(new_file)
         db.session.commit()
@@ -146,48 +137,104 @@ def upload():
             return jsonify({"code": 1, "desc": f"服务器内部错误: {str(e)}"})
 
 
+@schematic.route("/update", methods=["POST"])
+@login_required
+def update_schematic():
+    """
+    投影编辑API
+    """
+    try:
+        schematic_id = request.form.get("id", 0, type=int)
+        schematic_item = get_schematic(schematic_id)
+        if schematic_item is None:
+            return jsonify({"code": 1, "desc": "投影不存在"})
+
+        if not check_user_permission(current_user, 'edit', schematic_item):
+            return jsonify({"code": 1, "desc": "无权修改该投影"})
+
+        name: str = request.form.get("name", "").strip()
+        original_author = request.form.get("originalAuthor", "").strip()
+
+        type_: str = request.form.get("type", "").strip()
+        type_enum: SchematicType | None = Schematic.type_to_enum(int(type_))
+        if type_enum is None:
+            return jsonify({"code": 1, "desc": "无效的投影类型"})
+
+        game_version: str = request.form.get("gameVersion", "").strip()
+        tags_raw: str = request.form.get("tags", "").strip()
+        tags: list[str] = [t for t in tags_raw.split(" ") if t]
+        desc: str = request.form.get("desc", "").strip()
+        is_public_str = request.form.get("isPublic", "false")
+        is_public: bool = is_public_str.lower() == "true"
+
+        backup_link: str = request.form.get("backupLink", "").strip()
+        if not is_white_list_url(backup_link):
+            return jsonify({"code": 1, "desc": "该网盘不在白名单内不允许上传！"})
+
+        file_storage = request.files.get("uploadFile")
+        new_file_size_kb: int = 0
+
+        if file_storage:
+            new_file_size_kb = get_file_size(file_storage, 'KB')
+
+            if new_file_size_kb > MAX_FILE_SIZE_KB:
+                return jsonify({
+                    "code": 1,
+                    "desc": f"投影文件大小不能超过{MAX_FILE_SIZE_KB}KB！"
+                })
+
+        schematic_item.name = name
+        schematic_item.original_author = original_author
+        schematic_item.schematic_type = type_enum
+        schematic_item.game_version = game_version
+        schematic_item.tag = " ".join(tags)
+        schematic_item.description = desc
+        schematic_item.is_public = is_public
+        schematic_item.backup_link = backup_link
+
+        if file_storage and new_file_size_kb != 0:
+            schematic_item.file_size_KB = new_file_size_kb
+            schematic_item.file_data.file_blob = file_storage.read()
+
+        db.session.commit()
+        return jsonify({"code": 0, "desc": f"投影更新成功"})
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"code": 1, "desc": f"服务器内部错误: {str(e)}"})
+
+
 @schematic.route("/query_by_type", methods=["GET"])
 @login_required
 def query_by_type():
     """
-        投影查询API，按照投影类型查询
+    投影查询API，按照投影类型查询，带分页功能，返回一定数量的投影缩略信息
     """
 
-    type_str = request.args.get("type", "", type=str)
-    try:
-        type_index = SchematicType[type_str.upper()].value
-
-    except KeyError:
-        return jsonify({"code": 1, "desc": "无效的投影类型"}), 400
+    type_: int = request.args.get("type", 0, type=int)
+    type_enum: SchematicType | None = Schematic.type_to_enum(type_)
+    if type_enum is None:
+        return jsonify({"code": 1, "desc": "无效的投影类型"})
 
     page = request.args.get("page", 1, type=int)
     per_page = min(request.args.get("per_page", 10, type=int), 100) # 最大每页100条, 默认10条
 
-    query = (db.session.query(Schematics)
-             .filter(Schematics.schematic_type == type_index)
-             .paginate(page=page, per_page=per_page, error_out=False))
-
-    schematics_list = [
-        {
-            "id": item.id,
-            "name": item.name,
-            "type": item.schematic_type,
-            "uploader": item.uploader.username,
-            "originalAuthor": item.original_author,
-            "tags": item.tag.split(" "),
-            "gameVersion": item.game_version,
-            "downloadCount": item.download_count,
-            "uploadDate": item.upload_date.strftime("%Y-%m-%d %H:%M:%S"),
-            "updateDate": item.update_date.strftime("%Y-%m-%d %H:%M:%S"),
-        }
-        for item in query.items
-    ]
+    query = (db.session.query(Schematic)
+             .filter(Schematic.schematic_type == type_enum)
+             .filter(
+                or_(
+                    Schematic.is_public == True,
+                    Schematic.uploader_id == current_user.id
+                )
+            )
+             .paginate(page=page, per_page=per_page, error_out=False)
+            )
 
     return jsonify({
         "code": 0,
         "desc": "投影查询成功",
         "data": {
-            "items": schematics_list,
+            "items": [to_brief_dict(item) for item in query.items],
             "total": query.total,
             "page": query.page,
             "pages": query.pages,
@@ -196,3 +243,152 @@ def query_by_type():
             "has_prev": query.has_prev
         }
     })
+
+
+@schematic.route("/query_detail", methods=["GET"])
+@login_required
+def query_detail():
+    """
+    通过投影ID，在此API获取单个投影的详细信息
+    """
+    schematic_id = request.args.get("id", 0, type=int)
+    schematic_item = get_schematic(schematic_id)
+    if schematic_item is None:
+        return jsonify({"code": 1, "desc": "投影不存在"})
+
+    if not check_user_permission(current_user, 'detail', schematic_item):
+        return jsonify({"code": 1, "desc": "无权查看！"})
+
+    return jsonify({
+        "code": 0,
+        "desc": "投影查询成功",
+        "data": {
+            "id": schematic_item.id,
+            "name" : schematic_item.name,
+            "type": schematic_item.schematic_type,
+            "uploader" : schematic_item.uploader.username,
+            "originalAuthor" : schematic_item.original_author,
+            "tags": schematic_item.tag.split(" "),
+            "gameVersion": schematic_item.game_version,
+            "downloadCount": schematic_item.download_count,
+            "uploadDate": schematic_item.upload_date.isoformat(),
+            "updateDate": schematic_item.update_date.isoformat(),
+            "description": schematic_item.description,
+            "isPublic": schematic_item.is_public,
+            "fileSizeKB": schematic_item.file_size_KB,
+            "backupLink": schematic_item.backup_link,
+        }
+    })
+
+
+@schematic.route("/search", methods=["GET"])
+@login_required
+def search_schematics():
+    """
+    搜索投影，根据搜索文字和类型筛选
+    """
+    search_text = request.args.get('text', '', type=str).strip()
+
+    type_: int = request.args.get("type", 0, type=int)
+    type_enum: SchematicType | None = Schematic.type_to_enum(type_)
+    if type_enum is None:
+        return jsonify({"code": 1, "desc": "无效的投影类型"})
+
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 10, type=int)
+
+    if search_text == '':
+        return jsonify({"code": 1, "desc": "请输入要搜索的内容"})
+
+    pagination = (
+        db.session.query(Schematic)
+        .options(joinedload(Schematic.uploader))  # JOIN 预加载
+        .filter(
+            or_(
+                Schematic.is_public == True,
+                Schematic.uploader_id == current_user.id
+            )
+        )
+        .filter(Schematic.name.ilike(f'%{search_text}%'))
+        .filter(Schematic.schematic_type == type_enum)
+        .order_by(Schematic.id.desc())
+        .paginate(page=page, per_page=per_page, error_out=False)
+    )
+
+    return jsonify({
+        "code": 0,
+        "desc": "投影查询成功",
+        "data": {
+            'items': [to_brief_dict(item) for item in pagination.items],
+            'total': pagination.total,
+            'page': pagination.page,
+            'per_page': pagination.per_page,
+            'pages': pagination.pages,
+            'has_next': pagination.has_next,
+            'has_prev': pagination.has_prev,
+        }
+    })
+
+
+@schematic.route("/download", methods=["GET"])
+@login_required
+def download_schematic():
+    """
+    下载投影
+    """
+    schematic_id = request.args.get('id', 0, type=int)
+    schematic_item = db.session.query(Schematic).filter_by(id=schematic_id).first()
+
+    if not schematic_item:
+        return jsonify({"code": 1, "desc": "投影不存在"})
+
+    if not check_user_permission(current_user, 'download', schematic_item):
+        return jsonify({"code": 1, "desc": "无权下载该私有投影"})
+
+    file_record = db.session.query(SchematicFile).filter_by(schematic_id=schematic_id).first()
+    if not file_record or not file_record.file_blob:
+        return jsonify({"code": 1, "desc": "投影文件数据缺失"})
+
+    db.session.execute(
+        update(Schematic)
+        .where(Schematic.id == schematic_id)
+        .values(download_count=Schematic.download_count + 1)
+    )
+    db.session.commit()
+
+    safe_name = f"{schematic_item.name}.litematic"
+
+    buffer = BytesIO(file_record.file_blob)
+    buffer.seek(0)
+
+    return send_file(
+        buffer,
+        mimetype="application/octet-stream",
+        as_attachment=True, # 强制浏览器将响应作为附件下载，而不是在浏览器中直接打开或预览
+        download_name=safe_name, # Flask 2.x+ (RFC 5987 自动处理为安全的文件名)
+    )
+
+
+@schematic.route("/delete", methods=["GET"])
+@login_required
+def delete_schematic():
+    """
+    删除投影
+    """
+    schematic_id = request.args.get("id", 0, type=int)
+    schematic_item = get_schematic(schematic_id)
+    if schematic_item is None:
+        return jsonify({"code": 1, "desc": "投影不存在"})
+
+    if not check_user_permission(current_user, 'delete', schematic_item):
+        return jsonify({"code": 1, "desc": "无权删除该投影"})
+
+    try:
+        db.session.delete(schematic_item)
+        db.session.commit()
+
+        return jsonify({"code": 0, "desc": "投影删除成功"})
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"code": 1, "desc": f"服务器内部错误: {str(e)}"})

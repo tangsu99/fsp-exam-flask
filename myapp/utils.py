@@ -1,3 +1,4 @@
+import os
 import re
 from datetime import timedelta, timezone, datetime
 from functools import wraps
@@ -57,7 +58,7 @@ def required_role(role: str):
     return decorator
 
 
-def check_password(password: str) -> bool:
+def check_password_format(password: str) -> bool:
     return bool(PASSWORD_PATTERN.match(password))
 
 
@@ -66,7 +67,7 @@ def is_survey_response_expired(survey_response: Response) -> bool:
     validity_period = timedelta(hours=val) # 有效期为 24h
 
     # 只判断未完成的问卷，已完成的问卷不存在“过期”的说法
-    if survey_response.is_completed is False:
+    if not survey_response.is_completed:
         create_time = survey_response.create_time
         create_datetime = create_time.replace(tzinfo=timezone.utc)
         current_datetime = datetime.now(timezone.utc)
@@ -106,3 +107,57 @@ def validate_json_required_fields(required_fields:dict, data: dict) -> dict:
 
     return return_data
 
+
+# 定义白名单规则列表
+# 字符串代表严格匹配前缀，字典中的 'regex' 代表正则表达式匹配
+WHITE_LIST_RULES = [
+    "https://pan.baidu.com",  # 百度网盘固定前缀
+    "https://pan.quark.cn",  # 夸克网盘固定前缀
+    {"regex":r'^https://.*lanzou[a-z]?\.com'}  # 蓝奏云正则规则
+]
+
+def is_white_list_url(url: str) -> bool:
+    """检测单个链接是否符合白名单列表中的规则"""
+
+    strip_url = url.strip()
+    if strip_url == "":
+        return True
+
+    for rule in WHITE_LIST_RULES:
+        if isinstance(rule, str) and strip_url.startswith(rule):
+            return True
+
+        if isinstance(rule, dict) and 'regex' in rule:
+            if re.match(rule['regex'], strip_url):
+                return True
+    return False
+
+
+def get_file_size(file_storage, unit='KB'):
+    """
+    获取文件对象的大小，并转换为指定单位。
+    如果计算结果向下取整后为0，则强制返回1。
+
+    :param file_storage: 文件对象（如 Flask 的 FileStorage）
+    :param unit: 目标单位，支持 'KB', 'MB', 'GB'
+    :return: 转换后的大小 (int)
+    """
+
+    original_pos = file_storage.tell()
+    file_storage.seek(0, os.SEEK_END)
+    size_bytes = file_storage.tell()
+    file_storage.seek(original_pos)
+
+    unit_factors = {
+        'KB': 1024,
+        'MB': 1024 ** 2,
+        'GB': 1024 ** 3
+    }
+
+    factor = unit_factors.get(unit.upper(), 1024)
+
+    # 向下取整
+    calculated_size = size_bytes // factor
+
+    # 如果算出来文件大小为 0 按 1 算
+    return calculated_size if calculated_size > 0 else 1
