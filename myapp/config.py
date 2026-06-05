@@ -1,6 +1,7 @@
 from attr.converters import to_bool
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import select
 
 from myapp.db_model import ConfigModel
 from myapp.default_config import DEFAULT_CONFIG
@@ -26,13 +27,15 @@ class Config:
 
         with self.app.app_context():
             for default_config_item in DEFAULT_CONFIG:
-                conf: ConfigModel | None = ConfigModel.query.filter(ConfigModel.key == default_config_item.get('key')).first()
+                stmt = select(ConfigModel).where(ConfigModel.key == default_config_item.get('key'))
+                conf: ConfigModel | None = self.db.session.execute(stmt).scalar_one_or_none()
+
                 if conf is None:
                     self.db.session.add(ConfigModel(
-                        default_config_item['key'],
-                        default_config_item['value'],
-                        default_config_item['type'],
-                        default_config_item['description']
+                        key=default_config_item['key'],
+                        value=default_config_item['value'],
+                        type=default_config_item['type'],
+                        description=default_config_item['description']
                     ))
 
             self.db.session.commit()
@@ -42,29 +45,31 @@ class Config:
         当配置发生变化时需要执行此方法
         """
         with self.app.app_context():
-            config_list = ConfigModel.query.all()
-            for db_config_item in config_list:
-                # print(db_config_item.key)
-                self.app.config[db_config_item.key] = self.type_conversion(db_config_item.value, db_config_item.type)
+            stmt = select(ConfigModel.key, ConfigModel.value, ConfigModel.type)
+            rows = self.db.session.execute(stmt).all()
+
+            for key, value, type_ in rows:
+                self.app.config[key] = self.type_conversion(value, type_)
 
     def get_item(self, key: str) -> dict | None:
-        item: ConfigModel | None = ConfigModel.query.filter(ConfigModel.key == key).first()
-        if item is None:
-            return None
-
-        return { 'key': item.key, 'value': item.value, 'type': item.type, 'description': item.description}
+        stmt = select(ConfigModel).where(ConfigModel.key == key)
+        conf: ConfigModel | None = self.db.session.execute(stmt).scalar_one_or_none()
+        return None if conf is None else { 'key': conf.key, 'value': conf.value, 'type': conf.type, 'description': conf.description }
 
     def get_all_item(self) -> list:
-        config_list = ConfigModel.query.all()
+        stmt = select(ConfigModel.key, ConfigModel.value, ConfigModel.type, ConfigModel.description)
+        rows = self.db.session.execute(stmt).all()
+
         res = []
-        for item in config_list:
+        for item in rows:
             res.append({ 'key': item.key, 'value': item.value, 'type': item.type, 'description': item.description})
 
         return res
 
     def set_item(self, item_key: str, item_value: str, item_type:str, item_description:str) -> None:
-        item_value = str(item_value) # 保险起见
-        conf: ConfigModel | None = ConfigModel.query.filter(ConfigModel.key == item_key).first()
+        stmt = select(ConfigModel).where(ConfigModel.key == item_key)
+        conf: ConfigModel | None = self.db.session.execute(stmt).scalar_one_or_none()
+
         if conf is None:
             self.db.session.add(ConfigModel(item_key, item_value, item_type, item_description))
         else:
@@ -76,7 +81,9 @@ class Config:
         self.__resync_flask_config()
 
     def delete_item(self, item_key: str) -> bool:
-        conf: ConfigModel | None = ConfigModel.query.filter(ConfigModel.key == item_key).first()
+        stmt = select(ConfigModel).where(ConfigModel.key == item_key)
+        conf: ConfigModel | None = self.db.session.execute(stmt).scalar_one_or_none()
+
         if conf:
             self.db.session.delete(conf)
             self.db.session.commit()

@@ -1,9 +1,9 @@
 from datetime import datetime, timedelta, timezone
-from enum import Enum, unique
+from enum import IntEnum, unique
 from typing import Optional
 
 from flask_login import UserMixin
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, func, LargeBinary
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, func, LargeBinary, exists
 from sqlalchemy.dialects.mysql import LONGTEXT
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -12,9 +12,40 @@ from myapp import bcrypt, db
 # steve avatar, auth.py import this
 DEFAULT_AVATAR = "8667ba71-b85a-4004-af54-457a9734eed7"
 
+# 统一使用带时区的 DateTime
+# SQLite 原生不支持 TIMESTAMP WITH TIME ZONE，
+# 但 SQLAlchemy 会自动将其映射为 TEXT/CHAR 并正确处理 ISO 格式，无需担心
+TZ_AWARE_DATETIME = DateTime(timezone=True)
+
+# upload_date: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
+# update_date: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+# 上述代码对应的 DDL 应该如下
+# upload_date     datetime default CURRENT_TIMESTAMP not null,
+# update_date     datetime default CURRENT_TIMESTAMP not null on update CURRENT_TIMESTAMP,
+# SQLite 的 CURRENT_TIMESTAMP 默认返回的就是 UTC 格式字符串；MySQL/PG 返回的是服务器本地时间
+# 它们都不带时区，很麻烦，Unix 时间戳又只支持到 2038 年
+# 所以采用 Python 赋值时间比较方便
+# 这样设置的时间，存在 DB 的都是 UTC 时间的 datetime，前后端都可以直接正确处理
+# 时间发给前端的时候 .isoformat() 加不加都可以
+
+# 建议的字段设置：
+# upload_date: Mapped[datetime] = mapped_column(
+#     TZ_AWARE_DATETIME, # 定义时就显性说明带时区
+#     default=lambda: datetime.now(timezone.utc), # 每次 INSERT 时动态调用
+#     nullable=False
+# )
+#
+# update_date: Mapped[datetime] = mapped_column(
+#     TZ_AWARE_DATETIME,
+#     default=lambda: datetime.now(timezone.utc),
+#     onupdate=lambda: datetime.now(timezone.utc),
+#     nullable=False
+# )
+
+# func.utc_timestamp() # MySQL 特有，返回 UTC 时间戳，不支持 PGSQL 和 SQLite
 
 @unique
-class QuestionCategory(Enum):
+class QuestionCategory(IntEnum):
     SINGLE_CHOICE = 1
     MULTIPLE_CHOICE = 2
     FILL_IN_THE_BLANKS = 3
@@ -22,10 +53,16 @@ class QuestionCategory(Enum):
 
 
 @unique
-class GuaranteeStatus(Enum):
+class GuaranteeStatus(IntEnum):
     WAITING = 1
     REFUSE = 2
     AGREEMENT = 3
+
+
+class SchematicType(IntEnum):
+    OTHER = 0
+    REDSTONE = 1
+    ARCHITECTURE = 2
 
 
 # 问卷表模型
@@ -202,11 +239,11 @@ class Option(db.Model):
 # 用户表模型
 class User(UserMixin, db.Model):
     __tablename__ = "users"  # 指定表名
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)  # 主键，用户唯一标识，自增
-    username: Mapped[str] = mapped_column(String(100), nullable=False)  # 用户名，不允许为空
-    user_qq: Mapped[str] = mapped_column(String(25), nullable=False)
-    password: Mapped[str] = mapped_column(String(100), nullable=False)  # 密码，不允许为空
-    role: Mapped[str] = mapped_column(String(100))  # 用户角色，如普通用户、管理员等，可为空
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    username: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
+    user_qq: Mapped[str] = mapped_column(String(25), unique=True, nullable=False)
+    _password_hash: Mapped[str] = mapped_column("password", String(100), nullable=False) # 哈希过的密码
+    role: Mapped[str] = mapped_column(String(100), nullable=False, default="user") # 用户角色，如普通用户、管理员等
     addtime: Mapped[datetime] = mapped_column(
         DateTime, default=func.utc_timestamp(), server_default=func.utc_timestamp()
     )  # 用户新增时间，默认为当前时间，DB 里面是 UTC 时间
@@ -216,18 +253,25 @@ class User(UserMixin, db.Model):
     )  # 0 未激活 1 正常 2 临时封禁 3 永久封禁 4 删除
     tokens: Mapped[list["Token"]] = relationship("Token", backref="user", lazy="select")
     whitelist: Mapped[list["Whitelist"]] = relationship("Whitelist", backref="wl_user", lazy="select")
+
+    # 使用 back_populates 替代 backref
+    # back_populates 是显式双向绑定，不会在对方模型上隐式创建属性
+
+    # 担保人身份：我作为担保人的担保记录
     guarantees: Mapped[list["Guarantee"]] = relationship(
         "Guarantee",
         foreign_keys="Guarantee.guarantee_id",
-        backref="guarantor",
+        back_populates="guarantor",
         lazy="select",
     )
-    applicant: Mapped[list["Guarantee"]] = relationship(
+    # 申请人身份：我作为申请人的担保记录
+    applicant_guarantees: Mapped[list["Guarantee"]] = relationship(
         "Guarantee",
         foreign_keys="Guarantee.applicant_id",
-        backref="applicant",
+        back_populates="applicant_user",
         lazy="select",
     )
+
     responses: Mapped[list["Response"]] = relationship(
         "Response", backref="user", lazy="select", cascade="all, delete"
     )  # 与答卷表建立一对多关系，级联删除
@@ -238,17 +282,26 @@ class User(UserMixin, db.Model):
         "ActivationToken", backref="user_active", lazy="select", cascade="all, delete"
     )
 
-    def __init__(self, username: str, user_qq: str = "1", role: str = "user"):
-        self.username = username
-        self.user_qq = user_qq
-        self.role = role
+    @property
+    def password(self) -> str:
+        """禁止直接读取密码哈希"""
+        raise AttributeError("密码不可读取！如果需要比较新旧密码是否一致，请使用 check_password() 进行校验")
 
-    def set_password(self, password) -> "User":
-        self.password = bcrypt.generate_password_hash(password).decode("utf-8")
-        return self
+    @password.setter
+    def password(self, raw_password: str) -> None:
+        """所有赋值自动哈希，内建安全逻辑"""
+        if not isinstance(raw_password, str):
+            raise TypeError("密码必须是字符串")
+        self._password_hash = bcrypt.generate_password_hash(raw_password).decode("utf-8")
 
-    def check_password(self, password) -> bool:
-        return bcrypt.check_password_hash(self.password, password)
+    def check_password(self, password: str) -> bool:
+        return bcrypt.check_password_hash(self._password_hash, password)
+
+    @property
+    def has_play_permission(self):
+        """查看用户是否拥有至少一个白名单"""
+        stmt = exists().where(Whitelist.user_id == self.id)
+        return db.session.query(stmt).scalar()
 
 
 # 答卷表模型
@@ -326,30 +379,38 @@ class ResponseDetail(db.Model):
 
 
 class Guarantee(db.Model):
-    __tablename__ = "guarantees"  # 指定表名
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)  # 主键，担保唯一标识，自增
-    guarantee_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)  # 担保人id，不允许为空
-    applicant_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)  # 申请人id，不允许为空
-    player_name: Mapped[str] = mapped_column(String(25), nullable=False)  # 被担保人ID，不允许为空
-    player_uuid: Mapped[str] = mapped_column(String(36), nullable=False)  # 被担保人UUID，不允许为空
-    status: Mapped[int] = mapped_column(Integer, nullable=False, default=0)  # 担保状态, 0 待同意，1 已同意，2 已拒绝
-    create_time: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    expiration_time: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    def __init__(
-        self,
-        guarantee_id: int,
-        applicant_id: int,
-        player_name: str,
-        player_uuid: str,
-        create_time: datetime,
-        expiration_time: datetime
-    ):
-        self.guarantee_id = guarantee_id
-        self.applicant_id = applicant_id
-        self.player_name = player_name
-        self.player_uuid = player_uuid
-        self.create_time = create_time
-        self.expiration_time = expiration_time
+    __tablename__ = "guarantees"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    guarantee_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False) # 担保人id
+    applicant_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False) # 申请人id
+    player_name: Mapped[str] = mapped_column(String(25), nullable=False)  # 被担保玩家昵称
+    player_uuid: Mapped[str] = mapped_column(String(36), nullable=False)  # 被担保人UUID
+    status: Mapped[int] = mapped_column(Integer, nullable=False, default=0) # 担保状态
+    create_time: Mapped[datetime] = mapped_column(DateTime, nullable=False) # 创建时间
+    expiration_time: Mapped[datetime] = mapped_column(DateTime, nullable=False) # 过期时间
+
+    guarantor: Mapped["User"] = relationship(
+        "User",
+        foreign_keys=[guarantee_id],
+        back_populates="guarantees",
+    )
+
+    applicant_user: Mapped["User"] = relationship(
+        "User",
+        foreign_keys=[applicant_id],
+        back_populates="applicant_guarantees",
+    )
+
+    STATUS_MAP: dict[int, str] = {
+        0: "待同意",
+        1: "已同意",
+        2: "已拒绝",
+    }
+
+    @property
+    def status_text(self) -> str:
+        """获取状态的中文含义"""
+        return self.STATUS_MAP.get(self.status, "未知状态")
 
 
 class Whitelist(db.Model):
@@ -456,23 +517,20 @@ class ConfigModel(db.Model):
         server_onupdate=func.utc_timestamp()
     )
 
-    def __init__(self, key: str, value: str, type_: str, description: str):
-        self.key = key
-        self.value = value
-        self.type = type_
-        self.description = description
+    def __repr__(self):
+        return f'<config for key: {self.key}>'
 
 
 # 投影信息表
-class Schematics(db.Model):
+class Schematic(db.Model):
     __tablename__ = 'schematics'
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String(100), nullable=False) # 投影文件名 (30个汉字，这里设为100字符足够容纳)
-    uploader_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)  # 上传者ID
-    uploader: Mapped["User"] = relationship("User", backref="schematics")
+    uploader_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)  # 上传用户ID
+    uploader: Mapped["User"] = relationship("User", backref="schematics") # 上传用户
     original_author: Mapped[str] = mapped_column(String(100), nullable=True)  # 投影原作者
-    schematic_type: Mapped[int] = mapped_column(Integer, nullable=False)  # 投影类型
+    schematic_type: Mapped[SchematicType] = mapped_column(Integer, nullable=False) # 投影类型
     game_version: Mapped[str] = mapped_column(String(50), nullable=False) # 投影版本
     tag: Mapped[str] = mapped_column(String(200), nullable=True)  # 投影tag
     description: Mapped[str] = mapped_column(Text, nullable=True)  # 投影描述
@@ -480,21 +538,50 @@ class Schematics(db.Model):
     download_count: Mapped[int] = mapped_column(Integer, default=0)  # 下载量
     file_size_KB: Mapped[int] = mapped_column(Integer, nullable=False)  # 投影大小（KB）
     backup_link: Mapped[str] = mapped_column(String(255), nullable=True)  # 文件备用链接
-    upload_date: Mapped[datetime] = mapped_column(DateTime, default=func.utc_timestamp(), nullable=False)
-    update_date: Mapped[datetime] = mapped_column(DateTime, default=func.utc_timestamp(), onupdate=func.utc_timestamp(), nullable=False)
+
+    upload_date: Mapped[datetime] = mapped_column(
+        TZ_AWARE_DATETIME,
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False
+    )
+
+    update_date: Mapped[datetime] = mapped_column(
+        TZ_AWARE_DATETIME,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False
+    )
 
     # 与文件分表建立一对一关系 (cascade确保删除主表时，关联的二进制文件也被删除)
-    file_data: Mapped["SchematicFiles"] = relationship(
+    file_data: Mapped["SchematicFile"] = relationship(
         back_populates="schematics",
         cascade="all, delete-orphan",
         uselist=False
     )
 
+    @staticmethod
+    def type_to_enum(type_: str | int) -> SchematicType | None:
+        """将前端传入的类型值转换为合法的枚举整数值"""
+        if isinstance(type_, str):
+            upper_val = type_.upper()
+            try:
+                return SchematicType[upper_val]
+            except KeyError:
+                return None
+        if isinstance(type_, int):
+            try:
+                return SchematicType(type_)
+            except ValueError:
+                return None
+        return None
+
+
     def __repr__(self):
-        return f'<Schematics {self.name}>'
+        return f'<Schematics for ID {self.id}>'
+
 
 # 投影文件二进制分表
-class SchematicFiles(db.Model):
+class SchematicFile(db.Model):
     __tablename__ = 'schematic_files'
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -510,7 +597,7 @@ class SchematicFiles(db.Model):
     file_blob: Mapped[bytes] = mapped_column(LargeBinary(524288), nullable=False)
 
     # 反向关联回主表
-    schematics: Mapped["Schematics"] = relationship(back_populates="file_data")
+    schematics: Mapped["Schematic"] = relationship(back_populates="file_data")
 
     def __repr__(self):
         return f'<SchematicFiles for ID {self.schematic_id}>'
