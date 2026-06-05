@@ -2,7 +2,7 @@ from flask import Blueprint, jsonify, request
 from flask_login import current_user, login_required
 
 from myapp import db
-from myapp.db_model import User, Token
+from myapp.db_model import User, Token, Whitelist
 
 user = Blueprint("user", __name__)
 
@@ -10,9 +10,6 @@ user = Blueprint("user", __name__)
 @user.route("/getInfo")
 @login_required
 def get_user_info():
-    temp = current_user.whitelist
-    play_permission: bool = True if len(temp) > 0 else False
-
     return jsonify(
         {
             "code": 0,
@@ -24,7 +21,7 @@ def get_user_info():
                 "addtime": current_user.addtime,
                 "avatar": current_user.avatar,
                 "status": current_user.status,
-                "play_permission": play_permission,
+                "play_permission": current_user.has_play_permission,
             },
         }
     )
@@ -85,3 +82,17 @@ def update_password(uid: int, token: str, new_password: str):
     db.session.delete(token_record)
     db.session.commit()
     return "修改成功"
+
+
+@user.route("/getChainOfTrust", methods=["GET"])
+@login_required
+def get_chain_of_trust():
+    query_player_uuid = request.args.get("uuid", '', type=str)
+
+    query = db.session.query(Whitelist).filter_by(player_uuid=query_player_uuid).filter()
+    # if q
+    # uuid已经在白名单里
+
+    # temp = current_user.whitelist
+    # play_permission: bool = True if len(temp) > 0 else False
+    #

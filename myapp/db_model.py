@@ -3,7 +3,7 @@ from enum import IntEnum, unique
 from typing import Optional
 
 from flask_login import UserMixin
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, func, LargeBinary
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, func, LargeBinary, exists
 from sqlalchemy.dialects.mysql import LONGTEXT
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -41,6 +41,8 @@ TZ_AWARE_DATETIME = DateTime(timezone=True)
 #     onupdate=lambda: datetime.now(timezone.utc),
 #     nullable=False
 # )
+
+# func.utc_timestamp() # MySQL 特有，返回 UTC 时间戳，不支持 PGSQL 和 SQLite
 
 @unique
 class QuestionCategory(IntEnum):
@@ -294,6 +296,12 @@ class User(UserMixin, db.Model):
 
     def check_password(self, password: str) -> bool:
         return bcrypt.check_password_hash(self._password_hash, password)
+
+    @property
+    def has_play_permission(self):
+        """查看用户是否拥有至少一个白名单"""
+        stmt = exists().where(Whitelist.user_id == self.id)
+        return db.session.query(stmt).scalar()
 
 
 # 答卷表模型
