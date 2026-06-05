@@ -9,4 +9,4 @@ log/
 .env
 
 .idea/dataSources.xml
-migrations/versions/
+migrations/
