@@ -2,9 +2,70 @@ from flask import Blueprint, jsonify, request
 from flask_login import current_user, login_required
 
 from myapp import db
-from myapp.db_model import User, Token, Whitelist
+from myapp.db_model import User, Token, Whitelist, Guarantee
 
 user = Blueprint("user", __name__)
+
+
+def build_trust_chain(player_uuid: str, max_depth: int = 10) -> list[dict]:
+    """
+    构建信任链列表
+    Returns: [{"guarantor": {...}, "applicant": {...}}, ...]
+             列表顺序为：从直接担保人 -> 最顶层担保人
+    """
+    chain = []
+    visited_user_ids = set()  # 防止环形担保导致无限循环
+
+    # 1. 找到目标玩家的白名单记录及关联用户
+    whitelist_entry = db.session.query(Whitelist).filter_by(player_uuid=player_uuid).first()
+    if not whitelist_entry or not whitelist_entry.user_id:
+        return chain
+
+    current_applicant_id = whitelist_entry.user_id
+    visited_user_ids.add(current_applicant_id)
+
+    # 2. 逐层向上追溯担保关系
+    depth = 0
+    while depth < max_depth:
+        # 查找当前用户作为申请人的担保记录
+        guarantee = db.session.query(Guarantee).filter(
+            Guarantee.applicant_id == current_applicant_id
+        ).first()
+
+        if not guarantee:
+            break  # 没有更多担保记录，到达信任链顶端
+
+        guarantor = guarantee.guarantor
+        applicant = guarantee.applicant_user
+
+        # 安全检查：如果担保人已访问过，说明存在环，立即终止
+        if guarantor.id in visited_user_ids:
+            chain.append({
+                "guarantor": {"id": guarantor.id, "username": guarantor.username, "warning": "检测到环形担保"},
+                "applicant": {"id": applicant.id, "username": applicant.username}
+            })
+            break
+
+        chain.append({
+            "guarantor": {
+                "id": guarantor.id,
+                "username": guarantor.username,
+                "user_qq": guarantor.user_qq,
+                "avatar": guarantor.avatar
+            },
+            "applicant": {
+                "id": applicant.id,
+                "username": applicant.username,
+                "user_qq": applicant.user_qq,
+                "avatar": applicant.avatar
+            }
+        })
+
+        visited_user_ids.add(guarantor.id)
+        current_applicant_id = guarantor.id  # 继续向上追溯
+        depth += 1
+
+    return chain
 
 
 @user.route("/getInfo")
@@ -89,10 +150,21 @@ def update_password(uid: int, token: str, new_password: str):
 def get_chain_of_trust():
     query_player_uuid = request.args.get("uuid", '', type=str)
 
-    query = db.session.query(Whitelist).filter_by(player_uuid=query_player_uuid).filter()
-    # if q
-    # uuid已经在白名单里
+    if not query_player_uuid:
+        return jsonify({"code": 1, "desc": "缺少 uuid 参数"})
 
-    # temp = current_user.whitelist
-    # play_permission: bool = True if len(temp) > 0 else False
-    #
+    player = db.session.query(Whitelist).filter_by(player_uuid=query_player_uuid).first()
+    if player is None:
+        return jsonify({"code": 1, "desc": "该玩家没有白名单！"})
+
+    trust_chain = build_trust_chain(query_player_uuid)
+
+    return jsonify({
+        "code": 0,
+        "desc": "success",
+        "data": {
+            "playerUUID": query_player_uuid,
+            "playerName": player.player_name,
+            "chain": trust_chain,
+        }
+    })
