@@ -10,7 +10,7 @@ This is the back-end part of the Minecraft server website that integrates whitel
 ### Environment Configuration
 
 ```
-uv sync # 请确保已经安装了 UV
+uv sync
 cp .env.example .env
 ```
 
@@ -40,32 +40,34 @@ flask --app main.py db upgrade
 
 ## Run
 
--   Before running the Flask application, please ensure that the MySQL service is started!
--   Windows system development environment:
-    -   default url：http://127.0.0.1:5000
-    -   startup command：`uv run ./main.py`
-    -   startup command(virtual environment)：`python ./main.py`
+- Before running the Flask application, please ensure that the MySQL service is started!
+- Windows system development environment:
+  - default url：http://127.0.0.1:5000
+  - startup command：`uv run ./main.py`
+  - startup command(virtual environment)：`python ./main.py`
 
--   Linux system development environment:
+- Linux system development environment:
+  - install uv
+    ```bash
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+    source ~/.bashrc
+    ```
+  - install gunicorn: `pip install gunicorn`
+  - systemd config：
+    ```text
+    [Unit]
+    Description=Fsp Exam Application
+    After=network.target
 
-    -   systemd config：
+    [Service]
+    User=root
+    Group=root
+    WorkingDirectory=/opt/web/fsp_exam
+    Environment="PATH=/opt/web/fsp_exam/venv/bin"
+    ExecStart=/root/.local/bin/uv run gunicorn --config=config.py main:app
 
-        ```text
-        [Unit]
-        Description=Fsp Exam Application
-        After=network.target
-
-        [Service]
-        User=root
-        Group=root
-        WorkingDirectory=/opt/web/fsp_exam
-        Environment="PATH=/opt/web/fsp_exam/venv/bin"
-        ExecStart=/opt/web/fsp_exam/venv/bin/gunicorn --config=config.py main:app
-
-        [Install]
-        WantedBy=multi-user.target
-
-        ```
-
-    -   first：`systemctl daemon-reload`
-    -   start：`systemctl start myflaskapp`
+    [Install]
+    WantedBy=multi-user.target
+    ```
+  - first：`systemctl daemon-reload`
+  - start：`systemctl start myflaskapp`
