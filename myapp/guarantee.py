@@ -40,8 +40,8 @@ def check_guarantor(info: dict) -> dict:
 def check_applicant(info: dict) -> dict:
     player_uuid = info.get("player_uuid", "")
 
-    if not is_player_in_whitelist(player_uuid):
-        return {"code": 1, "desc": "担保人不属于白名单成员，无法担保！"}
+    if is_player_in_whitelist(player_uuid):
+        return {"code": 1, "desc": "你已经是白名单成员"}
 
     g_result = db.session.query(Guarantee).filter(
         Guarantee.player_uuid == info.get("player_uuid"),
