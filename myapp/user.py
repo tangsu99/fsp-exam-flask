@@ -41,8 +41,19 @@ def build_trust_chain(player_uuid: str, max_depth: int = 10) -> list[dict]:
         # 安全检查：如果担保人已访问过，说明存在环，立即终止
         if guarantor.id in visited_user_ids:
             chain.append({
-                "guarantor": {"id": guarantor.id, "username": guarantor.username, "warning": "检测到环形担保"},
-                "applicant": {"id": applicant.id, "username": applicant.username}
+                "guarantor": {
+                    "id": guarantor.id,
+                    "username": guarantor.username,
+                    "user_qq": guarantor.user_qq,
+                    "avatar": guarantor.avatar,
+                    "warning": "检测到环形担保"
+                },
+                "applicant": {
+                    "id": applicant.id,
+                    "username": applicant.username,
+                    "user_qq": applicant.user_qq,
+                    "avatar": applicant.avatar
+                }
             })
             break
 
