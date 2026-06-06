@@ -9,6 +9,7 @@ def setup():
     print('+' * LEN)
     print('Setting...')
     if User.query.count() == 0:
+        # Please be sure to change the default password!
         username: str = 'root'
         password: str = '@12345Root'
         user = User(username, '123456789', 'admin').set_password(password)

@@ -5,7 +5,7 @@ This is the back-end part of the Minecraft server website that integrates whitel
 
 ## Project Setup
 
--   The initial administrator user and password are written in main.py. Please be sure to change the default password!
+-   The initial administrator user and password are written in `main.py`. Please be sure to change the default password!
 
 ### Environment Configuration
 
