@@ -16,19 +16,7 @@ DEFAULT_AVATAR = "8667ba71-b85a-4004-af54-457a9734eed7"
 # SQLite 原生不支持 TIMESTAMP WITH TIME ZONE，
 # 但 SQLAlchemy 会自动将其映射为 TEXT/CHAR 并正确处理 ISO 格式，无需担心
 TZ_AWARE_DATETIME = DateTime(timezone=True)
-
-# upload_date: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
-# update_date: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
-# 上述代码对应的 DDL 应该如下
-# upload_date     datetime default CURRENT_TIMESTAMP not null,
-# update_date     datetime default CURRENT_TIMESTAMP not null on update CURRENT_TIMESTAMP,
-# SQLite 的 CURRENT_TIMESTAMP 默认返回的就是 UTC 格式字符串；MySQL/PG 返回的是服务器本地时间
-# 它们都不带时区，很麻烦，Unix 时间戳又只支持到 2038 年
-# 所以采用 Python 赋值时间比较方便
-# 这样设置的时间，存在 DB 的都是 UTC 时间的 datetime，前后端都可以直接正确处理
-# 时间发给前端的时候 .isoformat() 加不加都可以
-
-# 建议的字段设置：
+# 建议的涉及时间的字段设置：
 # upload_date: Mapped[datetime] = mapped_column(
 #     TZ_AWARE_DATETIME, # 定义时就显性说明带时区
 #     default=lambda: datetime.now(timezone.utc), # 每次 INSERT 时动态调用
@@ -42,7 +30,19 @@ TZ_AWARE_DATETIME = DateTime(timezone=True)
 #     nullable=False
 # )
 
+# 不推荐：
+# upload_date: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
+# update_date: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+# 上述代码对应的 DDL 应该如下
+# upload_date     datetime default CURRENT_TIMESTAMP not null,
+# update_date     datetime default CURRENT_TIMESTAMP not null on update CURRENT_TIMESTAMP,
+# func.now() 翻译出来是 CURRENT_TIMESTAMP，SQLite 的 CURRENT_TIMESTAMP 默认返回的就是 UTC 格式字符串；MySQL/PG 返回的是服务器本地时间
+# 它们都不带时区，很麻烦，Unix 时间戳又只支持到 2038 年
 # func.utc_timestamp() # MySQL 特有，返回 UTC 时间戳，不支持 PGSQL 和 SQLite
+# 所以采用 Python 赋值时间比较方便且跨平台
+# 这样设置的时间，存在 DB 的都是 UTC 时间的 datetime，前后端都可以直接正确处理
+# 时间发给前端的时候 .isoformat() 加不加都可以
+
 
 @unique
 class QuestionCategory(IntEnum):
@@ -244,7 +244,11 @@ class User(UserMixin, db.Model):
     user_qq: Mapped[str] = mapped_column(String(25), unique=True, nullable=False)
     _password_hash: Mapped[str] = mapped_column("password", String(100), nullable=False) # 哈希过的密码
     role: Mapped[str] = mapped_column(String(100), nullable=False, default="user") # 用户角色，如普通用户、管理员等
-    registered_at: Mapped[datetime] = mapped_column(DateTime, default=func.utc_timestamp())
+    registered_at: Mapped[datetime] = mapped_column(
+        TZ_AWARE_DATETIME,
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False
+    )
     avatar: Mapped[str] = mapped_column(String(500), default=DEFAULT_AVATAR)
     status: Mapped[int] = mapped_column(
         Integer, nullable=False, default=0

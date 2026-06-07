@@ -1,4 +1,3 @@
-from datetime import datetime, timezone
 from flask import Blueprint, jsonify, request
 from flask_login import login_required, current_user
 from sqlalchemy import select
@@ -19,7 +18,8 @@ from myapp.db_model import (
     Whitelist,
 )
 from myapp.mail import survey_result_mail, send_mail
-from myapp.utils import check_password_format, required_role, is_survey_response_expired, validate_json_required_fields
+from myapp.utils import check_password_format, required_role, is_survey_response_expired, validate_json_required_fields, \
+    parse_frontend_time_to_utc
 
 admin = Blueprint("admin", __name__)
 
@@ -446,13 +446,13 @@ def users():
     per_page = request.args.get("size", 10, type=int)  # 获取每页条数，默认为 10
 
     # 分页查询用户
-    query = User.query.filter(User.status != 4)
+    query = db.session.query(User).filter(User.status != 4)
     pagination = query.paginate(page=page, per_page=per_page, error_out=False)
-    users = pagination.items
+    user_list = pagination.items
 
     # 构造返回数据
     user_data = []
-    for user in users:
+    for user in user_list:
         user_data.append(
             {
                 "id": user.id,
@@ -460,7 +460,7 @@ def users():
                 "userQQ": user.user_qq,
                 "role": user.role,
                 "status": user.status,
-                "addtime": user.registered_at.replace(tzinfo=timezone.utc).isoformat() if user.registered_at else None,
+                "addtime": user.registered_at.isoformat(),
                 "avatar": user.avatar,
             }
         )
@@ -495,7 +495,7 @@ def get_user():
                 "user_qq": user.user_qq,
                 "role": user.role,
                 "status": user.status,
-                "addtime": user.registered_at.replace(tzinfo=timezone.utc).isoformat() if user.registered_at else None,
+                "addtime": user.registered_at.isoformat(),
                 "avatar": user.avatar,
             },
         }
@@ -546,7 +546,7 @@ def set_user():
         username = req_data.get("username")
         password = req_data.get("password")
         user_qq = req_data.get("userQQ")
-        registration_time = req_data.get("addtime")
+        registered_at_iso_str = req_data.get("addtime")
         role = req_data.get("role")
         status = req_data.get("status")
 
@@ -569,10 +569,8 @@ def set_user():
         if user_qq:
             user.user_qq = user_qq
 
-        if registration_time:
-            iso_string_fixed = registration_time.replace('Z', '+00:00')
-            dt = datetime.fromisoformat(iso_string_fixed)
-            user.registered_at = dt
+        if registered_at_iso_str:
+            user.registered_at = parse_frontend_time_to_utc(registered_at_iso_str)
 
         if role:
             user.role = role
