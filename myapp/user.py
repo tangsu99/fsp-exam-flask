@@ -90,7 +90,7 @@ def get_user_info():
                 "username": current_user.username,
                 "user_qq": current_user.user_qq,
                 "role": current_user.role,
-                "addtime": current_user.registered_at,
+                "addtime": current_user.registered_at.isoformat(),
                 "avatar": current_user.avatar,
                 "status": current_user.status,
                 "play_permission": current_user.has_play_permission,

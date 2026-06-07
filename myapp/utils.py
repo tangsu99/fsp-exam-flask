@@ -161,3 +161,10 @@ def get_file_size(file_storage, unit='KB'):
 
     # 如果算出来文件大小为 0 按 1 算
     return calculated_size if calculated_size > 0 else 1
+
+def parse_frontend_time_to_utc(front_end_time: str) -> datetime:
+    """
+    对于前端用 new Date(time).toISOString() 格式化的时间，此函数可以将其转化为 UTC 时间的 DateTime
+    front_end_time 打印出来应该类似这种格式：2026-06-07T10:43:00.000Z
+    """
+    return datetime.fromisoformat(front_end_time.replace('Z', '+00:00'))
