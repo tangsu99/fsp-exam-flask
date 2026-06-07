@@ -460,7 +460,7 @@ def users():
                 "userQQ": user.user_qq,
                 "role": user.role,
                 "status": user.status,
-                "addtime": user.addtime.replace(tzinfo=timezone.utc).isoformat() if user.addtime else None,
+                "addtime": user.registered_at.replace(tzinfo=timezone.utc).isoformat() if user.registered_at else None,
                 "avatar": user.avatar,
             }
         )
@@ -482,7 +482,7 @@ def users():
 @required_role("admin")
 def get_user():
     id_ = request.args.get("id", 0, type=int)
-    user: User | None = User.query.get(id_)
+    user: User | None = db.session.get(User, id_)
     if user is None:
         return jsonify({"code": 1, "desc": "未找到用户！"}), 400
     return jsonify(
@@ -495,7 +495,7 @@ def get_user():
                 "user_qq": user.user_qq,
                 "role": user.role,
                 "status": user.status,
-                "addtime": user.addtime.replace(tzinfo=timezone.utc).isoformat() if user.addtime else None,
+                "addtime": user.registered_at.replace(tzinfo=timezone.utc).isoformat() if user.registered_at else None,
                 "avatar": user.avatar,
             },
         }
@@ -572,7 +572,7 @@ def set_user():
         if registration_time:
             iso_string_fixed = registration_time.replace('Z', '+00:00')
             dt = datetime.fromisoformat(iso_string_fixed)
-            user.addtime = dt
+            user.registered_at = dt
 
         if role:
             user.role = role
