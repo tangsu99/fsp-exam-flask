@@ -244,9 +244,7 @@ class User(UserMixin, db.Model):
     user_qq: Mapped[str] = mapped_column(String(25), unique=True, nullable=False)
     _password_hash: Mapped[str] = mapped_column("password", String(100), nullable=False) # 哈希过的密码
     role: Mapped[str] = mapped_column(String(100), nullable=False, default="user") # 用户角色，如普通用户、管理员等
-    addtime: Mapped[datetime] = mapped_column(
-        DateTime, default=func.utc_timestamp(), server_default=func.utc_timestamp()
-    )  # 用户新增时间，默认为当前时间，DB 里面是 UTC 时间
+    registered_at: Mapped[datetime] = mapped_column(DateTime, default=func.utc_timestamp())
     avatar: Mapped[str] = mapped_column(String(500), default=DEFAULT_AVATAR)
     status: Mapped[int] = mapped_column(
         Integer, nullable=False, default=0
