@@ -67,25 +67,17 @@ class SchematicType(IntEnum):
 
 # 问卷表模型
 class Survey(db.Model):
-    __tablename__ = "surveys"  # 指定表名
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)  # 主键，问卷唯一标识，自增
-    name: Mapped[str] = mapped_column(String(200), nullable=False)  # 问卷名称，不允许为空
-    description: Mapped[Optional[str]] = mapped_column(Text)  # 问卷描述，可为空
-    create_time: Mapped[datetime] = mapped_column(
-        DateTime, default=func.utc_timestamp(), server_default=func.utc_timestamp()
-    )  # 问卷创建时间，默认为当前时间
-    status: Mapped[int] = mapped_column(Integer, nullable=False)  # 问卷状态，！！！已废弃字段！！！
+    __tablename__ = "surveys"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text, default='', nullable=False)
+    create_time: Mapped[datetime] = mapped_column(TZ_AWARE_DATETIME, default=lambda: datetime.now(timezone.utc), nullable=False)
     questions: Mapped[list["Question"]] = relationship(
         "Question", backref="survey", lazy="select", cascade="all, delete"
     )  # 与问题表建立一对多关系，级联删除
     response: Mapped[list["Response"]] = relationship(
         "Response", backref="survey_res", lazy="select", cascade="all, delete"
     )  # 与答卷表建立一对多关系，级联删除
-
-    def __init__(self, name: str, description: str, status: int = 0):
-        self.name = name
-        self.description = description
-        self.status = status
 
 
 # 问题表模型
@@ -212,21 +204,14 @@ class QuestionImgURL(db.Model):
 
 # 选项表模型
 class Option(db.Model):
-    __tablename__ = "options"  # 指定表名
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)  # 主键，选项唯一标识，自增
+    __tablename__ = "options"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     question_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("questions.id", ondelete="CASCADE"), nullable=False
     )  # 所属问题id，外键，关联问题表，级联删除
     option_text: Mapped[str] = mapped_column(Text, nullable=False)  # 选项内容，不允许为空
     is_correct: Mapped[Optional[bool]] = mapped_column(Boolean)  # 是否为正确选项，对于有标准答案的题目，可为空
-    create_time: Mapped[datetime] = mapped_column(
-        DateTime, default=func.utc_timestamp(), server_default=func.utc_timestamp()
-    )  # 选项创建时间，默认为当前时间
-
-    def __init__(self, question_id: int, option_text: str, is_correct: bool = False):
-        self.question_id = question_id
-        self.option_text = option_text
-        self.is_correct = is_correct
+    create_time: Mapped[datetime] = mapped_column(TZ_AWARE_DATETIME, default=lambda: datetime.now(timezone.utc), nullable=False)
 
 
 # 用户表模型

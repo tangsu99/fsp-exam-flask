@@ -732,7 +732,6 @@ def get_survey(sid: int):
         "name": survey.name,
         "description": survey.description,
         "create_time": survey.create_time,
-        # "status": status, 好像没用
         "questions": [],
     }
 
@@ -848,7 +847,6 @@ def get_detail(resp_id: int):
         "description": survey.description,
         "create_time": survey.create_time,
         "isReviewed": res.is_reviewed,
-        # "status": survey.status, 好像用不到
         "questions": [],
     }
 
