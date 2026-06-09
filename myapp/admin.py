@@ -20,7 +20,7 @@ from myapp.db_model import (
 )
 from myapp.mail import survey_result_mail, send_mail
 from myapp.utils import check_password_format, required_role, is_survey_response_expired, validate_json_required_fields, \
-    parse_frontend_time_to_utc
+    parse_frontend_time_to_utc, parse_dt_to_iso_utc
 
 admin = Blueprint("admin", __name__)
 
@@ -502,7 +502,7 @@ def get_user():
                 "user_qq": user.user_qq,
                 "role": user.role,
                 "status": user.status,
-                "addtime": user.registered_at.isoformat(),
+                "addtime": parse_dt_to_iso_utc(user.registered_at),
                 "avatar": user.avatar,
             },
         }
