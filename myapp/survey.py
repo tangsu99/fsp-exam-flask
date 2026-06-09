@@ -1,5 +1,4 @@
 from datetime import datetime, timedelta, timezone
-from threading import Thread
 from typing import cast
 
 from flask import Blueprint, jsonify, request
@@ -52,14 +51,13 @@ def get_all_question_type():
 def get_survey(sid: int):
     user: User = cast(User, current_user)
 
-    # 查询指定问卷
-    survey = Survey.query.get(sid)
-    if not survey:
+    survey_ = db.session.get(Survey, sid)
+    if not survey_:
         return jsonify({"code": 1, "desc": "未找到问卷"}), 404
 
     existing_response_list = user.responses
     for i in existing_response_list:
-        if i.is_completed is False:
+        if not i.is_completed:
             create_time = i.create_time
             break
     else:
@@ -69,17 +67,16 @@ def get_survey(sid: int):
 
     # 构建问卷数据结构
     survey_data = {
-        "id": survey.id,
-        "name": survey.name,
-        "description": survey.description,
-        "create_time": create_time,
+        "id": survey_.id,
+        "name": survey_.name,
+        "description": survey_.description,
+        "create_time": create_time.isoformat(),
         "ddl": ddl,
-        "status": survey.status,
         "questions": [],
     }
 
     # 查询问卷中的所有题目
-    for question in survey.questions:
+    for question in survey_.questions:
         # 不返回被逻辑删除的题目
         if question.logical_deletion:
             continue
@@ -112,7 +109,7 @@ def incomplete_survey_exist(response_list) -> Response | None:
     for i in response_list:
         if i.is_completed is False:
             expired = is_survey_response_expired(i)
-            if expired is False:
+            if not expired:
                 return i
 
     return None
