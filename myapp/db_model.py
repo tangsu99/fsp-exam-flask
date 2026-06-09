@@ -200,21 +200,14 @@ class Question(db.Model):
 
 # 问题图片表模型
 class QuestionImgURL(db.Model):
-    __tablename__ = "question_images"  # 指定表名
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)  # 主键，选项唯一标识，自增
+    __tablename__ = "question_images"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     question_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("questions.id", ondelete="CASCADE"), nullable=False
     )  # 所属问题id，外键，关联问题表，级联删除
-    img_alt: Mapped[str] = mapped_column(String(200))  # 图片alt，允许为空
-    img_data: Mapped[str] = mapped_column(LONGTEXT, nullable=False)  # 图片数据，URL 或者 Base64 编码的图片，不允许为空
-    create_time: Mapped[datetime] = mapped_column(
-        DateTime, default=func.utc_timestamp(), server_default=func.utc_timestamp()
-    )  # 选项创建时间，默认为当前时间
-
-    def __init__(self, question_id: int, img_alt: str, img_data: str):
-        self.question_id = question_id
-        self.img_alt = img_alt
-        self.img_data = img_data
+    img_alt: Mapped[str] = mapped_column(String(200), default='', nullable=False)
+    img_data: Mapped[str] = mapped_column(LONGTEXT, nullable=False) # 图片数据，URL 或者 Base64 编码的图片
+    create_time: Mapped[datetime] = mapped_column(TZ_AWARE_DATETIME, default=lambda: datetime.now(timezone.utc), nullable=False)
 
 
 # 选项表模型
@@ -556,9 +549,9 @@ class Schematic(db.Model):
 
     # 与文件分表建立一对一关系 (cascade确保删除主表时，关联的二进制文件也被删除)
     file_data: Mapped["SchematicFile"] = relationship(
-        back_populates="schematics",
-        cascade="all, delete-orphan",
-        uselist=False
+        back_populates="schematics", # 建立双向关系，两端的数据状态会自动保持同步
+        cascade="all, delete-orphan", # ORM 层操作
+        uselist=False # 这是实现一对一关系的核心参数。默认情况下，relationship 返回的是一个列表（一对多）。将其设置为 False 后，SQLAlchemy 知道这个属性返回的是单个对象而不是列表
     )
 
     @staticmethod
