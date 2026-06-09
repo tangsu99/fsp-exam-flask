@@ -3,6 +3,7 @@ from flask_login import current_user, login_required
 
 from myapp import db
 from myapp.db_model import User, Token, Whitelist, Guarantee
+from myapp.utils import parse_dt_to_iso_utc
 
 user = Blueprint("user", __name__)
 
@@ -90,7 +91,7 @@ def get_user_info():
                 "username": current_user.username,
                 "user_qq": current_user.user_qq,
                 "role": current_user.role,
-                "addtime": current_user.registered_at.isoformat(),
+                "addtime": parse_dt_to_iso_utc(current_user.registered_at),
                 "avatar": current_user.avatar,
                 "status": current_user.status,
                 "play_permission": current_user.has_play_permission,

@@ -168,3 +168,6 @@ def parse_frontend_time_to_utc(front_end_time: str) -> datetime:
     front_end_time 打印出来应该类似这种格式：2026-06-07T10:43:00.000Z
     """
     return datetime.fromisoformat(front_end_time.replace('Z', '+00:00'))
+
+def parse_dt_to_iso_utc(dt: datetime) -> str:
+    return dt.replace(tzinfo=timezone.utc).isoformat()

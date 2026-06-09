@@ -287,9 +287,9 @@ class User(UserMixin, db.Model):
 # 答卷表模型
 class Response(db.Model):
     __tablename__ = "responses"  # 指定表名
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)  # 主键，答卷唯一标识，自增
-    is_completed: Mapped[bool] = mapped_column(Boolean, default=False)  # 完成状态，默认为False（未完成）
-    is_reviewed: Mapped[int] = mapped_column(Integer, default=0)  # 阅卷状态，0 待审核 1 已通过 2 已拒绝
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    is_completed: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_reviewed: Mapped[int] = mapped_column(Integer, default=0) # 阅卷状态，0 待审核 1 已通过 2 已拒绝
     reviewer_uid: Mapped[int] = mapped_column(Integer, nullable=True)
     player_name: Mapped[str] = mapped_column(String(25), nullable=False)
     player_uuid: Mapped[str] = mapped_column(String(36), nullable=False)
@@ -299,13 +299,11 @@ class Response(db.Model):
     survey_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("surveys.id", ondelete="CASCADE"), nullable=False
     )  # 所答问卷id，外键，关联问卷表，级联删除
-    survey_name: Mapped[str] = mapped_column(String(200), nullable=True)  # 问卷当时的名称
+    survey_name: Mapped[str] = mapped_column(String(200), nullable=True) # 问卷当时的名称
     response_time: Mapped[datetime] = mapped_column(
         DateTime, nullable=True
     )  # 答卷时间，默认为当前时间
-    create_time: Mapped[datetime] = mapped_column(
-        DateTime, default=func.utc_timestamp(), server_default=func.utc_timestamp()
-    )  # 答卷记录创建时间，默认为当前时间
+    create_time: Mapped[datetime] = mapped_column(TZ_AWARE_DATETIME, default=lambda: datetime.now(timezone.utc), nullable=False) # 开考时间
     response_details: Mapped[list["ResponseDetail"]] = relationship(
         "ResponseDetail", backref="response_d", lazy="select", cascade="all, delete"
     )  # 与答题详情表建立一对多关系，级联删除
@@ -313,13 +311,6 @@ class Response(db.Model):
         "ResponseScore", backref="response_s", lazy="select", cascade="all, delete"
     )
     archive_score: Mapped[float] = mapped_column(Float, nullable=True)
-
-    def __init__(self, user_id: int, survey_id: int, survey_name: str, player_name: str, player_uuid: str):
-        self.user_id = user_id
-        self.survey_id = survey_id
-        self.survey_name = survey_name
-        self.player_name = player_name
-        self.player_uuid = player_uuid
 
 
 class ResponseScore(db.Model):

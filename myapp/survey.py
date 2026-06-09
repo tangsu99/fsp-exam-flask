@@ -16,9 +16,10 @@ from myapp.db_model import (
     Survey,
     User,
     Whitelist,
+    ConfigModel
 )
 from myapp.mail import survey_complete_mail, send_mail
-from myapp.utils import is_survey_response_expired, status_check
+from myapp.utils import is_survey_response_expired, status_check, parse_dt_to_iso_utc
 
 survey = Blueprint("survey", __name__)
 
@@ -49,11 +50,14 @@ def get_all_question_type():
 @survey.route("/survey/<int:sid>", methods=["GET"])
 @login_required
 def get_survey(sid: int):
+    """
+    获取问卷
+    """
     user: User = cast(User, current_user)
 
     survey_ = db.session.get(Survey, sid)
     if not survey_:
-        return jsonify({"code": 1, "desc": "未找到问卷"}), 404
+        return jsonify({"code": 1, "desc": "未找到问卷"})
 
     existing_response_list = user.responses
     for i in existing_response_list:
@@ -63,15 +67,19 @@ def get_survey(sid: int):
     else:
         return jsonify({"code": 1, "desc": "错误"})
 
-    ddl = create_time + timedelta(hours=24)
+    span = db.session.get(ConfigModel, "RESPONSE_VALIDITY_PERIOD")
+    if span is None:
+        return jsonify({"code": 1, "desc": "管理员未设置作答时间"})
+
+    ddl = create_time + timedelta(hours=int(span.value)) # 答题有效时间 24 小时
 
     # 构建问卷数据结构
     survey_data = {
         "id": survey_.id,
         "name": survey_.name,
         "description": survey_.description,
-        "create_time": create_time.isoformat(),
-        "ddl": ddl,
+        "create_time": parse_dt_to_iso_utc(create_time),
+        "ddl": parse_dt_to_iso_utc(ddl),
         "questions": [],
     }
 
@@ -134,6 +142,9 @@ def check_survey():
 @login_required
 @status_check()
 def start_survey():
+    """
+    创建答卷
+    """
     user: User = cast(User, current_user)
 
     # 检查用户是否有未完成的答卷
@@ -153,9 +164,13 @@ def start_survey():
     if not sid or not slot_name or not mc_name or not mc_uuid:
         return jsonify({"code": 1, "desc": "缺少信息！"})
 
-    is_in_whitelist = Whitelist.query.filter_by(player_uuid=mc_uuid).first()
+    is_in_whitelist = db.session.query(Whitelist).filter_by(player_uuid=mc_uuid).first()
     if is_in_whitelist:
         return jsonify({"code": 2, "desc": "此玩家存在已有白名单! "})
+
+    survey_exist = db.session.get(Survey, sid)
+    if survey_exist is None:
+        return jsonify({"code": 1, "desc": "问卷不存在！"})
 
     # 创建新的答卷
     new_response = Response(
@@ -230,26 +245,29 @@ def make_answer_details(
 @survey.route("/complete_survey", methods=["POST"])
 @login_required
 def complete_survey():
+    """
+    交卷
+    """
     data = request.get_json()
     user: User = cast(User, current_user)
     res: Response | None = incomplete_survey_exist(user.responses)
     if res is None:
-        return jsonify({"code": 1, "desc": "问卷未找到！"}), 400
+        return jsonify({"code": 1, "desc": "你没有要提交的问卷！"})
 
-    response_id: int = res.id  # 答卷ID
+    response_id: int = res.id # 答卷ID
 
     # 客观题分数
     count_score: float = 0
 
     for i in data:
-        question_id: int = i.get("id")  # 问题ID
-        answer: list | None = i.get("answer")  # 用户答案
+        question_id: int = i.get("id") # 问题ID
+        answer: list | None = i.get("answer") # 用户答案
 
         # 允许空题
         if answer is None:
             continue
 
-        question: Question | None = Question.query.get(question_id)
+        question: Question | None = db.session.get(Question, question_id)
 
         # 如果这道题已经被删除，就算了
         if question is None:
