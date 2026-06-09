@@ -1,6 +1,7 @@
 from flask import Blueprint, jsonify, request
 from flask_login import login_required, current_user
-from sqlalchemy import select
+from sqlalchemy import select, delete
+from sqlalchemy.orm import Mapped
 
 from myapp import db, my_config, APP
 from myapp.db_model import (
@@ -182,7 +183,7 @@ def check_and_format_questions(questions: list)->dict:
 
     for question_data in questions:
         validate_res: dict = validate_json_required_fields(question_required_fields, question_data)
-        print(validate_res)
+
         if validate_res["success"] is False:
             return {"success": False, "desc": "题目数据格式验证失败！"}
 
@@ -208,7 +209,7 @@ def add_question_images(question_id: int, img_list: list) -> None:
         db.session.add(img)
 
 
-def add_question_options(question_id: int, question_type: int, options: list) -> None:
+def add_question_options(question_id: int, question_type: int | Mapped[int], options: list) -> None:
     # 如果是填空题或者主观，设置第一个选项为正确选项
     if question_type in [3, 4]:
         options[0]["isCorrect"] = True
@@ -310,30 +311,36 @@ def edit_question():
     if not question_id:
         return jsonify({"code": 1, "desc": "缺少题目 ID"})
 
-    question: Question | None = Question.query.get(question_id)
+    try:
+        question: Question | None = db.session.get(Question, question_id)
 
-    if question is None:
-        return jsonify({"code": 1, "desc": "题目不存在"})
+        if question is None:
+            return jsonify({"code": 1, "desc": "题目不存在"})
 
-    # 更新题目基本信息
-    question.survey_id = req_data["surveyId"]
-    question.question_text = req_data["title"]
-    question.question_type = req_data["type"]
-    question.score = req_data["score"]
+        # 更新题目基本信息
+        question.survey_id = req_data["surveyId"]
+        question.question_text = req_data["title"]
+        question.question_type = req_data["type"]
+        question.score = req_data["score"]
 
-    # 处理选项数据
-    options = req_data.get("options")
-    Option.query.filter_by(question_id=question_id).delete()
-    add_question_options(question.id, question.question_type, options)
+        # 处理选项数据
+        options = req_data.get("options")
+        stmt_opt = delete(Option).where(Option.question_id == question_id)
+        db.session.execute(stmt_opt)
+        add_question_options(question.id, question.question_type, options)
 
-    # 处理图片数据
-    img_list = req_data.get("img_list", [])
-    QuestionImgURL.query.filter_by(question_id=question_id).delete()
-    add_question_images(question_id, img_list)
+        # 处理图片数据
+        img_list = req_data.get("img_list", [])
+        stmt = delete(QuestionImgURL).where(QuestionImgURL.question_id == question_id)
+        db.session.execute(stmt)
+        add_question_images(question_id, img_list)
 
-    db.session.commit()
+        db.session.commit()
 
-    return jsonify({"code": 0, "desc": "修改题目成功"})
+        return jsonify({"code": 0, "desc": "修改题目成功"})
+    except Exception as e:
+        db.session.rollback()
+        raise e
 
 
 @admin.route("/delQuestion", methods=["POST"])
