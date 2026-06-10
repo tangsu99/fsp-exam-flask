@@ -63,21 +63,12 @@ def check_password_format(password: str) -> bool:
 
 
 def is_survey_response_expired(survey_response: Response) -> bool:
-    # 只判断未完成的问卷，已完成的问卷不存在“过期”的说法
-    if survey_response.is_completed:
-        return False
-
+    """
+    判断答卷是否过期
+    """
     expired_datetime = survey_response.end_time.replace(tzinfo=timezone.utc)
     current_datetime = datetime.now(timezone.utc)
-
-    # 如果 当前时间 大于 截至时间，算过期
-    if current_datetime > expired_datetime:
-        survey_response.is_completed = True
-        survey_response.is_reviewed = 2
-        db.session.commit()
-        return True
-    return False
-
+    return True if current_datetime > expired_datetime else False
 
 def validate_json_required_fields(required_fields:dict, data: dict) -> dict:
     """

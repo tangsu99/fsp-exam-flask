@@ -635,6 +635,10 @@ def get_surveys():
             expired = is_survey_response_expired(i)
             if expired is False and i.is_completed is False:
                 not_completed_count += 1
+            if expired:
+                i.is_completed = True
+                i.is_reviewed = 2
+                db.session.commit()
 
         not_reviewed_count = Response.query.filter(
             Response.survey_id == _survey.id,
@@ -681,7 +685,10 @@ def get_responses():
     }
     for i in result:
         # 刷新一下是否过期
-        is_survey_response_expired(i)
+        if is_survey_response_expired(i):
+            i.is_completed = True
+            i.is_reviewed = 2
+            db.session.commit()
 
         total_score: float = 0
 
