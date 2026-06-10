@@ -3,6 +3,7 @@ from flask_login import current_user, login_required
 
 from myapp import db
 from myapp.db_model import User, Token, Whitelist, Guarantee
+from myapp.utils import parse_dt_to_iso_utc
 
 user = Blueprint("user", __name__)
 
@@ -41,8 +42,19 @@ def build_trust_chain(player_uuid: str, max_depth: int = 10) -> list[dict]:
         # 安全检查：如果担保人已访问过，说明存在环，立即终止
         if guarantor.id in visited_user_ids:
             chain.append({
-                "guarantor": {"id": guarantor.id, "username": guarantor.username, "warning": "检测到环形担保"},
-                "applicant": {"id": applicant.id, "username": applicant.username}
+                "guarantor": {
+                    "id": guarantor.id,
+                    "username": guarantor.username,
+                    "user_qq": guarantor.user_qq,
+                    "avatar": guarantor.avatar,
+                    "warning": "检测到环形担保"
+                },
+                "applicant": {
+                    "id": applicant.id,
+                    "username": applicant.username,
+                    "user_qq": applicant.user_qq,
+                    "avatar": applicant.avatar
+                }
             })
             break
 
@@ -79,7 +91,7 @@ def get_user_info():
                 "username": current_user.username,
                 "user_qq": current_user.user_qq,
                 "role": current_user.role,
-                "addtime": current_user.addtime,
+                "addtime": parse_dt_to_iso_utc(current_user.registered_at),
                 "avatar": current_user.avatar,
                 "status": current_user.status,
                 "play_permission": current_user.has_play_permission,

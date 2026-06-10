@@ -8,11 +8,10 @@ LEN = 50
 def setup():
     print('+' * LEN)
     print('Setting...')
-    if User.query.count() == 0:
-        username: str = 'root'
-        password: str = '@12345Root'
-        user = User(username, '123456789', 'admin').set_password(password)
-        user.status = 1
+    if db.session.query(User).count() == 0:
+        # Please be sure to change the default password!
+        user = User(username='root', user_qq='123456789', role='admin', status=1)
+        user.password = '@12345Root'
         db.session.add(user)
         db.session.commit()
         print('Created Admin account!')

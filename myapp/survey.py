@@ -1,9 +1,9 @@
 from datetime import datetime, timedelta, timezone
-from threading import Thread
 from typing import cast
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, current_app
 from flask_login import current_user, login_required
+from sqlalchemy import select
 
 from myapp import db, APP
 from myapp.db_model import (
@@ -16,73 +16,38 @@ from myapp.db_model import (
     ResponseScore,
     Survey,
     User,
-    Whitelist,
+    Whitelist
 )
 from myapp.mail import survey_complete_mail, send_mail
-from myapp.utils import is_survey_response_expired, status_check
+from myapp.utils import is_survey_response_expired, status_check, parse_dt_to_iso_utc
 
 survey = Blueprint("survey", __name__)
 
 
-@survey.route("/get_slots", methods=["GET"])
-@login_required
-def get_all_question_type():
-    slots: list[SurveySlot] = SurveySlot.query.all()
+def incomplete_survey_exist(response_list: list[Response]) -> Response | None:
+    for i in response_list:
+        if not i.is_completed:
+            if not is_survey_response_expired(i):
+                return i
+            i.is_completed = True
+            i.is_reviewed = 2
+            db.session.flush()
 
-    res_data = {
-        "code": 0,
-        "desc": "成功! ",
-        "list": [],
-    }
+    return None
 
-    for slot in slots:
-        res_data["list"].append(
-            {
-                "id": slot.id,
-                "slotName": slot.slot_name,
-                "mountedSID": slot.mounted_survey_id,
-            }
-        )
-
-    return jsonify(res_data)
-
-
-@survey.route("/survey/<int:sid>", methods=["GET"])
-@login_required
-def get_survey(sid: int):
-    user: User = cast(User, current_user)
-
-    # 查询指定问卷
-    survey = Survey.query.get(sid)
-    if not survey:
-        return jsonify({"code": 1, "desc": "未找到问卷"}), 404
-
-    existing_response_list = user.responses
-    for i in existing_response_list:
-        if i.is_completed is False:
-            create_time = i.create_time
-            break
-    else:
-        return jsonify({"code": 1, "desc": "错误"})
-
-    ddl = create_time + timedelta(hours=24)
-
-    # 构建问卷数据结构
-    survey_data = {
-        "id": survey.id,
-        "name": survey.name,
-        "description": survey.description,
-        "create_time": create_time,
-        "ddl": ddl,
-        "status": survey.status,
-        "questions": [],
-    }
-
-    # 查询问卷中的所有题目
-    for question in survey.questions:
-        # 不返回被逻辑删除的题目
+def build_survey_questions(survey_: Survey) -> list:
+    questions = []
+    for question in survey_.questions:
         if question.logical_deletion:
             continue
+
+        options_data = [
+            {
+                "id": opt.id,
+                "text": "此处作答" if question.question_type in (3, 4) else opt.option_text
+            }
+            for opt in question.options
+        ]
 
         question_data = {
             "display_order": question.display_order,
@@ -90,32 +55,68 @@ def get_survey(sid: int):
             "title": question.question_text,
             "type": question.question_type,
             "score": question.score,
-            "img_list": [],
-            "options": [],
+            "img_list": [{"alt": img.img_alt, "data": img.img_data} for img in question.img_list],
+            "options": options_data,
         }
 
-        for img in question.img_list:
-            question_data["img_list"].append({"alt": img.img_alt, "data": img.img_data})
+        questions.append(question_data)
 
-        # 查询题目中的所有选项
-        for option in question.options:
-            if question.question_type == 3 or question.question_type == 4:
-                question_data["options"].append({"id": option.id, "text": "此处作答"})
-                continue
-            question_data["options"].append({"id": option.id, "text": option.option_text})
+    return questions
 
-        survey_data["questions"].append(question_data)
+
+@survey.route("/get_slots", methods=["GET"])
+@login_required
+def get_all_exam():
+    """获取所有可选择的问卷"""
+    stmt = select(SurveySlot)
+    slots = db.session.execute(stmt).scalars().all()
+    res_data = {
+        "code": 0,
+        "desc": "成功! ",
+        "list": [
+            {
+                "id": slot.id,
+                "slotName": slot.slot_name,
+                "mountedSID": slot.mounted_survey_id,
+            }
+            for slot in slots
+        ],
+    }
+
+    return jsonify(res_data)
+
+
+@survey.route("/survey/<int:sid>", methods=["GET"])
+@login_required
+def get_survey(sid: int):
+    """
+    获取问卷
+    """
+    user: User = cast(User, current_user)
+
+    survey_ = db.session.get(Survey, sid)
+    if not survey_:
+        return jsonify({"code": 1, "desc": "未找到问卷"})
+
+    existing_response_list = user.responses
+    for i in existing_response_list:
+        if not i.is_completed:
+            create_time = i.create_time
+            end_time = i.end_time
+            break
+    else:
+        return jsonify({"code": 1, "desc": "没有要填写的问卷"})
+
+    survey_data = {
+        "id": survey_.id,
+        "name": survey_.name,
+        "description": survey_.description,
+        "create_time": parse_dt_to_iso_utc(create_time),
+        "ddl": parse_dt_to_iso_utc(end_time),
+        "questions": build_survey_questions(survey_),
+    }
+
     return jsonify(survey_data)
-
-
-def incomplete_survey_exist(response_list) -> Response | None:
-    for i in response_list:
-        if i.is_completed is False:
-            expired = is_survey_response_expired(i)
-            if expired is False:
-                return i
-
-    return None
 
 
 @survey.route("/check_survey", methods=["POST"])
@@ -137,6 +138,9 @@ def check_survey():
 @login_required
 @status_check()
 def start_survey():
+    """
+    创建答卷
+    """
     user: User = cast(User, current_user)
 
     # 检查用户是否有未完成的答卷
@@ -156,11 +160,14 @@ def start_survey():
     if not sid or not slot_name or not mc_name or not mc_uuid:
         return jsonify({"code": 1, "desc": "缺少信息！"})
 
-    is_in_whitelist = Whitelist.query.filter_by(player_uuid=mc_uuid).first()
+    is_in_whitelist = db.session.query(Whitelist).filter_by(player_uuid=mc_uuid).first()
     if is_in_whitelist:
         return jsonify({"code": 2, "desc": "此玩家存在已有白名单! "})
 
-    # 创建新的答卷
+    survey_exist = db.session.get(Survey, sid)
+    if survey_exist is None:
+        return jsonify({"code": 1, "desc": "问卷不存在！"})
+
     new_response = Response(
         user_id=user.id,
         survey_id=sid,
@@ -168,19 +175,17 @@ def start_survey():
         player_name=mc_name,
         player_uuid=mc_uuid,
     )
+
     db.session.add(new_response)
+    db.session.flush()
+
+    val = current_app.config["RESPONSE_VALIDITY_PERIOD"]
+    validity_period = timedelta(hours=val)
+    new_response.end_time = new_response.create_time + validity_period
+
     db.session.commit()
 
-    return (
-        jsonify(
-            {
-                "code": 0,
-                "desc": "问卷开始！",
-                "response": new_response.survey_id,
-            }
-        ),
-        201,
-    )
+    return jsonify({"code": 0, "desc": "问卷开始！", "response": new_response.survey_id,})
 
 
 def objective_question_scoring(user_response: list[str], question: Question) -> float:
@@ -199,7 +204,7 @@ def objective_question_scoring(user_response: list[str], question: Question) -> 
     elif question.question_type == QuestionCategory.FILL_IN_THE_BLANKS.value:
         new_user_response: str = user_response[0]
         correct_answer_id: int = correct_options[0]
-        option: Option | None = Option.query.get(correct_answer_id)
+        option: Option | None = db.session.get(Option, correct_answer_id)
         if option is not None:
             correct_answer: str = option.option_text
             if new_user_response == correct_answer:
@@ -233,26 +238,29 @@ def make_answer_details(
 @survey.route("/complete_survey", methods=["POST"])
 @login_required
 def complete_survey():
+    """
+    交卷
+    """
     data = request.get_json()
     user: User = cast(User, current_user)
     res: Response | None = incomplete_survey_exist(user.responses)
     if res is None:
-        return jsonify({"code": 1, "desc": "问卷未找到！"}), 400
+        return jsonify({"code": 1, "desc": "你没有要提交的问卷！"})
 
-    response_id: int = res.id  # 答卷ID
+    response_id: int = res.id # 答卷ID
 
     # 客观题分数
     count_score: float = 0
 
     for i in data:
-        question_id: int = i.get("id")  # 问题ID
-        answer: list | None = i.get("answer")  # 用户答案
+        question_id: int = i.get("id") # 问题ID
+        answer: list | None = i.get("answer") # 用户答案
 
         # 允许空题
         if answer is None:
             continue
 
-        question: Question | None = Question.query.get(question_id)
+        question: Question | None = db.session.get(Question, question_id)
 
         # 如果这道题已经被删除，就算了
         if question is None:
@@ -271,21 +279,21 @@ def complete_survey():
 
     # 标记答卷为已完成
     res.is_completed = True
-    res.response_time = datetime.now(timezone.utc)
+    res.submit_time = datetime.now(timezone.utc)
     db.session.commit()
 
-    send_survey_complete(user.username, res.response_time.isoformat(), res.id)
+    send_survey_complete(user.username, res.submit_time.replace(tzinfo=timezone.utc).isoformat(), res.id)
 
     return jsonify({"code": 0, "desc": "提交成功！", "score": count_score}), 200
 
 
 def send_survey_complete(username: str, response_time: str, id_: int):
     with APP.app_context():
-        admins: list[User] = User.query.filter_by(role='admin').all()
-        if len(admins) == 0:
+        stmt = select(User).filter_by(role='admin')
+        admins: list[User] = db.session.execute(stmt).scalars().all()
+        if not admins:
             return
-        admin_mail = []
-        for admin in admins:
-            admin_mail.append(f'{admin.user_qq}@qq.com')
-        msg = survey_complete_mail(admin_mail, username, response_time, id_)
+
+        admin_mails = [f"{admin.user_qq}@qq.com" for admin in admins]
+        msg = survey_complete_mail(admin_mails, username, response_time, id_)
         send_mail(APP, msg)

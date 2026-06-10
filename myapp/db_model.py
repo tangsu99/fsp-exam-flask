@@ -16,19 +16,7 @@ DEFAULT_AVATAR = "8667ba71-b85a-4004-af54-457a9734eed7"
 # SQLite 原生不支持 TIMESTAMP WITH TIME ZONE，
 # 但 SQLAlchemy 会自动将其映射为 TEXT/CHAR 并正确处理 ISO 格式，无需担心
 TZ_AWARE_DATETIME = DateTime(timezone=True)
-
-# upload_date: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
-# update_date: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
-# 上述代码对应的 DDL 应该如下
-# upload_date     datetime default CURRENT_TIMESTAMP not null,
-# update_date     datetime default CURRENT_TIMESTAMP not null on update CURRENT_TIMESTAMP,
-# SQLite 的 CURRENT_TIMESTAMP 默认返回的就是 UTC 格式字符串；MySQL/PG 返回的是服务器本地时间
-# 它们都不带时区，很麻烦，Unix 时间戳又只支持到 2038 年
-# 所以采用 Python 赋值时间比较方便
-# 这样设置的时间，存在 DB 的都是 UTC 时间的 datetime，前后端都可以直接正确处理
-# 时间发给前端的时候 .isoformat() 加不加都可以
-
-# 建议的字段设置：
+# 建议的涉及时间的字段设置：
 # upload_date: Mapped[datetime] = mapped_column(
 #     TZ_AWARE_DATETIME, # 定义时就显性说明带时区
 #     default=lambda: datetime.now(timezone.utc), # 每次 INSERT 时动态调用
@@ -42,7 +30,19 @@ TZ_AWARE_DATETIME = DateTime(timezone=True)
 #     nullable=False
 # )
 
+# 不推荐：
+# upload_date: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
+# update_date: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+# 上述代码对应的 DDL 应该如下
+# upload_date     datetime default CURRENT_TIMESTAMP not null,
+# update_date     datetime default CURRENT_TIMESTAMP not null on update CURRENT_TIMESTAMP,
+# func.now() 翻译出来是 CURRENT_TIMESTAMP，SQLite 的 CURRENT_TIMESTAMP 默认返回的就是 UTC 格式字符串；MySQL/PG 返回的是服务器本地时间
+# 它们都不带时区，很麻烦，Unix 时间戳又只支持到 2038 年
 # func.utc_timestamp() # MySQL 特有，返回 UTC 时间戳，不支持 PGSQL 和 SQLite
+# 所以采用 Python 赋值时间比较方便且跨平台
+# 这样设置的时间，存在 DB 的都是 UTC 时间的 datetime，前后端都可以直接正确处理
+# 时间发给前端的时候 .isoformat() 加不加都可以
+
 
 @unique
 class QuestionCategory(IntEnum):
@@ -67,25 +67,17 @@ class SchematicType(IntEnum):
 
 # 问卷表模型
 class Survey(db.Model):
-    __tablename__ = "surveys"  # 指定表名
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)  # 主键，问卷唯一标识，自增
-    name: Mapped[str] = mapped_column(String(200), nullable=False)  # 问卷名称，不允许为空
-    description: Mapped[Optional[str]] = mapped_column(Text)  # 问卷描述，可为空
-    create_time: Mapped[datetime] = mapped_column(
-        DateTime, default=func.utc_timestamp(), server_default=func.utc_timestamp()
-    )  # 问卷创建时间，默认为当前时间
-    status: Mapped[int] = mapped_column(Integer, nullable=False)  # 问卷状态，！！！已废弃字段！！！
+    __tablename__ = "surveys"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text, default='', nullable=False)
+    create_time: Mapped[datetime] = mapped_column(TZ_AWARE_DATETIME, default=lambda: datetime.now(timezone.utc), nullable=False)
     questions: Mapped[list["Question"]] = relationship(
         "Question", backref="survey", lazy="select", cascade="all, delete"
     )  # 与问题表建立一对多关系，级联删除
     response: Mapped[list["Response"]] = relationship(
         "Response", backref="survey_res", lazy="select", cascade="all, delete"
     )  # 与答卷表建立一对多关系，级联删除
-
-    def __init__(self, name: str, description: str, status: int = 0):
-        self.name = name
-        self.description = description
-        self.status = status
 
 
 # 问题表模型
@@ -200,40 +192,26 @@ class Question(db.Model):
 
 # 问题图片表模型
 class QuestionImgURL(db.Model):
-    __tablename__ = "question_images"  # 指定表名
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)  # 主键，选项唯一标识，自增
+    __tablename__ = "question_images"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     question_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("questions.id", ondelete="CASCADE"), nullable=False
     )  # 所属问题id，外键，关联问题表，级联删除
-    img_alt: Mapped[str] = mapped_column(String(200))  # 图片alt，允许为空
-    img_data: Mapped[str] = mapped_column(LONGTEXT, nullable=False)  # 图片数据，URL 或者 Base64 编码的图片，不允许为空
-    create_time: Mapped[datetime] = mapped_column(
-        DateTime, default=func.utc_timestamp(), server_default=func.utc_timestamp()
-    )  # 选项创建时间，默认为当前时间
-
-    def __init__(self, question_id: int, img_alt: str, img_data: str):
-        self.question_id = question_id
-        self.img_alt = img_alt
-        self.img_data = img_data
+    img_alt: Mapped[str] = mapped_column(String(200), default='', nullable=False)
+    img_data: Mapped[str] = mapped_column(LONGTEXT, nullable=False) # 图片数据，URL 或者 Base64 编码的图片
+    create_time: Mapped[datetime] = mapped_column(TZ_AWARE_DATETIME, default=lambda: datetime.now(timezone.utc), nullable=False)
 
 
 # 选项表模型
 class Option(db.Model):
-    __tablename__ = "options"  # 指定表名
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)  # 主键，选项唯一标识，自增
+    __tablename__ = "options"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     question_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("questions.id", ondelete="CASCADE"), nullable=False
     )  # 所属问题id，外键，关联问题表，级联删除
     option_text: Mapped[str] = mapped_column(Text, nullable=False)  # 选项内容，不允许为空
     is_correct: Mapped[Optional[bool]] = mapped_column(Boolean)  # 是否为正确选项，对于有标准答案的题目，可为空
-    create_time: Mapped[datetime] = mapped_column(
-        DateTime, default=func.utc_timestamp(), server_default=func.utc_timestamp()
-    )  # 选项创建时间，默认为当前时间
-
-    def __init__(self, question_id: int, option_text: str, is_correct: bool = False):
-        self.question_id = question_id
-        self.option_text = option_text
-        self.is_correct = is_correct
+    create_time: Mapped[datetime] = mapped_column(TZ_AWARE_DATETIME, default=lambda: datetime.now(timezone.utc), nullable=False)
 
 
 # 用户表模型
@@ -244,9 +222,11 @@ class User(UserMixin, db.Model):
     user_qq: Mapped[str] = mapped_column(String(25), unique=True, nullable=False)
     _password_hash: Mapped[str] = mapped_column("password", String(100), nullable=False) # 哈希过的密码
     role: Mapped[str] = mapped_column(String(100), nullable=False, default="user") # 用户角色，如普通用户、管理员等
-    addtime: Mapped[datetime] = mapped_column(
-        DateTime, default=func.utc_timestamp(), server_default=func.utc_timestamp()
-    )  # 用户新增时间，默认为当前时间，DB 里面是 UTC 时间
+    registered_at: Mapped[datetime] = mapped_column(
+        TZ_AWARE_DATETIME,
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False
+    )
     avatar: Mapped[str] = mapped_column(String(500), default=DEFAULT_AVATAR)
     status: Mapped[int] = mapped_column(
         Integer, nullable=False, default=0
@@ -307,9 +287,9 @@ class User(UserMixin, db.Model):
 # 答卷表模型
 class Response(db.Model):
     __tablename__ = "responses"  # 指定表名
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)  # 主键，答卷唯一标识，自增
-    is_completed: Mapped[bool] = mapped_column(Boolean, default=False)  # 完成状态，默认为False（未完成）
-    is_reviewed: Mapped[int] = mapped_column(Integer, default=0)  # 阅卷状态，0 待审核 1 已通过 2 已拒绝
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    is_completed: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_reviewed: Mapped[int] = mapped_column(Integer, default=0) # 阅卷状态，0 待审核 1 已通过 2 已拒绝
     reviewer_uid: Mapped[int] = mapped_column(Integer, nullable=True)
     player_name: Mapped[str] = mapped_column(String(25), nullable=False)
     player_uuid: Mapped[str] = mapped_column(String(36), nullable=False)
@@ -319,13 +299,10 @@ class Response(db.Model):
     survey_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("surveys.id", ondelete="CASCADE"), nullable=False
     )  # 所答问卷id，外键，关联问卷表，级联删除
-    survey_name: Mapped[str] = mapped_column(String(200), nullable=True)  # 问卷当时的名称
-    response_time: Mapped[datetime] = mapped_column(
-        DateTime, nullable=True
-    )  # 答卷时间，默认为当前时间
-    create_time: Mapped[datetime] = mapped_column(
-        DateTime, default=func.utc_timestamp(), server_default=func.utc_timestamp()
-    )  # 答卷记录创建时间，默认为当前时间
+    survey_name: Mapped[str] = mapped_column(String(200), nullable=True) # 问卷当时的名称
+    create_time: Mapped[datetime] = mapped_column(TZ_AWARE_DATETIME, default=lambda: datetime.now(timezone.utc), nullable=False) # 开考时间
+    submit_time: Mapped[datetime] = mapped_column(TZ_AWARE_DATETIME, nullable=True) # 交卷时间
+    end_time: Mapped[datetime] = mapped_column(TZ_AWARE_DATETIME, nullable=True) # 截止时间
     response_details: Mapped[list["ResponseDetail"]] = relationship(
         "ResponseDetail", backref="response_d", lazy="select", cascade="all, delete"
     )  # 与答题详情表建立一对多关系，级联删除
@@ -333,13 +310,6 @@ class Response(db.Model):
         "ResponseScore", backref="response_s", lazy="select", cascade="all, delete"
     )
     archive_score: Mapped[float] = mapped_column(Float, nullable=True)
-
-    def __init__(self, user_id: int, survey_id: int, survey_name: str, player_name: str, player_uuid: str):
-        self.user_id = user_id
-        self.survey_id = survey_id
-        self.survey_name = survey_name
-        self.player_name = player_name
-        self.player_uuid = player_uuid
 
 
 class ResponseScore(db.Model):
@@ -554,9 +524,9 @@ class Schematic(db.Model):
 
     # 与文件分表建立一对一关系 (cascade确保删除主表时，关联的二进制文件也被删除)
     file_data: Mapped["SchematicFile"] = relationship(
-        back_populates="schematics",
-        cascade="all, delete-orphan",
-        uselist=False
+        back_populates="schematics", # 建立双向关系，两端的数据状态会自动保持同步
+        cascade="all, delete-orphan", # ORM 层操作
+        uselist=False # 这是实现一对一关系的核心参数。默认情况下，relationship 返回的是一个列表（一对多）。将其设置为 False 后，SQLAlchemy 知道这个属性返回的是单个对象而不是列表
     )
 
     @staticmethod

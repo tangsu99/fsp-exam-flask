@@ -63,21 +63,12 @@ def check_password_format(password: str) -> bool:
 
 
 def is_survey_response_expired(survey_response: Response) -> bool:
-    val = current_app.config["RESPONSE_VALIDITY_PERIOD"]
-    validity_period = timedelta(hours=val) # 有效期为 24h
-
-    # 只判断未完成的问卷，已完成的问卷不存在“过期”的说法
-    if not survey_response.is_completed:
-        create_time = survey_response.create_time
-        create_datetime = create_time.replace(tzinfo=timezone.utc)
-        current_datetime = datetime.now(timezone.utc)
-        expired_datetime = create_datetime + validity_period
-        if expired_datetime < current_datetime:
-            survey_response.is_completed = True
-            survey_response.is_reviewed = 2
-            db.session.commit()
-            return True
-    return False
+    """
+    判断答卷是否过期
+    """
+    expired_datetime = survey_response.end_time.replace(tzinfo=timezone.utc)
+    current_datetime = datetime.now(timezone.utc)
+    return True if current_datetime > expired_datetime else False
 
 def validate_json_required_fields(required_fields:dict, data: dict) -> dict:
     """
@@ -161,3 +152,13 @@ def get_file_size(file_storage, unit='KB'):
 
     # 如果算出来文件大小为 0 按 1 算
     return calculated_size if calculated_size > 0 else 1
+
+def parse_frontend_time_to_utc(front_end_time: str) -> datetime:
+    """
+    对于前端用 new Date(time).toISOString() 格式化的时间，此函数可以将其转化为 UTC 时间的 DateTime
+    front_end_time 打印出来应该类似这种格式：2026-06-07T10:43:00.000Z
+    """
+    return datetime.fromisoformat(front_end_time.replace('Z', '+00:00'))
+
+def parse_dt_to_iso_utc(dt: datetime) -> str:
+    return dt.replace(tzinfo=timezone.utc).isoformat()

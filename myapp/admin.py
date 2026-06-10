@@ -1,7 +1,7 @@
-from datetime import datetime, timezone
 from flask import Blueprint, jsonify, request
 from flask_login import login_required, current_user
-from sqlalchemy import select
+from sqlalchemy import select, delete
+from sqlalchemy.orm import Mapped
 
 from myapp import db, my_config, APP
 from myapp.db_model import (
@@ -19,7 +19,8 @@ from myapp.db_model import (
     Whitelist,
 )
 from myapp.mail import survey_result_mail, send_mail
-from myapp.utils import check_password_format, required_role, is_survey_response_expired, validate_json_required_fields
+from myapp.utils import check_password_format, required_role, is_survey_response_expired, validate_json_required_fields, \
+    parse_frontend_time_to_utc, parse_dt_to_iso_utc
 
 admin = Blueprint("admin", __name__)
 
@@ -182,7 +183,7 @@ def check_and_format_questions(questions: list)->dict:
 
     for question_data in questions:
         validate_res: dict = validate_json_required_fields(question_required_fields, question_data)
-        print(validate_res)
+
         if validate_res["success"] is False:
             return {"success": False, "desc": "题目数据格式验证失败！"}
 
@@ -208,7 +209,7 @@ def add_question_images(question_id: int, img_list: list) -> None:
         db.session.add(img)
 
 
-def add_question_options(question_id: int, question_type: int, options: list) -> None:
+def add_question_options(question_id: int, question_type: int | Mapped[int], options: list) -> None:
     # 如果是填空题或者主观，设置第一个选项为正确选项
     if question_type in [3, 4]:
         options[0]["isCorrect"] = True
@@ -310,30 +311,36 @@ def edit_question():
     if not question_id:
         return jsonify({"code": 1, "desc": "缺少题目 ID"})
 
-    question: Question | None = Question.query.get(question_id)
+    try:
+        question: Question | None = db.session.get(Question, question_id)
 
-    if question is None:
-        return jsonify({"code": 1, "desc": "题目不存在"})
+        if question is None:
+            return jsonify({"code": 1, "desc": "题目不存在"})
 
-    # 更新题目基本信息
-    question.survey_id = req_data["surveyId"]
-    question.question_text = req_data["title"]
-    question.question_type = req_data["type"]
-    question.score = req_data["score"]
+        # 更新题目基本信息
+        question.survey_id = req_data["surveyId"]
+        question.question_text = req_data["title"]
+        question.question_type = req_data["type"]
+        question.score = req_data["score"]
 
-    # 处理选项数据
-    options = req_data.get("options")
-    Option.query.filter_by(question_id=question_id).delete()
-    add_question_options(question.id, question.question_type, options)
+        # 处理选项数据
+        options = req_data.get("options")
+        stmt_opt = delete(Option).where(Option.question_id == question_id)
+        db.session.execute(stmt_opt)
+        add_question_options(question.id, question.question_type, options)
 
-    # 处理图片数据
-    img_list = req_data.get("img_list", [])
-    QuestionImgURL.query.filter_by(question_id=question_id).delete()
-    add_question_images(question_id, img_list)
+        # 处理图片数据
+        img_list = req_data.get("img_list", [])
+        stmt = delete(QuestionImgURL).where(QuestionImgURL.question_id == question_id)
+        db.session.execute(stmt)
+        add_question_images(question_id, img_list)
 
-    db.session.commit()
+        db.session.commit()
 
-    return jsonify({"code": 0, "desc": "修改题目成功"})
+        return jsonify({"code": 0, "desc": "修改题目成功"})
+    except Exception as e:
+        db.session.rollback()
+        raise e
 
 
 @admin.route("/delQuestion", methods=["POST"])
@@ -446,13 +453,13 @@ def users():
     per_page = request.args.get("size", 10, type=int)  # 获取每页条数，默认为 10
 
     # 分页查询用户
-    query = User.query.filter(User.status != 4)
+    query = db.session.query(User).filter(User.status != 4)
     pagination = query.paginate(page=page, per_page=per_page, error_out=False)
-    users = pagination.items
+    user_list = pagination.items
 
     # 构造返回数据
     user_data = []
-    for user in users:
+    for user in user_list:
         user_data.append(
             {
                 "id": user.id,
@@ -460,7 +467,7 @@ def users():
                 "userQQ": user.user_qq,
                 "role": user.role,
                 "status": user.status,
-                "addtime": user.addtime.replace(tzinfo=timezone.utc).isoformat() if user.addtime else None,
+                "addtime": user.registered_at.isoformat(),
                 "avatar": user.avatar,
             }
         )
@@ -482,7 +489,7 @@ def users():
 @required_role("admin")
 def get_user():
     id_ = request.args.get("id", 0, type=int)
-    user: User | None = User.query.get(id_)
+    user: User | None = db.session.get(User, id_)
     if user is None:
         return jsonify({"code": 1, "desc": "未找到用户！"}), 400
     return jsonify(
@@ -495,7 +502,7 @@ def get_user():
                 "user_qq": user.user_qq,
                 "role": user.role,
                 "status": user.status,
-                "addtime": user.addtime.replace(tzinfo=timezone.utc).isoformat() if user.addtime else None,
+                "addtime": parse_dt_to_iso_utc(user.registered_at),
                 "avatar": user.avatar,
             },
         }
@@ -546,7 +553,7 @@ def set_user():
         username = req_data.get("username")
         password = req_data.get("password")
         user_qq = req_data.get("userQQ")
-        registration_time = req_data.get("addtime")
+        registered_at_iso_str = req_data.get("addtime")
         role = req_data.get("role")
         status = req_data.get("status")
 
@@ -569,10 +576,8 @@ def set_user():
         if user_qq:
             user.user_qq = user_qq
 
-        if registration_time:
-            iso_string_fixed = registration_time.replace('Z', '+00:00')
-            dt = datetime.fromisoformat(iso_string_fixed)
-            user.addtime = dt
+        if registered_at_iso_str:
+            user.registered_at = parse_frontend_time_to_utc(registered_at_iso_str)
 
         if role:
             user.role = role
@@ -630,6 +635,10 @@ def get_surveys():
             expired = is_survey_response_expired(i)
             if expired is False and i.is_completed is False:
                 not_completed_count += 1
+            if expired:
+                i.is_completed = True
+                i.is_reviewed = 2
+                db.session.commit()
 
         not_reviewed_count = Response.query.filter(
             Response.survey_id == _survey.id,
@@ -660,10 +669,10 @@ def get_responses():
     """
     查询答卷列表
     """
-    page = request.args.get("page", 1, type=int)  # 获取页码，默认为 1
-    per_page = request.args.get("size", 10, type=int)  # 获取每页条数，默认为 10
+    page = request.args.get("page", 1, type=int)
+    per_page = request.args.get("size", 10, type=int)
 
-    pagination = Response.query.paginate(page=page, per_page=per_page, error_out=False)
+    pagination = db.session.query(Response).paginate(page=page, per_page=per_page, error_out=False)
     result = pagination.items
 
     response_data = {
@@ -676,24 +685,29 @@ def get_responses():
     }
     for i in result:
         # 刷新一下是否过期
-        is_survey_response_expired(i)
+        if is_survey_response_expired(i):
+            i.is_completed = True
+            i.is_reviewed = 2
+            db.session.commit()
 
         total_score: float = 0
 
         # 如果是被批改完的卷子，就直接调取总分，否则计算一遍
         if i.archive_score is None:
             scores = ResponseScore.query.filter_by(response_id=i.id).all()
-            total_score = sum(score.score for score in scores)  # 计算总分
+            total_score = sum(score.score for score in scores) # 计算总分
 
         else:
             total_score = i.archive_score
 
-        reviewer: None | User = User.query.get(i.reviewer_uid)
-
-        if reviewer is None:
-            reviewer_name = "该用户不存在"
+        if i.reviewer_uid is None:
+            reviewer_name = "未审核"
         else:
-            reviewer_name = reviewer.username
+            reviewer: None | User = db.session.get(User, i.reviewer_uid)
+            if reviewer is None:
+                reviewer_name = "该用户不存在"
+            else:
+                reviewer_name = reviewer.username
 
         response_data["list"].append(
             {
@@ -706,7 +720,7 @@ def get_responses():
                 "score": total_score,
                 "surveyId": i.survey_res.id,
                 "createTime": i.create_time,
-                "responseTime": i.response_time,
+                "responseTime": i.submit_time,
                 "reviewer_name": reviewer_name,
             }
         )
@@ -727,7 +741,6 @@ def get_survey(sid: int):
         "name": survey.name,
         "description": survey.description,
         "create_time": survey.create_time,
-        # "status": status, 好像没用
         "questions": [],
     }
 
@@ -843,7 +856,6 @@ def get_detail(resp_id: int):
         "description": survey.description,
         "create_time": survey.create_time,
         "isReviewed": res.is_reviewed,
-        # "status": survey.status, 好像用不到
         "questions": [],
     }
 
