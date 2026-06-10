@@ -106,12 +106,14 @@ def get_survey(sid: int):
     return jsonify(survey_data)
 
 
-def incomplete_survey_exist(response_list) -> Response | None:
+def incomplete_survey_exist(response_list: list[Response]) -> Response | None:
     for i in response_list:
         if not i.is_completed:
-            expired = is_survey_response_expired(i)
-            if not expired:
+            if not is_survey_response_expired(i):
                 return i
+            i.is_completed = True
+            i.is_reviewed = 2
+            db.session.flush()
 
     return None
 
