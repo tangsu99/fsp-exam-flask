@@ -665,10 +665,10 @@ def get_responses():
     """
     查询答卷列表
     """
-    page = request.args.get("page", 1, type=int)  # 获取页码，默认为 1
-    per_page = request.args.get("size", 10, type=int)  # 获取每页条数，默认为 10
+    page = request.args.get("page", 1, type=int)
+    per_page = request.args.get("size", 10, type=int)
 
-    pagination = Response.query.paginate(page=page, per_page=per_page, error_out=False)
+    pagination = db.session.query(Response).paginate(page=page, per_page=per_page, error_out=False)
     result = pagination.items
 
     response_data = {
@@ -688,12 +688,12 @@ def get_responses():
         # 如果是被批改完的卷子，就直接调取总分，否则计算一遍
         if i.archive_score is None:
             scores = ResponseScore.query.filter_by(response_id=i.id).all()
-            total_score = sum(score.score for score in scores)  # 计算总分
+            total_score = sum(score.score for score in scores) # 计算总分
 
         else:
             total_score = i.archive_score
 
-        reviewer: None | User = User.query.get(i.reviewer_uid)
+        reviewer: None | User = db.session.get(User, i.reviewer_uid)
 
         if reviewer is None:
             reviewer_name = "该用户不存在"
