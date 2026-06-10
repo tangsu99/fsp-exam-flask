@@ -1,6 +1,8 @@
 # Changelog
 
-## [0.2.1] (Developing)
+## [0.3.0] (Developing)
+
+## [0.2.1] (2026-06-10)
 
 ### Refactor
 
