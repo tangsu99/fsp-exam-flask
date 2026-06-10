@@ -700,12 +700,14 @@ def get_responses():
         else:
             total_score = i.archive_score
 
-        reviewer: None | User = db.session.get(User, i.reviewer_uid)
-
-        if reviewer is None:
-            reviewer_name = "该用户不存在"
+        if i.reviewer_uid is None:
+            reviewer_name = "未审核"
         else:
-            reviewer_name = reviewer.username
+            reviewer: None | User = db.session.get(User, i.reviewer_uid)
+            if reviewer is None:
+                reviewer_name = "该用户不存在"
+            else:
+                reviewer_name = reviewer.username
 
         response_data["list"].append(
             {
