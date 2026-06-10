@@ -1,6 +1,9 @@
 # Changelog
 
-## [0.3.0] (Developing)
+## [0.2.2] (Developing)
+
+### Refactor
+- 重构 admin 接口
 
 ## [0.2.1] (2026-06-10)
 
