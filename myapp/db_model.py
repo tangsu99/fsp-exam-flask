@@ -300,10 +300,8 @@ class Response(db.Model):
         Integer, ForeignKey("surveys.id", ondelete="CASCADE"), nullable=False
     )  # 所答问卷id，外键，关联问卷表，级联删除
     survey_name: Mapped[str] = mapped_column(String(200), nullable=True) # 问卷当时的名称
-    response_time: Mapped[datetime] = mapped_column(
-        DateTime, nullable=True
-    )  # 答卷时间，默认为当前时间
     create_time: Mapped[datetime] = mapped_column(TZ_AWARE_DATETIME, default=lambda: datetime.now(timezone.utc), nullable=False) # 开考时间
+    submit_time: Mapped[datetime] = mapped_column(TZ_AWARE_DATETIME, nullable=True) # 交卷时间
     response_details: Mapped[list["ResponseDetail"]] = relationship(
         "ResponseDetail", backref="response_d", lazy="select", cascade="all, delete"
     )  # 与答题详情表建立一对多关系，级联删除
