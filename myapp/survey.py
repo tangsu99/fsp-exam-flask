@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta, timezone
 from typing import cast
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, current_app
 from flask_login import current_user, login_required
 
 from myapp import db, APP
@@ -15,8 +15,7 @@ from myapp.db_model import (
     ResponseScore,
     Survey,
     User,
-    Whitelist,
-    ConfigModel
+    Whitelist
 )
 from myapp.mail import survey_complete_mail, send_mail
 from myapp.utils import is_survey_response_expired, status_check, parse_dt_to_iso_utc
@@ -63,23 +62,17 @@ def get_survey(sid: int):
     for i in existing_response_list:
         if not i.is_completed:
             create_time = i.create_time
+            end_time = i.end_time
             break
     else:
         return jsonify({"code": 1, "desc": "错误"})
 
-    span = db.session.get(ConfigModel, "RESPONSE_VALIDITY_PERIOD")
-    if span is None:
-        return jsonify({"code": 1, "desc": "管理员未设置作答时间"})
-
-    ddl = create_time + timedelta(hours=int(span.value)) # 答题有效时间 24 小时
-
-    # 构建问卷数据结构
     survey_data = {
         "id": survey_.id,
         "name": survey_.name,
         "description": survey_.description,
         "create_time": parse_dt_to_iso_utc(create_time),
-        "ddl": parse_dt_to_iso_utc(ddl),
+        "ddl": parse_dt_to_iso_utc(end_time),
         "questions": [],
     }
 
@@ -115,7 +108,7 @@ def get_survey(sid: int):
 
 def incomplete_survey_exist(response_list) -> Response | None:
     for i in response_list:
-        if i.is_completed is False:
+        if not i.is_completed:
             expired = is_survey_response_expired(i)
             if not expired:
                 return i
@@ -172,7 +165,6 @@ def start_survey():
     if survey_exist is None:
         return jsonify({"code": 1, "desc": "问卷不存在！"})
 
-    # 创建新的答卷
     new_response = Response(
         user_id=user.id,
         survey_id=sid,
@@ -180,19 +172,17 @@ def start_survey():
         player_name=mc_name,
         player_uuid=mc_uuid,
     )
+
     db.session.add(new_response)
+    db.session.flush()
+
+    val = current_app.config["RESPONSE_VALIDITY_PERIOD"]
+    validity_period = timedelta(hours=val)
+    new_response.end_time = new_response.create_time + validity_period
+
     db.session.commit()
 
-    return (
-        jsonify(
-            {
-                "code": 0,
-                "desc": "问卷开始！",
-                "response": new_response.survey_id,
-            }
-        ),
-        201,
-    )
+    return jsonify({"code": 0, "desc": "问卷开始！", "response": new_response.survey_id,})
 
 
 def objective_question_scoring(user_response: list[str], question: Question) -> float:
@@ -211,7 +201,7 @@ def objective_question_scoring(user_response: list[str], question: Question) -> 
     elif question.question_type == QuestionCategory.FILL_IN_THE_BLANKS.value:
         new_user_response: str = user_response[0]
         correct_answer_id: int = correct_options[0]
-        option: Option | None = Option.query.get(correct_answer_id)
+        option: Option | None = db.session.get(Option, correct_answer_id)
         if option is not None:
             correct_answer: str = option.option_text
             if new_user_response == correct_answer:
@@ -289,7 +279,7 @@ def complete_survey():
     res.submit_time = datetime.now(timezone.utc)
     db.session.commit()
 
-    send_survey_complete(user.username, res.submit_time.isoformat(), res.id)
+    send_survey_complete(user.username, res.submit_time.replace(tzinfo=timezone.utc).isoformat(), res.id)
 
     return jsonify({"code": 0, "desc": "提交成功！", "score": count_score}), 200
 
