@@ -3,6 +3,7 @@ from typing import cast
 
 from flask import Blueprint, jsonify, request, current_app
 from flask_login import current_user, login_required
+from sqlalchemy import select
 
 from myapp import db, APP
 from myapp.db_model import (
@@ -23,25 +24,64 @@ from myapp.utils import is_survey_response_expired, status_check, parse_dt_to_is
 survey = Blueprint("survey", __name__)
 
 
+def incomplete_survey_exist(response_list: list[Response]) -> Response | None:
+    for i in response_list:
+        if not i.is_completed:
+            if not is_survey_response_expired(i):
+                return i
+            i.is_completed = True
+            i.is_reviewed = 2
+            db.session.flush()
+
+    return None
+
+def build_survey_questions(survey_: Survey) -> list:
+    questions = []
+    for question in survey_.questions:
+        if question.logical_deletion:
+            continue
+
+        options_data = [
+            {
+                "id": opt.id,
+                "text": "此处作答" if question.question_type in (3, 4) else opt.option_text
+            }
+            for opt in question.options
+        ]
+
+        question_data = {
+            "display_order": question.display_order,
+            "id": question.id,
+            "title": question.question_text,
+            "type": question.question_type,
+            "score": question.score,
+            "img_list": [{"alt": img.img_alt, "data": img.img_data} for img in question.img_list],
+            "options": options_data,
+        }
+
+        questions.append(question_data)
+
+    return questions
+
+
 @survey.route("/get_slots", methods=["GET"])
 @login_required
-def get_all_question_type():
-    slots: list[SurveySlot] = SurveySlot.query.all()
-
+def get_all_exam():
+    """获取所有可选择的问卷"""
+    stmt = select(SurveySlot)
+    slots = db.session.execute(stmt).scalars().all()
     res_data = {
         "code": 0,
         "desc": "成功! ",
-        "list": [],
-    }
-
-    for slot in slots:
-        res_data["list"].append(
+        "list": [
             {
                 "id": slot.id,
                 "slotName": slot.slot_name,
                 "mountedSID": slot.mounted_survey_id,
             }
-        )
+            for slot in slots
+        ],
+    }
 
     return jsonify(res_data)
 
@@ -65,7 +105,7 @@ def get_survey(sid: int):
             end_time = i.end_time
             break
     else:
-        return jsonify({"code": 1, "desc": "错误"})
+        return jsonify({"code": 1, "desc": "没有要填写的问卷"})
 
     survey_data = {
         "id": survey_.id,
@@ -73,49 +113,10 @@ def get_survey(sid: int):
         "description": survey_.description,
         "create_time": parse_dt_to_iso_utc(create_time),
         "ddl": parse_dt_to_iso_utc(end_time),
-        "questions": [],
+        "questions": build_survey_questions(survey_),
     }
 
-    # 查询问卷中的所有题目
-    for question in survey_.questions:
-        # 不返回被逻辑删除的题目
-        if question.logical_deletion:
-            continue
-
-        question_data = {
-            "display_order": question.display_order,
-            "id": question.id,
-            "title": question.question_text,
-            "type": question.question_type,
-            "score": question.score,
-            "img_list": [],
-            "options": [],
-        }
-
-        for img in question.img_list:
-            question_data["img_list"].append({"alt": img.img_alt, "data": img.img_data})
-
-        # 查询题目中的所有选项
-        for option in question.options:
-            if question.question_type == 3 or question.question_type == 4:
-                question_data["options"].append({"id": option.id, "text": "此处作答"})
-                continue
-            question_data["options"].append({"id": option.id, "text": option.option_text})
-
-        survey_data["questions"].append(question_data)
     return jsonify(survey_data)
-
-
-def incomplete_survey_exist(response_list: list[Response]) -> Response | None:
-    for i in response_list:
-        if not i.is_completed:
-            if not is_survey_response_expired(i):
-                return i
-            i.is_completed = True
-            i.is_reviewed = 2
-            db.session.flush()
-
-    return None
 
 
 @survey.route("/check_survey", methods=["POST"])
@@ -288,11 +289,11 @@ def complete_survey():
 
 def send_survey_complete(username: str, response_time: str, id_: int):
     with APP.app_context():
-        admins: list[User] = User.query.filter_by(role='admin').all()
-        if len(admins) == 0:
+        stmt = select(User).filter_by(role='admin')
+        admins: list[User] = db.session.execute(stmt).scalars().all()
+        if not admins:
             return
-        admin_mail = []
-        for admin in admins:
-            admin_mail.append(f'{admin.user_qq}@qq.com')
-        msg = survey_complete_mail(admin_mail, username, response_time, id_)
+
+        admin_mails = [f"{admin.user_qq}@qq.com" for admin in admins]
+        msg = survey_complete_mail(admin_mails, username, response_time, id_)
         send_mail(APP, msg)
