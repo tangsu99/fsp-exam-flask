@@ -286,10 +286,10 @@ def complete_survey():
 
     # 标记答卷为已完成
     res.is_completed = True
-    res.response_time = datetime.now(timezone.utc)
+    res.submit_time = datetime.now(timezone.utc)
     db.session.commit()
 
-    send_survey_complete(user.username, res.response_time.isoformat(), res.id)
+    send_survey_complete(user.username, res.submit_time.isoformat(), res.id)
 
     return jsonify({"code": 0, "desc": "提交成功！", "score": count_score}), 200
 

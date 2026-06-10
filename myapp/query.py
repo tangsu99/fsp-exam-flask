@@ -59,7 +59,7 @@ def response():
             {
                 "id": res.id,
                 "survey_name": res.survey_name,
-                "responseTime": res.response_time,
+                "responseTime": res.submit_time,
                 "state": res.is_reviewed,
                 "get_score": total_score,
                 "full_score": full_score,

@@ -711,7 +711,7 @@ def get_responses():
                 "score": total_score,
                 "surveyId": i.survey_res.id,
                 "createTime": i.create_time,
-                "responseTime": i.response_time,
+                "responseTime": i.submit_time,
                 "reviewer_name": reviewer_name,
             }
         )
