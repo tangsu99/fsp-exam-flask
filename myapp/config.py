@@ -15,6 +15,7 @@ class Config:
     def __init__(self, app: Flask, db_: SQLAlchemy) -> None:
         self.app = app
         self.db = db_
+        self.accepted_types = ['str', 'int', 'bool', 'list']
         self.__init_default_config()
         self.__resync_flask_config()
 
@@ -66,12 +67,15 @@ class Config:
 
         return res
 
-    def set_item(self, item_key: str, item_value: str, item_type:str, item_description:str) -> None:
+    def set_item(self, item_key: str, item_value: str, item_type:str, item_description:str) -> bool:
         stmt = select(ConfigModel).where(ConfigModel.key == item_key)
         conf: ConfigModel | None = self.db.session.execute(stmt).scalar_one_or_none()
 
+        if item_type not in self.accepted_types:
+            return False
+
         if conf is None:
-            self.db.session.add(ConfigModel(item_key, item_value, item_type, item_description))
+            self.db.session.add(ConfigModel(key=item_key, value=item_value, type=item_type, description=item_description))
         else:
             conf.value = item_value
             conf.type = item_type
@@ -79,6 +83,7 @@ class Config:
 
         self.db.session.commit()
         self.__resync_flask_config()
+        return True
 
     def delete_item(self, item_key: str) -> bool:
         stmt = select(ConfigModel).where(ConfigModel.key == item_key)

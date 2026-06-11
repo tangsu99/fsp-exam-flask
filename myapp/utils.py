@@ -1,12 +1,11 @@
 import os
 import re
-from datetime import timedelta, timezone, datetime
+from datetime import timezone, datetime
 from functools import wraps
 from typing import cast
 from flask import abort, current_app, request, jsonify
 from flask_login import current_user
 
-from myapp import db
 from myapp.db_model import User, Response
 
 PASSWORD_PATTERN = re.compile(r"^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[\W_])[A-Za-z\d\W_]{8,16}$")
@@ -162,3 +161,18 @@ def parse_frontend_time_to_utc(front_end_time: str) -> datetime:
 
 def parse_dt_to_iso_utc(dt: datetime) -> str:
     return dt.replace(tzinfo=timezone.utc).isoformat()
+
+def build_pagination_dict(pagination, pagination_items: list, with_total:bool = False) -> dict:
+    result = {
+        "items": pagination_items,
+        "page": pagination.page,
+        "pages": pagination.pages,
+        "perPage": pagination.per_page,
+        "hasNext": pagination.has_next,
+        "hasPrev": pagination.has_prev
+    }
+
+    if with_total:
+        result["total"] = pagination.total
+
+    return result

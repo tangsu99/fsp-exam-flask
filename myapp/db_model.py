@@ -475,16 +475,15 @@ class ConfigModel(db.Model):
     type: Mapped[str] = mapped_column(String(10), nullable=False)
     description: Mapped[str] = mapped_column(String(256), nullable=True)
     create_time: Mapped[datetime] = mapped_column(
-        DateTime,
-        default=func.utc_timestamp(),
-        server_default=func.utc_timestamp()
+        TZ_AWARE_DATETIME,
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False
     )
     update_time: Mapped[datetime] = mapped_column(
-        DateTime,
-        default=func.utc_timestamp(),
-        onupdate=func.utc_timestamp(),
-        server_default=func.utc_timestamp(),
-        server_onupdate=func.utc_timestamp()
+        TZ_AWARE_DATETIME,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False
     )
 
     def __repr__(self):
