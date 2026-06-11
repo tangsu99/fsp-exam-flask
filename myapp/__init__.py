@@ -12,7 +12,6 @@ from flask_sqlalchemy import SQLAlchemy
 
 login_manager: LoginManager = LoginManager()
 db: SQLAlchemy = SQLAlchemy()
-my_config = None
 migrate = Migrate()
 bcrypt: Bcrypt = Bcrypt()
 mail: Mail = Mail()
@@ -25,7 +24,6 @@ def create_app():
     load_dotenv()
     app = Flask(__name__)
     global APP
-    global my_config
     APP = app
     app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL")  # 测试数据库
     app.config["SESSION_PROTECTION"] = None  # 禁用会话保护

@@ -2,8 +2,7 @@ from flask import Blueprint, jsonify, request
 from flask_login import login_required, current_user
 from sqlalchemy import select, delete
 from sqlalchemy.orm import Mapped
-
-from myapp import db, my_config, APP
+from myapp import db, APP
 from myapp.db_model import (
     Guarantee,
     Option,
@@ -17,22 +16,46 @@ from myapp.db_model import (
     Survey,
     User,
     Whitelist,
+    ConfigModel,
 )
 from myapp.mail import survey_result_mail, send_mail
 from myapp.utils import check_password_format, required_role, is_survey_response_expired, validate_json_required_fields, \
-    parse_frontend_time_to_utc, parse_dt_to_iso_utc
+    parse_frontend_time_to_utc, parse_dt_to_iso_utc, build_pagination_dict
+from myapp.survey_utils import is_survey_mounted
+from myapp.config import Config
 
 admin = Blueprint("admin", __name__)
 
+my_config = Config(APP, db)
 
-@admin.route("/config/query", methods=["GET"])
+@admin.route("/config/get", methods=["GET"])
 @login_required
 @required_role("admin")
 def get_config():
-    key = request.args.get('key')
-    if key is None:
-        return jsonify({"code": 0, "desc": "tangsu is lazy!", 'list': my_config.get_all_item()})
-    return jsonify({"code": 0, "desc": "tangsu is lazy!", 'value': my_config.get_item(key)})
+    key = request.args.get('key', type=str)
+    page = request.args.get("page", 1, type=int)
+    per_page = min(request.args.get("per_page", 10, type=int), 100)
+
+    stmt = select(ConfigModel)
+    if key:
+        stmt = stmt.where(ConfigModel.key.contains(key)) # 模糊查询
+
+    pagination = db.paginate(stmt, page=page, per_page=per_page, error_out=False)
+
+    pagination_items: list = [
+        {
+            "key": item.key,
+            "type": item.type,
+            "value": item.value,
+            "desc": item.description if item.description else ''
+        } for item in pagination.items
+    ]
+
+    return jsonify({
+        "code": 0,
+        "desc": "success",
+        "data": build_pagination_dict(pagination, pagination_items, True)
+    })
 
 
 @admin.route("/config/set", methods=["POST"])
@@ -40,29 +63,34 @@ def get_config():
 @required_role("admin")
 def set_config():
     data = request.get_json()
-    if not data or "key" not in data or "value" not in data or "type" not in data:
-        return jsonify({"code": 1, "desc": "数据不合法!"})
-    my_config.set_item(data["key"], data["value"], data["type"], data["description"])
-    return jsonify({"code": 0, "desc": "tangsu is lazy!"})
+    key = str(data.get("key") or "").strip()
+    value = str(data.get("value") or "").strip()
+    type_ = str(data.get("type") or "").strip()
+    description = str(data.get("description") or "").strip()
+
+    if not key:
+        return jsonify({"code": 1, "desc": "need key!"})
+
+    res = my_config.set_item(key, value, type_, description)
+    if res:
+        return jsonify({"code": 0, "desc": "success"})
+
+    return jsonify({"code": 1, "desc": "fail"})
 
 
-@admin.route("/config/delete", methods=["POST"])
+@admin.route("/config/del", methods=["POST"])
 @login_required
 @required_role("admin")
 def delete_config():
-    delete_key = str(request.get_json())
-    res = my_config.delete_item(delete_key)
+    data = request.get_json()
+    key = str(data.get("key") or "").strip()
+    res = my_config.delete_item(key)
     if res:
-        return jsonify({"code": 0, "desc": "删除配置成功"})
-    return jsonify({"code": 1, "desc": "该配置项不存在"})
+        return jsonify({"code": 0, "desc": "success"})
+    return jsonify({"code": 1, "desc": "fail"})
 
 
-def is_survey_mounted(survey_id: int) -> bool:
-    res = SurveySlot.query.filter_by(mounted_survey_id=survey_id).count()
-    return True if res else False
-
-
-@admin.route("/addSurvey", methods=["POST"])
+@admin.route("/survey/add", methods=["POST"])
 @login_required
 @required_role("admin")
 def add_survey():
@@ -70,14 +98,14 @@ def add_survey():
         name = request.json["name"]
         description = request.json["description"]
         if name and description:
-            survey: Survey = Survey(name, description)
+            survey: Survey = Survey(name=name, description=description)
             db.session.add(survey)
             db.session.commit()
-            return jsonify({"code": 0, "desc": "问卷创建成功", "surveyId": survey.id})
+            return jsonify({"code": 0, "desc": "问卷创建成功", "data":{"surveyId": survey.id}})
     return jsonify({"code": 1, "desc": "缺少数据"})
 
 
-@admin.route("/delSurvey", methods=["POST"])
+@admin.route("/survey/delete", methods=["POST"])
 @login_required
 @required_role("admin")
 def del_survey():
