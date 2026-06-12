@@ -3,7 +3,7 @@ from enum import IntEnum, unique
 from typing import Optional
 
 from flask_login import UserMixin
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, func, LargeBinary, exists
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, func, LargeBinary, exists, select, update
 from sqlalchemy.dialects.mysql import LONGTEXT
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -82,113 +82,63 @@ class Survey(db.Model):
 
 # 问题表模型
 class Question(db.Model):
-    __tablename__ = "questions"  # 指定表名
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)  # 主键，问题唯一标识，自增
+    __tablename__ = "questions"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     survey_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("surveys.id", ondelete="CASCADE"), nullable=False
-    )  # 所属问卷id，外键，关联问卷表，级联删除
-    question_text: Mapped[str] = mapped_column(String(500), nullable=False)  # 问题内容，不允许为空
-    question_type: Mapped[int] = mapped_column(
-        Integer, nullable=False
-    )  # 问题类型，不允许为空，如1-单选，2-多选，3-填空，4-简答等
-    score: Mapped[float] = mapped_column(Float, nullable=False)  # 问题分值，不允许为空
-    logical_deletion: Mapped[bool] = mapped_column(Boolean ,default=False, nullable=True)  # 逻辑删除
-    create_time: Mapped[datetime] = mapped_column(
-        DateTime, default=func.utc_timestamp(), server_default=func.utc_timestamp()
-    )  # 问题创建时间，默认为当前时间
+    ) # 所属问卷id，外键，关联问卷表，级联删除
+    question_text: Mapped[str] = mapped_column(String(500), nullable=False) # 问题内容，不允许为空
+    question_type: Mapped[QuestionCategory] = mapped_column(Integer, nullable=False) # 问题类型，不允许为空，如1-单选，2-多选，3-填空，4-简答等
+    score: Mapped[float] = mapped_column(Float, nullable=False) # 问题分值，不允许为空
+    logical_deletion: Mapped[bool] = mapped_column(Boolean ,default=False, nullable=True) # 逻辑删除
+    create_time: Mapped[datetime] = mapped_column(TZ_AWARE_DATETIME, default=lambda: datetime.now(timezone.utc), nullable=False)
     img_list: Mapped[list["QuestionImgURL"]] = relationship(
         "QuestionImgURL", backref="question_images_backref", lazy="select", cascade="all, delete"
-    )  # 与图片表建立一对多关系，级联删除
+    ) # 与图片表建立一对多关系，级联删除
     options: Mapped[list["Option"]] = relationship(
         "Option", backref="question", lazy="select", cascade="all, delete"
-    )  # 与选项表建立一对多关系，级联删除
+    ) # 与选项表建立一对多关系，级联删除
     response_details: Mapped[list["ResponseDetail"]] = relationship(
         "ResponseDetail", backref="question_r_d", lazy="select", cascade="all, delete"
     )
     display_order: Mapped[int] = mapped_column(Integer, nullable=False)
 
-    def __init__(
-        self,
-        survey_id: int,
-        question_text: str,
-        question_type: int,
-        score: float,
-        display_order: int | None = None,
-    ):
-        self.survey_id = survey_id
-        self.question_text = question_text
-        self.question_type = question_type
-        self.score = score
-
-        if display_order is None:
-            max_display_order = (
-                db.session.query(Question.display_order)
-                .filter(Question.survey_id == survey_id, Question.logical_deletion == False)
-                .order_by(Question.display_order.desc())
-                .first()
+    @classmethod
+    def create(cls, survey_id: int, question_text: str, question_type: QuestionCategory, score: float,
+               target_display_order: int | None = None) -> "Question":
+        """
+        如果 target_display_order 是 None，在末尾插入题目
+        如提供了 target_display_order，在指定位置插入一个问题，并调整后续问题的顺序
+        """
+        if target_display_order is None:
+            # 获取当前最大排序值
+            stmt = select(func.max(cls.display_order)).where(
+                cls.survey_id == survey_id,
+                cls.logical_deletion == False
             )
-            self.display_order = 1 if max_display_order is None else max_display_order.display_order + 1 # pyright: ignore
+            max_order = db.session.scalar(stmt)
+            target_display_order = 1 if max_order is None else max_order + 1
+
         else:
-            self.display_order = display_order
-
-    @classmethod
-    def append_question(cls, survey_id: int, question_text: str, question_type: int, score: float):
-        """
-        在末尾插入题目
-        """
-        new_question = cls(
-            survey_id=survey_id,
-            question_text=question_text,
-            question_type=question_type,
-            score=score,
-        )
-        db.session.add(new_question)
-        db.session.commit()
-
-        # 返回新建的实例
-        return new_question
-
-
-    @classmethod
-    def insert_question(cls, survey_id: int, question_text: str, question_type: int, score: float, target_display_order: int):
-        """
-        在指定位置插入一个问题，并调整后续问题的顺序。
-
-        :param survey_id: 所属问卷 ID
-        :param question_text: 问题内容
-        :param question_type: 问题类型
-        :param score: 问题分值
-        :param target_display_order: 目标插入位置
-        :return: 新建的 Question 实例
-        """
-        # 获取目标位置及之后的所有问题
-        questions_to_shift = (
-            db.session.query(Question)
-            .filter(
-                Question.survey_id == survey_id,
-                Question.display_order >= target_display_order,
-                Question.logical_deletion == False
+            # 直接将目标位置及之后的所有题目 display_order + 1
+            shift_stmt = (
+                update(cls)
+                .where(
+                    cls.survey_id == survey_id,
+                    cls.display_order >= target_display_order,
+                    cls.logical_deletion == False
+                )
+                .values(display_order=cls.display_order + 1)
             )
-            .order_by(Question.display_order.desc()) # 从后往前更新，避免冲突
-            .all()
-        )
+            db.session.execute(shift_stmt)
 
-        for question in questions_to_shift:
-            question.display_order +=1
-
-        new_question = cls(
+        return cls(
             survey_id=survey_id,
             question_text=question_text,
             question_type=question_type,
             score=score,
-            display_order=target_display_order,
+            display_order=target_display_order
         )
-        db.session.add(new_question)
-        db.session.commit()
-
-        # 返回新建的实例
-        return new_question
-
 
 # 问题图片表模型
 class QuestionImgURL(db.Model):
