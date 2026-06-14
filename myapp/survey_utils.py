@@ -1,9 +1,10 @@
-from myapp import db
-from myapp.db_model import SurveySlot, Survey, QuestionCategory, Question
-
-from sqlalchemy import select, exists
-
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
+
+from sqlalchemy import exists, select
+
+from myapp import db
+from myapp.db_model import Question, QuestionCategory, Response, Survey, SurveySlot
 
 
 @dataclass
@@ -16,7 +17,7 @@ class DCOption:
 @dataclass
 class DCImage:
     data: str
-    alt: str = ''
+    alt: str = ""
     question_id: int | None = None
 
 
@@ -28,7 +29,8 @@ class DCQuestion:
     _score: float
     options: list[DCOption] = field(default_factory=list)
     images: list[DCImage] = field(default_factory=list)
-    display_order: int | None = None # None 或者 0 都代表插入到末尾
+    display_order: int | None = None  # None 或者 0 都代表插入到末尾
+    id: int | None = None
 
     def __post_init__(self):
         if self.display_order == 0:
@@ -68,11 +70,17 @@ def is_survey_exist(survey_id: int) -> bool:
 
 
 def is_question_exist(question_id: int) -> bool:
-    stmt = select(exists().where(Question.id == question_id))
-    return db.session.scalar(stmt)
+    # stmt = select(exists().where(Question.id == question_id))
+    # return db.session.scalar(stmt)
+    res = db.session.get(Question, question_id)
+
+    if res is None or res.logical_deletion:
+        return False
+
+    return True
 
 
-def build_dc_questions(survey_id: int, questions: list) -> tuple[bool, str | list[DCQuestion]]:
+def build_dc_questions(questions: list, survey_id: int | None = None) -> tuple[bool, str | list[DCQuestion]]:
     if not is_survey_exist(survey_id):
         return False, "问卷不存在"
 
@@ -86,19 +94,15 @@ def build_dc_questions(survey_id: int, questions: list) -> tuple[bool, str | lis
 
             dc_question = DCQuestion(
                 survey_id=survey_id,
-                display_order=question.get("displayOrder", None),
                 title=question.get("title", "未知题目"),
                 type=question.get("type"),
                 _score=question.get("score", 5),
-
                 options=[
-                    DCOption(text=item.get("text", ""), is_correct=item.get("isCorrect", False))
-                    for item in raw_options
+                    DCOption(text=item.get("text", ""), is_correct=item.get("isCorrect", False)) for item in raw_options
                 ],
-                images=[
-                    DCImage(data=item.get("data", ""), alt=item.get("alt", ""))
-                    for item in raw_images
-                ]
+                images=[DCImage(data=item.get("data", ""), alt=item.get("alt", "")) for item in raw_images],
+                display_order=question.get("displayOrder", None),
+                id=question.get("id", None),
             )
 
             dc_questions.append(dc_question)
@@ -111,3 +115,12 @@ def build_dc_questions(survey_id: int, questions: list) -> tuple[bool, str | lis
         return False, "; ".join(errors)
 
     return True, dc_questions
+
+
+def is_survey_response_expired(survey_response: Response) -> bool:
+    """
+    判断答卷是否过期
+    """
+    expired_datetime = survey_response.end_time.replace(tzinfo=UTC)
+    current_datetime = datetime.now(UTC)
+    return True if current_datetime > expired_datetime else False

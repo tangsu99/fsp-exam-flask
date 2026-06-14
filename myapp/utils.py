@@ -1,12 +1,13 @@
 import os
 import re
-from datetime import timezone, datetime
+from datetime import UTC, datetime
 from functools import wraps
 from typing import cast
-from flask import abort, current_app, request, jsonify
+
+from flask import abort, current_app, jsonify, request
 from flask_login import current_user
 
-from myapp.db_model import User, Response
+from myapp.db_model import User
 
 PASSWORD_PATTERN = re.compile(r"^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[\W_])[A-Za-z\d\W_]{8,16}$")
 
@@ -24,7 +25,6 @@ def token_check():
         return decorated_function
 
     return decorator
-
 
 
 def status_check():
@@ -61,15 +61,7 @@ def check_password_format(password: str) -> bool:
     return bool(PASSWORD_PATTERN.match(password))
 
 
-def is_survey_response_expired(survey_response: Response) -> bool:
-    """
-    判断答卷是否过期
-    """
-    expired_datetime = survey_response.end_time.replace(tzinfo=timezone.utc)
-    current_datetime = datetime.now(timezone.utc)
-    return True if current_datetime > expired_datetime else False
-
-def validate_json_required_fields(required_fields:dict, data: dict) -> dict:
+def validate_json_required_fields(required_fields: dict, data: dict) -> dict:
     """
     接受数据格式模板（字典）和数据(字典）
     数据格式模板例如：
@@ -103,8 +95,9 @@ def validate_json_required_fields(required_fields:dict, data: dict) -> dict:
 WHITE_LIST_RULES = [
     "https://pan.baidu.com",  # 百度网盘固定前缀
     "https://pan.quark.cn",  # 夸克网盘固定前缀
-    {"regex":r'^https://.*lanzou[a-z]?\.com'}  # 蓝奏云正则规则
+    {"regex": r"^https://.*lanzou[a-z]?\.com"},  # 蓝奏云正则规则
 ]
+
 
 def is_white_list_url(url: str) -> bool:
     """检测单个链接是否符合白名单列表中的规则"""
@@ -117,13 +110,13 @@ def is_white_list_url(url: str) -> bool:
         if isinstance(rule, str) and strip_url.startswith(rule):
             return True
 
-        if isinstance(rule, dict) and 'regex' in rule:
-            if re.match(rule['regex'], strip_url):
+        if isinstance(rule, dict) and "regex" in rule:
+            if re.match(rule["regex"], strip_url):
                 return True
     return False
 
 
-def get_file_size(file_storage, unit='KB'):
+def get_file_size(file_storage, unit="KB"):
     """
     获取文件对象的大小，并转换为指定单位。
     如果计算结果向下取整后为0，则强制返回1。
@@ -138,11 +131,7 @@ def get_file_size(file_storage, unit='KB'):
     size_bytes = file_storage.tell()
     file_storage.seek(original_pos)
 
-    unit_factors = {
-        'KB': 1024,
-        'MB': 1024 ** 2,
-        'GB': 1024 ** 3
-    }
+    unit_factors = {"KB": 1024, "MB": 1024**2, "GB": 1024**3}
 
     factor = unit_factors.get(unit.upper(), 1024)
 
@@ -152,24 +141,27 @@ def get_file_size(file_storage, unit='KB'):
     # 如果算出来文件大小为 0 按 1 算
     return calculated_size if calculated_size > 0 else 1
 
+
 def parse_frontend_time_to_utc(front_end_time: str) -> datetime:
     """
     对于前端用 new Date(time).toISOString() 格式化的时间，此函数可以将其转化为 UTC 时间的 DateTime
     front_end_time 打印出来应该类似这种格式：2026-06-07T10:43:00.000Z
     """
-    return datetime.fromisoformat(front_end_time.replace('Z', '+00:00'))
+    return datetime.fromisoformat(front_end_time.replace("Z", "+00:00"))
+
 
 def parse_dt_to_iso_utc(dt: datetime) -> str:
-    return dt.replace(tzinfo=timezone.utc).isoformat()
+    return dt.replace(tzinfo=UTC).isoformat()
 
-def build_pagination_dict(pagination, pagination_items: list, with_total:bool = False) -> dict:
+
+def build_pagination_dict(pagination, pagination_items: list, with_total: bool = False) -> dict:
     result = {
         "items": pagination_items,
         "page": pagination.page,
         "pages": pagination.pages,
         "perPage": pagination.per_page,
         "hasNext": pagination.has_next,
-        "hasPrev": pagination.has_prev
+        "hasPrev": pagination.has_prev,
     }
 
     if with_total:

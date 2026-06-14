@@ -1,9 +1,21 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from enum import IntEnum, unique
-from typing import Optional
 
 from flask_login import UserMixin
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, func, LargeBinary, exists, select, update
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    LargeBinary,
+    String,
+    Text,
+    exists,
+    func,
+    select,
+    update,
+)
 from sqlalchemy.dialects.mysql import LONGTEXT
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -31,12 +43,13 @@ TZ_AWARE_DATETIME = DateTime(timezone=True)
 # )
 
 # 不推荐：
-# upload_date: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
-# update_date: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+# upload_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
+# update_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
 # 上述代码对应的 DDL 应该如下
 # upload_date     datetime default CURRENT_TIMESTAMP not null,
 # update_date     datetime default CURRENT_TIMESTAMP not null on update CURRENT_TIMESTAMP,
-# func.now() 翻译出来是 CURRENT_TIMESTAMP，SQLite 的 CURRENT_TIMESTAMP 默认返回的就是 UTC 格式字符串；MySQL/PG 返回的是服务器本地时间
+# func.now() 翻译出来是 CURRENT_TIMESTAMP，
+# SQLite 的 CURRENT_TIMESTAMP 默认返回的就是 UTC 格式字符串；MySQL/PG 返回的是服务器本地时间
 # 它们都不带时区，很麻烦，Unix 时间戳又只支持到 2038 年
 # func.utc_timestamp() # MySQL 特有，返回 UTC 时间戳，不支持 PGSQL 和 SQLite
 # 所以采用 Python 赋值时间比较方便且跨平台
@@ -70,8 +83,8 @@ class Survey(db.Model):
     __tablename__ = "surveys"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
-    description: Mapped[Optional[str]] = mapped_column(Text, default='', nullable=False)
-    create_time: Mapped[datetime] = mapped_column(TZ_AWARE_DATETIME, default=lambda: datetime.now(timezone.utc), nullable=False)
+    description: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    create_time: Mapped[datetime] = mapped_column(TZ_AWARE_DATETIME, default=lambda: datetime.now(UTC), nullable=False)
     questions: Mapped[list["Question"]] = relationship(
         "Question", backref="survey", lazy="select", cascade="all, delete"
     )  # 与问题表建立一对多关系，级联删除
@@ -86,36 +99,40 @@ class Question(db.Model):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     survey_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("surveys.id", ondelete="CASCADE"), nullable=False
-    ) # 所属问卷id，外键，关联问卷表，级联删除
-    question_text: Mapped[str] = mapped_column(String(500), nullable=False) # 问题内容，不允许为空
-    question_type: Mapped[QuestionCategory] = mapped_column(Integer, nullable=False) # 问题类型，不允许为空，如1-单选，2-多选，3-填空，4-简答等
-    score: Mapped[float] = mapped_column(Float, nullable=False) # 问题分值，不允许为空
-    logical_deletion: Mapped[bool] = mapped_column(Boolean ,default=False, nullable=True) # 逻辑删除
-    create_time: Mapped[datetime] = mapped_column(TZ_AWARE_DATETIME, default=lambda: datetime.now(timezone.utc), nullable=False)
+    )  # 所属问卷id，外键，关联问卷表，级联删除
+    question_text: Mapped[str] = mapped_column(String(500), nullable=False)  # 问题内容，不允许为空
+    # 问题类型，不允许为空，如1-单选，2-多选，3-填空，4-简答等
+    question_type: Mapped[QuestionCategory] = mapped_column(Integer, nullable=False)
+    score: Mapped[float] = mapped_column(Float, nullable=False)  # 问题分值，不允许为空
+    logical_deletion: Mapped[bool] = mapped_column(Boolean, default=False, nullable=True)  # 逻辑删除
+    create_time: Mapped[datetime] = mapped_column(TZ_AWARE_DATETIME, default=lambda: datetime.now(UTC), nullable=False)
     img_list: Mapped[list["QuestionImgURL"]] = relationship(
         "QuestionImgURL", backref="question_images_backref", lazy="select", cascade="all, delete"
-    ) # 与图片表建立一对多关系，级联删除
+    )  # 与图片表建立一对多关系，级联删除
     options: Mapped[list["Option"]] = relationship(
         "Option", backref="question", lazy="select", cascade="all, delete"
-    ) # 与选项表建立一对多关系，级联删除
+    )  # 与选项表建立一对多关系，级联删除
     response_details: Mapped[list["ResponseDetail"]] = relationship(
         "ResponseDetail", backref="question_r_d", lazy="select", cascade="all, delete"
     )
     display_order: Mapped[int] = mapped_column(Integer, nullable=False)
 
     @classmethod
-    def create(cls, survey_id: int, question_text: str, question_type: QuestionCategory, score: float,
-               target_display_order: int | None = None) -> "Question":
+    def create(
+        cls,
+        survey_id: int,
+        question_text: str,
+        question_type: QuestionCategory,
+        score: float,
+        target_display_order: int | None = None,
+    ) -> "Question":
         """
         如果 target_display_order 是 None，在末尾插入题目
         如提供了 target_display_order，在指定位置插入一个问题，并调整后续问题的顺序
         """
         if target_display_order is None:
             # 获取当前最大排序值
-            stmt = select(func.max(cls.display_order)).where(
-                cls.survey_id == survey_id,
-                cls.logical_deletion == False
-            )
+            stmt = select(func.max(cls.display_order)).where(cls.survey_id == survey_id, cls.logical_deletion is False)
             max_order = db.session.scalar(stmt)
             target_display_order = 1 if max_order is None else max_order + 1
 
@@ -124,9 +141,7 @@ class Question(db.Model):
             shift_stmt = (
                 update(cls)
                 .where(
-                    cls.survey_id == survey_id,
-                    cls.display_order >= target_display_order,
-                    cls.logical_deletion == False
+                    cls.survey_id == survey_id, cls.display_order >= target_display_order, cls.logical_deletion is False
                 )
                 .values(display_order=cls.display_order + 1)
             )
@@ -137,8 +152,9 @@ class Question(db.Model):
             question_text=question_text,
             question_type=question_type,
             score=score,
-            display_order=target_display_order
+            display_order=target_display_order,
         )
+
 
 # 问题图片表模型
 class QuestionImgURL(db.Model):
@@ -147,9 +163,9 @@ class QuestionImgURL(db.Model):
     question_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("questions.id", ondelete="CASCADE"), nullable=False
     )  # 所属问题id，外键，关联问题表，级联删除
-    img_alt: Mapped[str] = mapped_column(String(200), default='', nullable=False)
-    img_data: Mapped[str] = mapped_column(LONGTEXT, nullable=False) # 图片数据，URL 或者 Base64 编码的图片
-    create_time: Mapped[datetime] = mapped_column(TZ_AWARE_DATETIME, default=lambda: datetime.now(timezone.utc), nullable=False)
+    img_alt: Mapped[str] = mapped_column(String(200), default="", nullable=False)
+    img_data: Mapped[str] = mapped_column(LONGTEXT, nullable=False)  # 图片数据，URL 或者 Base64 编码的图片
+    create_time: Mapped[datetime] = mapped_column(TZ_AWARE_DATETIME, default=lambda: datetime.now(UTC), nullable=False)
 
 
 # 选项表模型
@@ -160,8 +176,8 @@ class Option(db.Model):
         Integer, ForeignKey("questions.id", ondelete="CASCADE"), nullable=False
     )  # 所属问题id，外键，关联问题表，级联删除
     option_text: Mapped[str] = mapped_column(Text, nullable=False)  # 选项内容，不允许为空
-    is_correct: Mapped[Optional[bool]] = mapped_column(Boolean)  # 是否为正确选项，对于有标准答案的题目，可为空
-    create_time: Mapped[datetime] = mapped_column(TZ_AWARE_DATETIME, default=lambda: datetime.now(timezone.utc), nullable=False)
+    is_correct: Mapped[bool] = mapped_column(Boolean)  # 是否为正确选项，对于有标准答案的题目，可为空
+    create_time: Mapped[datetime] = mapped_column(TZ_AWARE_DATETIME, default=lambda: datetime.now(UTC), nullable=False)
 
 
 # 用户表模型
@@ -170,12 +186,10 @@ class User(UserMixin, db.Model):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     username: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
     user_qq: Mapped[str] = mapped_column(String(25), unique=True, nullable=False)
-    _password_hash: Mapped[str] = mapped_column("password", String(100), nullable=False) # 哈希过的密码
-    role: Mapped[str] = mapped_column(String(100), nullable=False, default="user") # 用户角色，如普通用户、管理员等
+    _password_hash: Mapped[str] = mapped_column("password", String(100), nullable=False)  # 哈希过的密码
+    role: Mapped[str] = mapped_column(String(100), nullable=False, default="user")  # 用户角色，如普通用户、管理员等
     registered_at: Mapped[datetime] = mapped_column(
-        TZ_AWARE_DATETIME,
-        default=lambda: datetime.now(timezone.utc),
-        nullable=False
+        TZ_AWARE_DATETIME, default=lambda: datetime.now(UTC), nullable=False
     )
     avatar: Mapped[str] = mapped_column(String(500), default=DEFAULT_AVATAR)
     status: Mapped[int] = mapped_column(
@@ -239,7 +253,7 @@ class Response(db.Model):
     __tablename__ = "responses"  # 指定表名
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     is_completed: Mapped[bool] = mapped_column(Boolean, default=False)
-    is_reviewed: Mapped[int] = mapped_column(Integer, default=0) # 阅卷状态，0 待审核 1 已通过 2 已拒绝
+    is_reviewed: Mapped[int] = mapped_column(Integer, default=0)  # 阅卷状态，0 待审核 1 已通过 2 已拒绝
     reviewer_uid: Mapped[int] = mapped_column(Integer, nullable=True)
     player_name: Mapped[str] = mapped_column(String(25), nullable=False)
     player_uuid: Mapped[str] = mapped_column(String(36), nullable=False)
@@ -249,10 +263,10 @@ class Response(db.Model):
     survey_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("surveys.id", ondelete="CASCADE"), nullable=False
     )  # 所答问卷id，外键，关联问卷表，级联删除
-    survey_name: Mapped[str] = mapped_column(String(200), nullable=True) # 问卷当时的名称
-    create_time: Mapped[datetime] = mapped_column(TZ_AWARE_DATETIME, default=lambda: datetime.now(timezone.utc), nullable=False) # 开考时间
-    submit_time: Mapped[datetime] = mapped_column(TZ_AWARE_DATETIME, nullable=True) # 交卷时间
-    end_time: Mapped[datetime] = mapped_column(TZ_AWARE_DATETIME, nullable=True) # 截止时间
+    survey_name: Mapped[str] = mapped_column(String(200), nullable=True)  # 问卷当时的名称
+    create_time: Mapped[datetime] = mapped_column(TZ_AWARE_DATETIME, default=lambda: datetime.now(UTC), nullable=False)
+    submit_time: Mapped[datetime] = mapped_column(TZ_AWARE_DATETIME, nullable=True)  # 交卷时间
+    end_time: Mapped[datetime] = mapped_column(TZ_AWARE_DATETIME, nullable=True)  # 截止时间
     response_details: Mapped[list["ResponseDetail"]] = relationship(
         "ResponseDetail", backref="response_d", lazy="select", cascade="all, delete"
     )  # 与答题详情表建立一对多关系，级联删除
@@ -301,13 +315,13 @@ class ResponseDetail(db.Model):
 class Guarantee(db.Model):
     __tablename__ = "guarantees"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    guarantee_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False) # 担保人id
-    applicant_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False) # 申请人id
+    guarantee_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)  # 担保人id
+    applicant_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)  # 申请人id
     player_name: Mapped[str] = mapped_column(String(25), nullable=False)  # 被担保玩家昵称
     player_uuid: Mapped[str] = mapped_column(String(36), nullable=False)  # 被担保人UUID
-    status: Mapped[int] = mapped_column(Integer, nullable=False, default=0) # 担保状态
-    create_time: Mapped[datetime] = mapped_column(DateTime, nullable=False) # 创建时间
-    expiration_time: Mapped[datetime] = mapped_column(DateTime, nullable=False) # 过期时间
+    status: Mapped[int] = mapped_column(Integer, nullable=False, default=0)  # 担保状态
+    create_time: Mapped[datetime] = mapped_column(DateTime, nullable=False)  # 创建时间
+    expiration_time: Mapped[datetime] = mapped_column(DateTime, nullable=False)  # 过期时间
 
     guarantor: Mapped["User"] = relationship(
         "User",
@@ -339,12 +353,12 @@ class Whitelist(db.Model):
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=True, default=None)
     player_name: Mapped[str] = mapped_column(String(25), nullable=False)
     player_uuid: Mapped[str] = mapped_column(String(36), nullable=False)
-    auditor_uid: Mapped[int] = mapped_column(Integer, nullable=False)
-    source: Mapped[int] = mapped_column(Integer, nullable=False) # 0 代表考试，1代表担保，2代表其他
+    auditor_uid: Mapped[int] = mapped_column(ForeignKey("user.id"))
+    auditor = relationship("User", foreign_keys=[auditor_uid], lazy="noload")
+    auditor: Mapped[Optional["User"]] = relationship(foreign_keys=[auditor_uid], lazy="noload")
+    source: Mapped[int] = mapped_column(Integer, nullable=False)  # 0 代表考试，1代表担保，2代表其他
     created_at: Mapped[datetime] = mapped_column(
-        DateTime,
-        default=func.utc_timestamp(),
-        server_default=func.utc_timestamp()
+        DateTime, default=func.utc_timestamp(), server_default=func.utc_timestamp()
     )
 
     def __init__(self, user_id: int, player_name: str, player_uuid: str, source: int, auditor_uid: int):
@@ -359,14 +373,14 @@ class Token(db.Model):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
     token: Mapped[str] = mapped_column(String(256), unique=True, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=func.utc_timestamp(), server_default=func.utc_timestamp())
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=func.utc_timestamp())
     expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     is_revoked: Mapped[bool] = mapped_column(Boolean, default=False)
 
     def __init__(self, user_id, token, expires_in=3600):
         self.user_id = user_id
         self.token = token
-        self.expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
+        self.expires_at = datetime.now(UTC) + timedelta(seconds=expires_in)
 
 
 class SurveySlot(db.Model):
@@ -385,6 +399,7 @@ class RegistrationLimit(db.Model):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     ip: Mapped[str] = mapped_column(String(45), nullable=False)  # 支持IPv6的最大长度
     register_time = db.Column(db.DateTime, default=func.utc_timestamp(), server_default=func.utc_timestamp())
+
     def __init__(self, ip):
         self.ip = ip
 
@@ -393,14 +408,14 @@ class ResetPasswordToken(db.Model):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
     token: Mapped[str] = mapped_column(String(256), unique=True, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=func.utc_timestamp(), server_default=func.utc_timestamp())
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=func.utc_timestamp())
     expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     is_revoked: Mapped[bool] = mapped_column(Boolean, default=False)
 
     def __init__(self, user_id, token, expires_in=3600):
         self.user_id = user_id
         self.token = token
-        self.expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
+        self.expires_at = datetime.now(UTC) + timedelta(seconds=expires_in)
 
 
 class ActivationToken(db.Model):
@@ -414,7 +429,7 @@ class ActivationToken(db.Model):
     def __init__(self, user_id, token, expires_in=3600):
         self.user_id = user_id
         self.token = token
-        self.expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
+        self.expires_at = datetime.now(UTC) + timedelta(seconds=expires_in)
 
 
 # 配置表模型
@@ -424,33 +439,26 @@ class ConfigModel(db.Model):
     value: Mapped[str] = mapped_column(String(256), nullable=False)
     type: Mapped[str] = mapped_column(String(10), nullable=False)
     description: Mapped[str] = mapped_column(String(256), nullable=True)
-    create_time: Mapped[datetime] = mapped_column(
-        TZ_AWARE_DATETIME,
-        default=lambda: datetime.now(timezone.utc),
-        nullable=False
-    )
+    create_time: Mapped[datetime] = mapped_column(TZ_AWARE_DATETIME, default=lambda: datetime.now(UTC), nullable=False)
     update_time: Mapped[datetime] = mapped_column(
-        TZ_AWARE_DATETIME,
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc),
-        nullable=False
+        TZ_AWARE_DATETIME, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC), nullable=False
     )
 
     def __repr__(self):
-        return f'<config for key: {self.key}>'
+        return f"<config for key: {self.key}>"
 
 
 # 投影信息表
 class Schematic(db.Model):
-    __tablename__ = 'schematics'
+    __tablename__ = "schematics"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    name: Mapped[str] = mapped_column(String(100), nullable=False) # 投影文件名 (30个汉字，这里设为100字符足够容纳)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)  # 投影文件名 (30个汉字，这里设为100字符足够容纳)
     uploader_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)  # 上传用户ID
-    uploader: Mapped["User"] = relationship("User", backref="schematics") # 上传用户
+    uploader: Mapped["User"] = relationship("User", backref="schematics")  # 上传用户
     original_author: Mapped[str] = mapped_column(String(100), nullable=True)  # 投影原作者
-    schematic_type: Mapped[SchematicType] = mapped_column(Integer, nullable=False) # 投影类型
-    game_version: Mapped[str] = mapped_column(String(50), nullable=False) # 投影版本
+    schematic_type: Mapped[SchematicType] = mapped_column(Integer, nullable=False)  # 投影类型
+    game_version: Mapped[str] = mapped_column(String(50), nullable=False)  # 投影版本
     tag: Mapped[str] = mapped_column(String(200), nullable=True)  # 投影tag
     description: Mapped[str] = mapped_column(Text, nullable=True)  # 投影描述
     is_public: Mapped[bool] = mapped_column(Boolean, default=True)  # 是否公开
@@ -458,24 +466,19 @@ class Schematic(db.Model):
     file_size_KB: Mapped[int] = mapped_column(Integer, nullable=False)  # 投影大小（KB）
     backup_link: Mapped[str] = mapped_column(String(255), nullable=True)  # 文件备用链接
 
-    upload_date: Mapped[datetime] = mapped_column(
-        TZ_AWARE_DATETIME,
-        default=lambda: datetime.now(timezone.utc),
-        nullable=False
-    )
+    upload_date: Mapped[datetime] = mapped_column(TZ_AWARE_DATETIME, default=lambda: datetime.now(UTC), nullable=False)
 
     update_date: Mapped[datetime] = mapped_column(
-        TZ_AWARE_DATETIME,
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc),
-        nullable=False
+        TZ_AWARE_DATETIME, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC), nullable=False
     )
 
     # 与文件分表建立一对一关系 (cascade确保删除主表时，关联的二进制文件也被删除)
     file_data: Mapped["SchematicFile"] = relationship(
-        back_populates="schematics", # 建立双向关系，两端的数据状态会自动保持同步
-        cascade="all, delete-orphan", # ORM 层操作
-        uselist=False # 这是实现一对一关系的核心参数。默认情况下，relationship 返回的是一个列表（一对多）。将其设置为 False 后，SQLAlchemy 知道这个属性返回的是单个对象而不是列表
+        back_populates="schematics",  # 建立双向关系，两端的数据状态会自动保持同步
+        cascade="all, delete-orphan",  # ORM 层操作
+        uselist=False,
+        # 这是实现一对一关系的核心参数。默认情况下，relationship 返回的是一个列表（一对多）。
+        # 将其设置为 False 后，SQLAlchemy 知道这个属性返回的是单个对象而不是列表
     )
 
     @staticmethod
@@ -494,23 +497,17 @@ class Schematic(db.Model):
                 return None
         return None
 
-
     def __repr__(self):
-        return f'<Schematics for ID {self.id}>'
+        return f"<Schematics for ID {self.id}>"
 
 
 # 投影文件二进制分表
 class SchematicFile(db.Model):
-    __tablename__ = 'schematic_files'
+    __tablename__ = "schematic_files"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     # 外键关联投影主表
-    schematic_id: Mapped[int] = mapped_column(
-        Integer,
-        ForeignKey('schematics.id'),
-        nullable=False,
-        unique=True
-    )
+    schematic_id: Mapped[int] = mapped_column(Integer, ForeignKey("schematics.id"), nullable=False, unique=True)
 
     # 文件二进制字段 (最大512KB = 524288 Bytes)
     file_blob: Mapped[bytes] = mapped_column(LargeBinary(524288), nullable=False)
@@ -519,4 +516,4 @@ class SchematicFile(db.Model):
     schematics: Mapped["Schematic"] = relationship(back_populates="file_data")
 
     def __repr__(self):
-        return f'<SchematicFiles for ID {self.schematic_id}>'
+        return f"<SchematicFiles for ID {self.schematic_id}>"

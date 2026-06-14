@@ -1,25 +1,26 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import cast
 
-from flask import Blueprint, jsonify, request, current_app
+from flask import Blueprint, current_app, jsonify, request
 from flask_login import current_user, login_required
 from sqlalchemy import select
 
-from myapp import db, APP
+from myapp import APP, db
 from myapp.db_model import (
     Option,
     Question,
     QuestionCategory,
-    SurveySlot,
     Response,
     ResponseDetail,
     ResponseScore,
     Survey,
+    SurveySlot,
     User,
-    Whitelist
+    Whitelist,
 )
-from myapp.mail import survey_complete_mail, send_mail
-from myapp.utils import is_survey_response_expired, status_check, parse_dt_to_iso_utc
+from myapp.mail import send_mail, survey_complete_mail
+from myapp.survey_utils import is_survey_response_expired
+from myapp.utils import parse_dt_to_iso_utc, status_check
 
 survey = Blueprint("survey", __name__)
 
@@ -35,6 +36,7 @@ def incomplete_survey_exist(response_list: list[Response]) -> Response | None:
 
     return None
 
+
 def build_survey_questions(survey_: Survey) -> list:
     questions = []
     for question in survey_.questions:
@@ -42,10 +44,7 @@ def build_survey_questions(survey_: Survey) -> list:
             continue
 
         options_data = [
-            {
-                "id": opt.id,
-                "text": "此处作答" if question.question_type in (3, 4) else opt.option_text
-            }
+            {"id": opt.id, "text": "此处作答" if question.question_type in (3, 4) else opt.option_text}
             for opt in question.options
         ]
 
@@ -133,7 +132,6 @@ def check_survey():
     return jsonify({"code": 0, "desc": "暂无问卷! "})
 
 
-
 @survey.route("/start_survey", methods=["POST"])
 @login_required
 @status_check()
@@ -185,7 +183,13 @@ def start_survey():
 
     db.session.commit()
 
-    return jsonify({"code": 0, "desc": "问卷开始！", "response": new_response.survey_id,})
+    return jsonify(
+        {
+            "code": 0,
+            "desc": "问卷开始！",
+            "response": new_response.survey_id,
+        }
+    )
 
 
 def objective_question_scoring(user_response: list[str], question: Question) -> float:
@@ -247,14 +251,14 @@ def complete_survey():
     if res is None:
         return jsonify({"code": 1, "desc": "你没有要提交的问卷！"})
 
-    response_id: int = res.id # 答卷ID
+    response_id: int = res.id  # 答卷ID
 
     # 客观题分数
     count_score: float = 0
 
     for i in data:
-        question_id: int = i.get("id") # 问题ID
-        answer: list | None = i.get("answer") # 用户答案
+        question_id: int = i.get("id")  # 问题ID
+        answer: list | None = i.get("answer")  # 用户答案
 
         # 允许空题
         if answer is None:
@@ -279,17 +283,17 @@ def complete_survey():
 
     # 标记答卷为已完成
     res.is_completed = True
-    res.submit_time = datetime.now(timezone.utc)
+    res.submit_time = datetime.now(UTC)
     db.session.commit()
 
-    send_survey_complete(user.username, res.submit_time.replace(tzinfo=timezone.utc).isoformat(), res.id)
+    send_survey_complete(user.username, res.submit_time.replace(tzinfo=UTC).isoformat(), res.id)
 
     return jsonify({"code": 0, "desc": "提交成功！", "score": count_score}), 200
 
 
 def send_survey_complete(username: str, response_time: str, id_: int):
     with APP.app_context():
-        stmt = select(User).filter_by(role='admin')
+        stmt = select(User).filter_by(role="admin")
         admins: list[User] = db.session.execute(stmt).scalars().all()
         if not admins:
             return
