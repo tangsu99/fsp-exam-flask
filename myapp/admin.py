@@ -1,59 +1,60 @@
 from flask import Blueprint, jsonify, request
-from flask_login import login_required, current_user
-from sqlalchemy import func, select, delete
-from myapp import db, APP
+from flask_login import current_user, login_required
+from sqlalchemy import delete, func, select
+from sqlalchemy.orm import joinedload
+
+from myapp import APP, db
+from myapp.config import Config
 from myapp.db_model import (
+    ConfigModel,
     Guarantee,
     Option,
     Question,
     QuestionCategory,
     QuestionImgURL,
-    SurveySlot,
     Response,
     ResponseDetail,
     ResponseScore,
     Survey,
+    SurveySlot,
     User,
     Whitelist,
-    ConfigModel,
 )
-from myapp.mail import survey_result_mail, send_mail
-from myapp.utils import check_password_format, required_role, is_survey_response_expired, parse_frontend_time_to_utc, parse_dt_to_iso_utc, build_pagination_dict
-from myapp.survey_utils import is_survey_mounted, build_dc_questions, DCQuestion
-from myapp.config import Config
+from myapp.mail import send_mail, survey_result_mail
+from myapp.survey_utils import DCQuestion, build_dc_questions, is_survey_mounted, is_survey_response_expired
+from myapp.utils import (
+    build_pagination_dict,
+    check_password_format,
+    parse_dt_to_iso_utc,
+    parse_frontend_time_to_utc,
+    required_role,
+)
 
 admin = Blueprint("admin", __name__)
 
 my_config = Config(APP, db)
 
+
 @admin.route("/config/get", methods=["GET"])
 @login_required
 @required_role("admin")
 def get_config():
-    key = request.args.get('key', type=str)
+    key = request.args.get("key", type=str)
     page = request.args.get("page", 1, type=int)
     per_page = min(request.args.get("per_page", 10, type=int), 100)
 
     stmt = select(ConfigModel)
     if key:
-        stmt = stmt.where(ConfigModel.key.contains(key)) # 模糊查询
+        stmt = stmt.where(ConfigModel.key.contains(key))  # 模糊查询
 
     pagination = db.paginate(stmt, page=page, per_page=per_page, error_out=False)
 
     pagination_items: list = [
-        {
-            "key": item.key,
-            "type": item.type,
-            "value": item.value,
-            "desc": item.description if item.description else ''
-        } for item in pagination.items
+        {"key": item.key, "type": item.type, "value": item.value, "desc": item.description if item.description else ""}
+        for item in pagination.items
     ]
 
-    return jsonify({
-        "code": 0,
-        "desc": "success",
-        "data": build_pagination_dict(pagination, pagination_items, True)
-    })
+    return jsonify({"code": 0, "desc": "success", "data": build_pagination_dict(pagination, pagination_items, True)})
 
 
 @admin.route("/config/set", methods=["POST"])
@@ -102,7 +103,7 @@ def add_survey():
     survey: Survey = Survey(name=name, description=description)
     db.session.add(survey)
     db.session.commit()
-    return jsonify({"code": 0, "desc": "问卷创建成功", "data":{"surveyId": survey.id}})
+    return jsonify({"code": 0, "desc": "问卷创建成功", "data": {"surveyId": survey.id}})
 
 
 @admin.route("/survey/delete", methods=["POST"])
@@ -167,9 +168,9 @@ def add_question():
     """
     data = request.get_json()
     question_list = data.get("questions", [])
-    survey_id = data.get("surveyId", 0)
+    survey_id = data.get("surveyId", None)
 
-    is_valid, error_info_or_list = build_dc_questions(survey_id, question_list)
+    is_valid, error_info_or_list = build_dc_questions(question_list, survey_id)
     if not is_valid:
         return jsonify({"code": 1, "desc": error_info_or_list})
 
@@ -181,24 +182,16 @@ def add_question():
                 question_text=question.title,
                 question_type=question.type,
                 score=question.score,
-                target_display_order=question.display_order
+                target_display_order=question.display_order,
             )
 
             option_objs = [
-                Option(
-                    question_id=new_question.id,
-                    option_text=opt.text,
-                    is_correct=opt.is_correct
-                )
+                Option(question_id=new_question.id, option_text=opt.text, is_correct=opt.is_correct)
                 for opt in question.options
             ]
 
             image_objs = [
-                QuestionImgURL(
-                    question_id=new_question.id,
-                    img_alt=img.alt,
-                    img_data=img.data
-                )
+                QuestionImgURL(question_id=new_question.id, img_alt=img.alt, img_data=img.data)
                 for img in question.images
             ]
 
@@ -212,6 +205,7 @@ def add_question():
     except Exception as e:
         db.session.rollback()
         return jsonify({"code": 1, "desc": f"保存失败: {str(e)}"})
+
 
 @admin.route("/question/migration", methods=["POST"])
 @login_required
@@ -241,8 +235,7 @@ def migration_question():
 
     try:
         stmt = select(func.max(Question.display_order)).where(
-            Question.survey_id == target_survey_id,
-            Question.logical_deletion == False
+            Question.survey_id == target_survey_id, Question.logical_deletion is False
         )
         max_order = db.session.scalar(stmt)
 
@@ -261,99 +254,81 @@ def migration_question():
 @login_required
 @required_role("admin")
 def edit_question():
-    req_data = request.get_json(silent=True)
-    if not req_data:
-        return jsonify({"code": 1, "desc": "请求数据为空或格式错误"})
+    """
+    只接受一个题目一个题目修改
+    """
+    data = request.get_json()
+    question_data = data.get("question", None)
 
-    req_data: dict
-    question_id = req_data.get("id", None)
-    if question_id is None:
-        return jsonify({"code": 1, "desc": "缺少题目 ID"})
+    if question_data is None:
+        return jsonify({"code": 1, "desc": "fail"})
+
+    is_valid, error_info_or_list = build_dc_questions([question_data], question_data.get("surveyId", None))
+    if not is_valid:
+        return jsonify({"code": 1, "desc": error_info_or_list})
 
     try:
-        question = db.session.get(Question, question_id)
-        if question is None or question.logical_deletion:
+        question: DCQuestion = error_info_or_list[0]
+
+        new_question = db.session.get(Question, question.id)
+
+        if new_question is None or new_question.logical_deletion:
             return jsonify({"code": 1, "desc": "题目不存在或已被删除"})
 
-        question.survey_id = req_data.get("surveyId", question.survey_id)
-        question.question_text = req_data.get("title", question.question_text)
-        question.question_type = req_data.get("type", question.question_type)
-        question.score = req_data.get("score", question.score)
+        new_question.question_type = question.type
+        new_question.question_text = question.title
+        new_question.score = question.score
+        new_question.display_order = question.display_order
 
-        options = req_data.get("options", [])
-        images = req_data.get("img_list", [])
+        db.session.execute(delete(Option).where(Option.question_id == question.id))
+        db.session.execute(delete(QuestionImgURL).where(QuestionImgURL.question_id == question.id))
 
         option_objs = [
-            Option(
-                question_id=question_id,
-                option_text=opt.text,
-                is_correct=opt.is_correct
-            )
-            for opt in options
+            Option(question_id=question.id, option_text=opt.text, is_correct=opt.is_correct) for opt in question.options
         ]
 
         image_objs = [
-            QuestionImgURL(
-                question_id=question_id,
-                img_alt=img.alt,
-                img_data=img.data
-            )
-            for img in images
+            QuestionImgURL(question_id=question.id, img_alt=img.alt, img_data=img.data) for img in question.images
         ]
 
         db.session.add_all(option_objs)
         db.session.add_all(image_objs)
 
-
-        db.session.execute(delete(Option).where(Option.question_id == question_id))
-        add_question_options(question_id, question.question_type, options)
-
-
-        db.session.execute(delete(QuestionImgURL).where(QuestionImgURL.question_id == question_id))
-        add_question_images(question_id, img_list)
-
-
         db.session.commit()
-        return jsonify({"code": 0, "desc": "修改题目成功"})
+        return jsonify({"code": 0, "desc": "编辑题目成功"})
 
     except Exception as e:
         db.session.rollback()
-        return jsonify({"code": 1, "desc": f"修改失败: {str(e)}"})
+        return jsonify({"code": 1, "desc": f"编辑题目失败: {str(e)}"})
 
 
-@admin.route("/delQuestion", methods=["POST"])
+@admin.route("/question/delete", methods=["POST"])
 @login_required
 @required_role("admin")
 def del_question():
-    req_data = request.json
+    req_data = request.get_json()
     if req_data is None:
         return jsonify({"code": 1, "desc": "缺少数据"})
 
     try:
-        # 直接通过主键获取问题
-        question = db.session.get(Question, req_data)
+        question = db.session.get(Question, req_data.get("id", None))
 
         if question is None:
             return jsonify({"code": 0, "desc": "题目不存在"})
 
-        # 逻辑删除问题
         question.logical_deletion = True
+        question.display_order = 0  # 保险起见，把排序设置为0
 
-        # 保险起见，把排序设置为0
-        question.display_order = 0
-
-        # 提交事务
         db.session.commit()
         return jsonify({"code": 0, "desc": "删除题目成功"})
 
     except Exception as e:
-        # 处理其他异常
         db.session.rollback()
         print(f"An error occurred while deleting the question: {e}")
         return jsonify({"code": 1, "desc": "出现错误"})
 
 
-@admin.route("/sortSurveyQuestions", methods=["POST"])
+@admin.route("/question/sort", methods=["POST"])
 @login_required
 @required_role("admin")
 def sort_survey_question():
@@ -361,7 +336,7 @@ def sort_survey_question():
     编辑问卷排序模式提交排序API
     前端提供一个order_map 列表，列表元素数据格式：{ id: question_id, display_order: display_order}
     """
-    order_list : None | list[dict[str, int]] = request.json
+    order_list: None | list[dict[str, int]] = request.json
     if order_list is None or type(order_list) is not list:
         return jsonify({"code": 1, "desc": "缺少数据或数据错误"})
 
@@ -369,9 +344,9 @@ def sort_survey_question():
     new_order_set = set()
 
     for i in order_list:
-        question : None | Question = Question.query.get(i["id"])
+        question: None | Question = Question.query.get(i["id"])
         if question is None or question.logical_deletion is True:
-                return jsonify({"code": 1, "desc": "不存在ID为{i.id}的题目"})
+            return jsonify({"code": 1, "desc": "不存在ID为{i.id}的题目"})
         origin_order_set.add(question.display_order)
         new_order_set.add(i["display_order"])
         question.display_order = i["display_order"]
@@ -388,39 +363,30 @@ def sort_survey_question():
 @login_required
 @required_role("admin")
 def whitelist():
-    page = request.args.get("page", 1, type=int)  # 获取页码，默认为 1
-    per_page = request.args.get("size", 10, type=int)  # 获取每页条数，默认为 10
+    page = request.args.get("page", 1, type=int)
+    per_page = request.args.get("size", 10, type=int)
 
-    # 分页查询白名单
-    pagination = Whitelist.query.paginate(page=page, per_page=per_page, error_out=False)
-    result = pagination.items
+    stmt = select(Whitelist).options(
+        joinedload(Whitelist.wl_user),
+        joinedload(Whitelist.auditor),
+    )
 
-    # 构造返回数据
-    response_data = {"code": 0, "desc": "success", "list": []}
-    for i in result:
+    pagination = db.paginate(stmt, page=page, per_page=per_page, error_out=False)
+    items: list[Whitelist] = pagination.items
+    pagination_items: list = [
+        {
+            "id": item.id,
+            "username": item.wl_user.username,
+            "playerName": item.player_name,
+            "playerUUID": item.player_uuid,
+            "source": item.source,
+            "auditorName": item.auditor.username if item.auditor else None,
+            "authorizationDate": item.created_at,
+        }
+        for item in items
+    ]
 
-        auditor : None | User = User.query.get(i.auditor_uid)
-        if auditor is None:
-            auditor_name = "该用户不存在"
-        else:
-            auditor_name= auditor.username
-
-        response_data["list"].append({
-            "id": i.id,
-            "username": i.wl_user.username,
-            "name": i.player_name,
-            "uuid": i.player_uuid,
-            "source": i.source,
-            "auditor_name": auditor_name,
-            "created_at": i.created_at
-        })
-
-    # 添加分页信息
-    response_data["page"] = pagination.page
-    response_data["size"] = pagination.per_page
-    response_data["total"] = pagination.total
-
-    return jsonify(response_data)
+    return jsonify({"code": 0, "desc": "success", "data": build_pagination_dict(pagination, pagination_items, True)})
 
 
 @admin.route("/users", methods=["GET"])
@@ -508,12 +474,8 @@ def add_user():
             return jsonify({"code": 2, "desc": "用户名已存在！"}), 400
 
         # 创建用户
-        new_user = User(
-            username=username,
-            user_qq=user_qq,
-            role=role
-        )
-        new_user.password =password
+        new_user = User(username=username, user_qq=user_qq, role=role)
+        new_user.password = password
         db.session.add(new_user)
         db.session.commit()
 
@@ -618,10 +580,7 @@ def get_surveys():
                 i.is_reviewed = 2
                 db.session.commit()
 
-        not_reviewed_count = Response.query.filter(
-            Response.survey_id == _survey.id,
-            Response.is_reviewed == 0
-        ).count()
+        not_reviewed_count = Response.query.filter(Response.survey_id == _survey.id, Response.is_reviewed == 0).count()
 
         m = is_survey_mounted(_survey.id)
         status = 1 if m else 0
@@ -673,7 +632,7 @@ def get_responses():
         # 如果是被批改完的卷子，就直接调取总分，否则计算一遍
         if i.archive_score is None:
             scores = ResponseScore.query.filter_by(response_id=i.id).all()
-            total_score = sum(score.score for score in scores) # 计算总分
+            total_score = sum(score.score for score in scores)  # 计算总分
 
         else:
             total_score = i.archive_score
@@ -729,7 +688,7 @@ def get_survey(sid: int):
             continue
 
         question_data = {
-            "display_order" : question.display_order,
+            "display_order": question.display_order,
             "id": question.id,
             "title": question.question_text,
             "type": question.question_type,
@@ -796,15 +755,17 @@ def reviewed_response():
                 db.session.commit()
                 return jsonify({"code": 0, "desc": "此玩家存在已有白名单! "})
 
-            db.session.add(Whitelist(
+            db.session.add(
+                Whitelist(
                     user_id=resp.user_id,
                     player_name=resp.player_name,
                     player_uuid=resp.player_uuid,
                     source=0,
-                    auditor_uid=current_user.id
-            ))
+                    auditor_uid=current_user.id,
+                )
+            )
 
-        send_mail(APP, survey_result_mail([f'{resp.user.user_qq}@qq.com'], str(total_score)))
+        send_mail(APP, survey_result_mail([f"{resp.user.user_qq}@qq.com"], str(total_score)))
 
         db.session.commit()
         return jsonify({"code": 0, "desc": "操作成功"})
@@ -998,7 +959,6 @@ def del_slot():
         return jsonify({"code": 1, "desc": "出现错误"})
 
 
-
 @admin.route("/guarantee/get", methods=["GET"])
 @login_required
 @required_role("admin")
@@ -1014,15 +974,17 @@ def get_guarantee():
     result_list = []
 
     for item in pagination.items:
-        result_list.append({
-            "id": item.id,
-            "guarantor_username": item.guarantor.username,
-            "applicant_username": item.applicant_user.username,
-            "player_name": item.player_name,
-            "status": item.status,
-            "create_time": item.create_time,
-            "expiration_time": item.expiration_time
-        })
+        result_list.append(
+            {
+                "id": item.id,
+                "guarantor_username": item.guarantor.username,
+                "applicant_username": item.applicant_user.username,
+                "player_name": item.player_name,
+                "status": item.status,
+                "create_time": item.create_time,
+                "expiration_time": item.expiration_time,
+            }
+        )
 
     response_data = {
         "code": 0,
@@ -1034,4 +996,3 @@ def get_guarantee():
     }
 
     return jsonify(response_data)
-
