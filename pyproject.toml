@@ -32,3 +32,8 @@ select = [
     "UP",
 ]
 ignore = ["F401"]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.15.17",
+]
