@@ -37,3 +37,6 @@ dev = [
 [tool.pyright]
 venvPath = "."
 venv = ".venv"
+typeCheckingMode = "strict"
+reportMissingTypeStubs = false
+reportMissingImports = false
