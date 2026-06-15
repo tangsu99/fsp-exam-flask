@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy import exists, select
 
@@ -27,8 +28,8 @@ class DCQuestion:
     title: str
     type: QuestionCategory
     _score: float
-    options: list[DCOption] = field(default_factory=list)
-    images: list[DCImage] = field(default_factory=list)
+    options: list[DCOption] = field(default_factory=list[DCOption])
+    images: list[DCImage] = field(default_factory=list[DCImage])
     display_order: int | None = None  # None 或者 0 都代表插入到末尾
     id: int | None = None
 
@@ -64,28 +65,24 @@ def is_survey_mounted(survey_id: int) -> bool:
     return True if db.session.scalar(select(stmt)) else False
 
 
-def is_survey_exist(survey_id: int) -> bool:
+def is_survey_exist(survey_id: int) -> bool | None:
     stmt = select(exists().where(Survey.id == survey_id))
     return db.session.scalar(stmt)
 
 
-def is_question_exist(question_id: int) -> bool:
-    # stmt = select(exists().where(Question.id == question_id))
-    # return db.session.scalar(stmt)
-    res = db.session.get(Question, question_id)
-
-    if res is None or res.logical_deletion:
-        return False
-
-    return True
+def is_question_exist(question_id: int) -> bool | None:
+    stmt = select(exists().where(Question.id == question_id, Question.logical_deletion.is_(False)))
+    return db.session.scalar(stmt)
 
 
-def build_dc_questions(questions: list, survey_id: int | None = None) -> tuple[bool, str | list[DCQuestion]]:
-    if not is_survey_exist(survey_id):
+def build_dc_questions(
+    questions: list[dict[str, Any]], survey_id: int | None = None
+) -> tuple[bool, str | list[DCQuestion]]:
+    if (not survey_id) or (not is_survey_exist(survey_id)):
         return False, "问卷不存在"
 
-    dc_questions = []
-    errors = []
+    dc_questions: list[DCQuestion] = []
+    errors: list[str] = []
 
     for idx, question in enumerate(questions):
         try:
@@ -95,7 +92,7 @@ def build_dc_questions(questions: list, survey_id: int | None = None) -> tuple[b
             dc_question = DCQuestion(
                 survey_id=survey_id,
                 title=question.get("title", "未知题目"),
-                type=question.get("type"),
+                type=question.get("type", 0),
                 _score=question.get("score", 5),
                 options=[
                     DCOption(text=item.get("text", ""), is_correct=item.get("isCorrect", False)) for item in raw_options
