@@ -1,14 +1,17 @@
 from io import BytesIO
-from typing import Literal
+from typing import Any, Literal
 
 from flask import Blueprint, jsonify, request, send_file
-from flask_login import current_user, login_required
-from sqlalchemy import or_, update
+from flask_login import (
+    current_user,
+    login_required,  # type: ignore[reportUnknownVariableType]
+)
+from sqlalchemy import or_, select, update
 from sqlalchemy.orm import joinedload
 
 from myapp import db
-from myapp.db_model import Schematic, SchematicFile, SchematicType, User
-from myapp.utils import get_file_size, is_white_list_url
+from myapp.db_model import Schematic, SchematicFile, SchematicType
+from myapp.utils import build_pagination_dict, get_file_size, is_white_list_url
 
 schematic = Blueprint("schematic", __name__)
 
@@ -39,7 +42,7 @@ def get_schematic(schematic_id: int) -> Schematic | None:
 PermissionAction = Literal["detail", "download", "edit", "delete"]
 
 
-def check_user_permission(user: User, action: PermissionAction, schematic_item: Schematic):
+def check_user_permission(user: Any, action: PermissionAction, schematic_item: Schematic):
     """
     通用的权限校验函数
     :param user: 当前用户对象
@@ -51,8 +54,6 @@ def check_user_permission(user: User, action: PermissionAction, schematic_item: 
 
     elif action == "edit" or action == "delete":
         return True if schematic_item.uploader_id == user.id else False
-
-    return False
 
 
 @schematic.route("/", methods=["GET"])
@@ -212,26 +213,21 @@ def query_by_type():
     page = request.args.get("page", 1, type=int)
     per_page = min(request.args.get("per_page", 10, type=int), 100)  # 最大每页100条, 默认10条
 
-    query = (
-        db.session.query(Schematic)
-        .filter(Schematic.schematic_type == type_enum)
-        .filter(or_(Schematic.is_public, Schematic.uploader_id == current_user.id))
-        .paginate(page=page, per_page=per_page, error_out=False)
+    stmt = (
+        select(Schematic)
+        .options(joinedload(Schematic.uploader))
+        .where(
+            Schematic.schematic_type == type_enum, or_(Schematic.is_public, Schematic.uploader_id == current_user.id)
+        )
     )
+
+    pagination = db.paginate(stmt, page=page, per_page=per_page, error_out=False)
 
     return jsonify(
         {
             "code": 0,
             "desc": "投影查询成功",
-            "data": {
-                "items": [to_brief_dict(item) for item in query.items],
-                "total": query.total,
-                "page": query.page,
-                "pages": query.pages,
-                "per_page": query.per_page,
-                "has_next": query.has_next,
-                "has_prev": query.has_prev,
-            },
+            "data": build_pagination_dict(pagination, [to_brief_dict(item) for item in pagination.items]),
         }
     )
 
@@ -293,15 +289,18 @@ def search_schematics():
     if search_text == "":
         return jsonify({"code": 1, "desc": "请输入要搜索的内容"})
 
-    pagination = (
-        db.session.query(Schematic)
-        .options(joinedload(Schematic.uploader))  # JOIN 预加载
-        .filter(or_(Schematic.is_public, Schematic.uploader_id == current_user.id))
-        .filter(Schematic.name.ilike(f"%{search_text}%"))
-        .filter(Schematic.schematic_type == type_enum)
-        .order_by(Schematic.id.desc())
-        .paginate(page=page, per_page=per_page, error_out=False)
+    stmt = (
+        select(Schematic)
+        .options(joinedload(Schematic.uploader))
+        .where(
+            or_(Schematic.is_public, Schematic.uploader_id == current_user.id),
+            Schematic.schematic_type == type_enum,
+            Schematic.name.ilike(f"%{search_text}%"),
+        )
+        .order_by(Schematic.update_date.desc())  # 降序，新的在前面
     )
+
+    pagination = db.paginate(stmt, page=page, per_page=per_page, error_out=False)
 
     return jsonify(
         {
