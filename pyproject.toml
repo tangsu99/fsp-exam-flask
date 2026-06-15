@@ -25,15 +25,15 @@ dependencies = [
 
 [tool.ruff]
 line-length = 120
-select = [
-    "F",
-    "E",
-    "W",
-    "UP",
-]
-ignore = ["F401"]
+select = ["E", "F", "I", "B", "UP"]
+ignore = ["F401"] # Imported but unused
 
 [dependency-groups]
 dev = [
+    "pyright>=1.1.410",
     "ruff>=0.15.17",
 ]
+
+[tool.pyright]
+venvPath = "."
+venv = ".venv"
