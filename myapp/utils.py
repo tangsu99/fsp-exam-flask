@@ -1,22 +1,25 @@
 import os
 import re
+from collections.abc import Callable
 from datetime import UTC, datetime
 from functools import wraps
-from typing import cast
+from typing import Any, Literal, cast
 
 from flask import abort, current_app, jsonify, request
 from flask_login import current_user
+from flask_sqlalchemy.pagination import Pagination
+from werkzeug.datastructures import FileStorage
 
 from myapp.db_model import User
 
 PASSWORD_PATTERN = re.compile(r"^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[\W_])[A-Za-z\d\W_]{8,16}$")
 
 
-def token_check():
-    def decorator(f):
+def token_check() -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+    def decorator(f: Callable[..., Any]) -> Callable[..., Any]:
         @wraps(f)
-        def decorated_function(*args, **kwargs):
-            api_token = current_app.config["API_TOKEN"]
+        def decorated_function(*args: Any, **kwargs: Any) -> Any:
+            api_token = current_app.config.get("API_TOKEN", "")  # type: ignore[reportUnknownMemberType]
             token = request.headers.get("API-Token")
             if not token or api_token != token:
                 abort(401, description="Missing API Token")
@@ -27,10 +30,10 @@ def token_check():
     return decorator
 
 
-def status_check():
-    def decorator(f):
+def status_check() -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+    def decorator(f: Callable[..., Any]) -> Callable[..., Any]:
         @wraps(f)
-        def decorated_function(*args, **kwargs):
+        def decorated_function(*args: Any, **kwargs: Any) -> Any:
             user: User = cast(User, current_user)
             if user.status == 0:
                 return jsonify({"code": 3, "desc": "您的账户未激活请前往个人中心激活！"})
@@ -43,10 +46,10 @@ def status_check():
     return decorator
 
 
-def required_role(role: str):
-    def decorator(f):
+def required_role(role: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+    def decorator(f: Callable[..., Any]) -> Callable[..., Any]:
         @wraps(f)
-        def decorated_function(*args, **kwargs):
+        def decorated_function(*args: Any, **kwargs: Any) -> Any:
             user: User = cast(User, current_user)
             if user.role != role:
                 abort(401, description="角色不符")
@@ -59,35 +62,6 @@ def required_role(role: str):
 
 def check_password_format(password: str) -> bool:
     return bool(PASSWORD_PATTERN.match(password))
-
-
-def validate_json_required_fields(required_fields: dict, data: dict) -> dict:
-    """
-    接受数据格式模板（字典）和数据(字典）
-    数据格式模板例如：
-    required_fields = {
-        "survey": (int, True, "question_survey_id"),
-        "type": (int, True, "question_type"),
-        "score": (float, True, "question_score"),
-        "title": (str, True, "question_title"),
-        "options": (list, True, "question_options"),
-        "display_order": (int, True, "question_display_order")
-    }
-    """
-    return_data = {"success": True, "data": {}}
-    for field, (expected_type, is_required, new_field) in required_fields.items():
-        value = data.get(field)
-
-        if value is None and is_required:
-            return {"success": False}
-
-        # 分数是浮点的，如果前端传来例如5分，会被识别成int类型，如果不处理会出问题
-        if not isinstance(value, expected_type) and expected_type is float and not isinstance(value, int):
-            return {"success": False}
-
-        return_data["data"][new_field] = value
-
-    return return_data
 
 
 # 定义白名单规则列表
@@ -116,7 +90,7 @@ def is_white_list_url(url: str) -> bool:
     return False
 
 
-def get_file_size(file_storage, unit="KB"):
+def get_file_size(file_storage: FileStorage, unit: Literal["KB", "MB", "GB"] = "KB") -> int:
     """
     获取文件对象的大小，并转换为指定单位。
     如果计算结果向下取整后为0，则强制返回1。
@@ -154,8 +128,10 @@ def parse_dt_to_iso_utc(dt: datetime) -> str:
     return dt.replace(tzinfo=UTC).isoformat()
 
 
-def build_pagination_dict(pagination, pagination_items: list, with_total: bool = False) -> dict:
-    result = {
+def build_pagination_dict(
+    pagination: Pagination, pagination_items: list[Any], with_total: bool = False
+) -> dict[str, Any]:
+    result: dict[str, Any] = {
         "items": pagination_items,
         "page": pagination.page,
         "pages": pagination.pages,
