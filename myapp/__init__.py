@@ -1,5 +1,5 @@
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from dotenv import load_dotenv
 from flask import Flask, Request, jsonify
@@ -9,9 +9,16 @@ from flask_login import LoginManager
 from flask_mail import Mail
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy.orm import DeclarativeBase, MappedAsDataclass
+
+
+class Base(MappedAsDataclass, DeclarativeBase):
+    pass
+
 
 login_manager: LoginManager = LoginManager()
 db: SQLAlchemy = SQLAlchemy()
+db = SQLAlchemy(model_class=Base)
 migrate = Migrate()
 bcrypt: Bcrypt = Bcrypt()
 mail: Mail = Mail()
@@ -98,7 +105,7 @@ def create_app():
             if (
                 token_record
                 and not token_record.is_revoked
-                and token_record.expires_at.replace(tzinfo=timezone.utc) > datetime.now(timezone.utc)
+                and token_record.expires_at.replace(tzinfo=UTC) > datetime.now(UTC)
             ):
                 return token_record.user
         # 如果两种方式都未找到用户，返回 None
