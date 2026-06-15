@@ -16,7 +16,7 @@ schematic = Blueprint("schematic", __name__)
 MAX_FILE_SIZE_KB: int = 500
 
 
-def to_brief_dict(self):
+def to_brief_dict(self: Schematic):
     return {
         "id": self.id,
         "name": self.name,
@@ -39,7 +39,7 @@ def get_schematic(schematic_id: int) -> Schematic | None:
 PermissionAction = Literal["detail", "download", "edit", "delete"]
 
 
-def check_user_permission(user: User, action: PermissionAction, schematic_item):
+def check_user_permission(user: User, action: PermissionAction, schematic_item: Schematic):
     """
     通用的权限校验函数
     :param user: 当前用户对象

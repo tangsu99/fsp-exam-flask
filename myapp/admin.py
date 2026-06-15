@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify, request
 from flask_login import current_user, login_required
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, exists, func, select
 from sqlalchemy.orm import joinedload
 
 from myapp import APP, db
@@ -15,10 +15,13 @@ from myapp.db_model import (
     Response,
     ResponseDetail,
     ResponseScore,
+    ResponseStatus,
     Survey,
     SurveySlot,
     User,
+    UserStatus,
     Whitelist,
+    WhitelistType,
 )
 from myapp.mail import send_mail, survey_result_mail
 from myapp.survey_utils import DCQuestion, build_dc_questions, is_survey_mounted, is_survey_response_expired
@@ -234,9 +237,8 @@ def migration_question():
         return jsonify({"code": 0, "desc": "题目已在目标问卷中，无需迁移"})
 
     try:
-        stmt = select(func.max(Question.display_order)).where(
-            Question.survey_id == target_survey_id, Question.logical_deletion is False
-        )
+        stmt = (select(func.max(Question.display_order))
+                .where(Question.survey_id == target_survey_id, Question.logical_deletion.is_(False)))
         max_order = db.session.scalar(stmt)
 
         current_question.survey_id = target_survey_id
@@ -367,7 +369,7 @@ def whitelist():
     per_page = request.args.get("size", 10, type=int)
 
     stmt = select(Whitelist).options(
-        joinedload(Whitelist.wl_user),
+        joinedload(Whitelist.user),
         joinedload(Whitelist.auditor),
     )
 
@@ -376,7 +378,7 @@ def whitelist():
     pagination_items: list = [
         {
             "id": item.id,
-            "username": item.wl_user.username,
+            "username": item.user.username,
             "playerName": item.player_name,
             "playerUUID": item.player_uuid,
             "source": item.source,
@@ -393,39 +395,25 @@ def whitelist():
 @login_required
 @required_role("admin")
 def users():
-    page = request.args.get("page", 1, type=int)  # 获取页码，默认为 1
-    per_page = request.args.get("size", 10, type=int)  # 获取每页条数，默认为 10
+    page = request.args.get("page", 1, type=int)
+    per_page = request.args.get("size", 10, type=int)
 
-    # 分页查询用户
-    query = db.session.query(User).filter(User.status != 4)
-    pagination = query.paginate(page=page, per_page=per_page, error_out=False)
-    user_list = pagination.items
+    stmt = select(User).where(User.status != UserStatus.DELETED)
+    pagination = db.paginate(stmt, page=page, per_page=per_page, error_out=False)
 
-    # 构造返回数据
-    user_data = []
-    for user in user_list:
-        user_data.append(
-            {
-                "id": user.id,
-                "username": user.username,
-                "userQQ": user.user_qq,
-                "role": user.role,
-                "status": user.status,
-                "addtime": user.registered_at.isoformat(),
-                "avatar": user.avatar,
-            }
-        )
-
-    return jsonify(
+    pagination_items = [
         {
-            "code": 0,
-            "desc": "success",
-            "list": user_data,
-            "page": pagination.page,
-            "size": pagination.per_page,
-            "total": pagination.total,
-        }
-    )
+            "id": user.id,
+            "username": user.username,
+            "userQQ": user.user_qq,
+            "role": user.role,
+            "status": user.status,
+            "registeredAt": parse_dt_to_iso_utc(user.registered_at),
+            "avatar": user.avatar
+        } for user in pagination.items
+    ]
+
+    return jsonify({"code": 0, "desc": "success", "data": build_pagination_dict(pagination, pagination_items, True)})
 
 
 @admin.route("/user", methods=["GET"])
@@ -435,7 +423,8 @@ def get_user():
     id_ = request.args.get("id", 0, type=int)
     user: User | None = db.session.get(User, id_)
     if user is None:
-        return jsonify({"code": 1, "desc": "未找到用户！"}), 400
+        return jsonify({"code": 1, "desc": "未找到用户！"})
+
     return jsonify(
         {
             "code": 0,
@@ -446,8 +435,9 @@ def get_user():
                 "user_qq": user.user_qq,
                 "role": user.role,
                 "status": user.status,
-                "addtime": parse_dt_to_iso_utc(user.registered_at),
+                "registeredAt": parse_dt_to_iso_utc(user.registered_at),
                 "avatar": user.avatar,
+                "whitelist": user.whitelist
             },
         }
     )
@@ -725,7 +715,7 @@ def reviewed_response():
     req_data = request.json
     if req_data:
         rid = req_data.get("response")
-        status: int = req_data.get("status")
+        status: ResponseStatus = req_data.get("status")
 
         resp: Response | None = Response.query.get(rid)
 
@@ -735,23 +725,20 @@ def reviewed_response():
         if resp.is_reviewed:
             return jsonify({"code": 1, "desc": "已被审核! "})
 
-        if status not in [0, 1, 2]:
-            return jsonify({"code": 4, "desc": "未知状态！"})
-
-        # 设置审核状态后，强制将问卷设置为已完成的
         resp.is_reviewed = status
         resp.reviewer_uid = current_user.id
         resp.is_completed = True
 
         # 已审核的问卷不可再批分，向归档分数字段添加分数，优化查询答卷列表时的速度
-        scores = ResponseScore.query.filter_by(response_id=rid).all()
-        total_score: float = sum(score.score for score in scores)  # 计算总分
+        stmt = select(func.sum(ResponseScore.score)).where(ResponseScore.response_id == rid)
+        total_score: float = db.session.execute(stmt).scalar() or 0.0
         resp.archive_score = total_score
 
         # 为通过的用户添加白名单
-        if status == 1:
-            wl = Whitelist.query.filter_by(player_uuid=resp.player_uuid).first()
-            if wl is not None:
+        if status == ResponseStatus.APPROVED:
+            stmt = select(exists().where(Whitelist.player_uuid == resp.player_uuid))
+
+            if db.session.execute(stmt).scalar():
                 db.session.commit()
                 return jsonify({"code": 0, "desc": "此玩家存在已有白名单! "})
 
@@ -760,7 +747,7 @@ def reviewed_response():
                     user_id=resp.user_id,
                     player_name=resp.player_name,
                     player_uuid=resp.player_uuid,
-                    source=0,
+                    source=WhitelistType.EXAM,
                     auditor_uid=current_user.id,
                 )
             )
@@ -871,7 +858,11 @@ def set_score():
         response_id = req_data.get("responseId")
         if not all([score, response_id, question_id]):
             return jsonify({"code": 2, "desc": "字段无效！"}), 400
-        res = ResponseScore.query.filter_by(question_id=question_id, response_id=response_id).first()
+
+        stmt = (select(ResponseScore)
+                .where(ResponseScore.question_id == question_id, ResponseScore.response_id == response_id)
+                )
+        res = db.session.scalar(stmt)
         if res is not None:
             res.score = score
         else:
@@ -943,7 +934,6 @@ def del_slot():
     slot_id: str | None = req_data.get("id")
 
     try:
-        # 直接通过主键获取问题
         slot = SurveySlot.query.get(slot_id)
         if slot is None:
             return jsonify({"code": 0, "desc": "要删除的插槽不存在"})
@@ -953,7 +943,6 @@ def del_slot():
         return jsonify({"code": 0, "desc": "删除插槽成功"})
 
     except Exception as e:
-        # 处理其他异常
         db.session.rollback()
         print(f"An error occurred while deleting the question: {e}")
         return jsonify({"code": 1, "desc": "出现错误"})
@@ -966,33 +955,22 @@ def get_guarantee():
     page = request.args.get("page", 1, type=int)
     per_page = request.args.get("size", 10, type=int)
 
-    # stmt 是 Statement（语句） 的缩写，
-    # 在 SQLAlchemy 2.0 中特指由 select()、insert()、update()、delete() 等函数构建的 SQL 表达式对象。
     stmt = select(Guarantee)
     pagination = db.paginate(stmt, page=page, per_page=per_page, error_out=False)
 
-    result_list = []
+    pagination_items = []
 
     for item in pagination.items:
-        result_list.append(
+        pagination_items.append(
             {
                 "id": item.id,
                 "guarantor_username": item.guarantor.username,
                 "applicant_username": item.applicant_user.username,
                 "player_name": item.player_name,
                 "status": item.status,
-                "create_time": item.create_time,
-                "expiration_time": item.expiration_time,
+                "create_time": parse_dt_to_iso_utc(item.create_time),
+                "expiration_time": parse_dt_to_iso_utc(item.expiration_time)
             }
         )
 
-    response_data = {
-        "code": 0,
-        "desc": "yes",
-        "list": result_list,
-        "page": pagination.page,
-        "size": pagination.per_page,
-        "total": pagination.total,
-    }
-
-    return jsonify(response_data)
+    return jsonify({"code": 0, "desc": "success", "data": build_pagination_dict(pagination, pagination_items, True)})
