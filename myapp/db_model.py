@@ -1,5 +1,6 @@
 from datetime import UTC, datetime, timedelta
 from enum import IntEnum, unique
+from typing import Optional, Self
 
 from flask_login import UserMixin
 from sqlalchemy import (
@@ -7,6 +8,7 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    Index,
     Integer,
     LargeBinary,
     String,
@@ -17,7 +19,7 @@ from sqlalchemy import (
     update,
 )
 from sqlalchemy.dialects.mysql import LONGTEXT
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import DeclarativeBase, Mapped, MappedAsDataclass, mapped_column, relationship
 
 from myapp import bcrypt, db
 
@@ -78,6 +80,35 @@ class SchematicType(IntEnum):
     ARCHITECTURE = 2
 
 
+@unique
+class UserStatus(IntEnum):
+    INACTIVE = 0
+    ACTIVE = 1
+    TEMP_BANNED = 2
+    PERM_BANNED = 3
+    DELETED = 4
+
+
+@unique
+class ResponseStatus(IntEnum):
+    PENDING = 0
+    APPROVED = 1
+    REJECTED = 2
+
+
+@unique
+class WhitelistType(IntEnum):
+    EXAM = 0
+    GUARANTEE = 1
+    OTHER = 2
+
+
+class Base(MappedAsDataclass, DeclarativeBase):
+    pass
+    # DeclarativeBase 负责底层脏活：处理表结构映射、数据库交互、生成 Table 和 Mapper 对象。
+    # MappedAsDataclass 负责上层体验：自动生成类型安全的 __init__ 方法，提供现代化的类型注解支持。
+
+
 # 问卷表模型
 class Survey(db.Model):
     __tablename__ = "surveys"
@@ -94,28 +125,30 @@ class Survey(db.Model):
 
 
 # 问题表模型
-class Question(db.Model):
+class Question(Base):
     __tablename__ = "questions"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(primary_key=True, init=False)
     survey_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("surveys.id", ondelete="CASCADE"), nullable=False
     )  # 所属问卷id，外键，关联问卷表，级联删除
+    display_order: Mapped[int] = mapped_column(Integer, nullable=False)
     question_text: Mapped[str] = mapped_column(String(500), nullable=False)  # 问题内容，不允许为空
     # 问题类型，不允许为空，如1-单选，2-多选，3-填空，4-简答等
     question_type: Mapped[QuestionCategory] = mapped_column(Integer, nullable=False)
-    score: Mapped[float] = mapped_column(Float, nullable=False)  # 问题分值，不允许为空
-    logical_deletion: Mapped[bool] = mapped_column(Boolean, default=False, nullable=True)  # 逻辑删除
+    score: Mapped[float] = mapped_column(Float, nullable=False)
+    logical_deletion: Mapped[bool] = mapped_column(default=False)
     create_time: Mapped[datetime] = mapped_column(TZ_AWARE_DATETIME, default=lambda: datetime.now(UTC), nullable=False)
     img_list: Mapped[list["QuestionImgURL"]] = relationship(
-        "QuestionImgURL", backref="question_images_backref", lazy="select", cascade="all, delete"
+        "QuestionImgURL", backref="question_images_backref", lazy="select", cascade="all, delete", init=False
     )  # 与图片表建立一对多关系，级联删除
     options: Mapped[list["Option"]] = relationship(
-        "Option", backref="question", lazy="select", cascade="all, delete"
+        "Option", backref="question", lazy="select", cascade="all, delete", init=False
     )  # 与选项表建立一对多关系，级联删除
     response_details: Mapped[list["ResponseDetail"]] = relationship(
-        "ResponseDetail", backref="question_r_d", lazy="select", cascade="all, delete"
+        "ResponseDetail", backref="question_r_d", lazy="select", cascade="all, delete", init=False
     )
-    display_order: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    __table_args__ = (Index("idx_question_id_logical", "id", "logical_deletion"),)
 
     @classmethod
     def create(
@@ -125,14 +158,16 @@ class Question(db.Model):
         question_type: QuestionCategory,
         score: float,
         target_display_order: int | None = None,
-    ) -> "Question":
+    ) -> Self:
         """
         如果 target_display_order 是 None，在末尾插入题目
         如提供了 target_display_order，在指定位置插入一个问题，并调整后续问题的顺序
         """
         if target_display_order is None:
             # 获取当前最大排序值
-            stmt = select(func.max(cls.display_order)).where(cls.survey_id == survey_id, cls.logical_deletion is False)
+            stmt = select(func.max(cls.display_order)).where(
+                cls.survey_id == survey_id, cls.logical_deletion.is_(False)
+            )
             max_order = db.session.scalar(stmt)
             target_display_order = 1 if max_order is None else max_order + 1
 
@@ -141,7 +176,9 @@ class Question(db.Model):
             shift_stmt = (
                 update(cls)
                 .where(
-                    cls.survey_id == survey_id, cls.display_order >= target_display_order, cls.logical_deletion is False
+                    cls.survey_id == survey_id,
+                    cls.display_order >= target_display_order,
+                    cls.logical_deletion.is_(False),
                 )
                 .values(display_order=cls.display_order + 1)
             )
@@ -183,23 +220,27 @@ class Option(db.Model):
 # 用户表模型
 class User(UserMixin, db.Model):
     __tablename__ = "users"  # 指定表名
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(primary_key=True)
     username: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
     user_qq: Mapped[str] = mapped_column(String(25), unique=True, nullable=False)
-    _password_hash: Mapped[str] = mapped_column("password", String(100), nullable=False)  # 哈希过的密码
+    _password_hash: Mapped[str] = mapped_column("password", String(100), nullable=False)
     role: Mapped[str] = mapped_column(String(100), nullable=False, default="user")  # 用户角色，如普通用户、管理员等
     registered_at: Mapped[datetime] = mapped_column(
         TZ_AWARE_DATETIME, default=lambda: datetime.now(UTC), nullable=False
     )
-    avatar: Mapped[str] = mapped_column(String(500), default=DEFAULT_AVATAR)
-    status: Mapped[int] = mapped_column(
-        Integer, nullable=False, default=0
-    )  # 0 未激活 1 正常 2 临时封禁 3 永久封禁 4 删除
-    tokens: Mapped[list["Token"]] = relationship("Token", backref="user", lazy="select")
-    whitelist: Mapped[list["Whitelist"]] = relationship("Whitelist", backref="wl_user", lazy="select")
+    avatar: Mapped[str] = mapped_column(String(500), default=DEFAULT_AVATAR)  # 头像的 UUID
+    status: Mapped[UserStatus] = mapped_column(Integer, nullable=False, default=0)
+    tokens: Mapped[list["Token"]] = relationship("Token", backref="user")
 
-    # 使用 back_populates 替代 backref
-    # back_populates 是显式双向绑定，不会在对方模型上隐式创建属性
+    # 拥有的白名单
+    whitelist: Mapped[list["Whitelist"]] = relationship(
+        foreign_keys="Whitelist.user_id", back_populates="user", lazy="selectin", cascade="all, delete-orphan"
+    )
+
+    # 作为审核人的白名单（审核了哪些白名单）
+    audited_whitelist: Mapped[list["Whitelist"]] = relationship(
+        foreign_keys="Whitelist.auditor_uid", back_populates="auditor"
+    )
 
     # 担保人身份：我作为担保人的担保记录
     guarantees: Mapped[list["Guarantee"]] = relationship(
@@ -244,8 +285,8 @@ class User(UserMixin, db.Model):
     @property
     def has_play_permission(self):
         """查看用户是否拥有至少一个白名单"""
-        stmt = exists().where(Whitelist.user_id == self.id)
-        return db.session.query(stmt).scalar()
+        stmt = select(exists().where(Whitelist.user_id == self.id))
+        return db.session.execute(stmt).scalar()
 
 
 # 答卷表模型
@@ -253,7 +294,7 @@ class Response(db.Model):
     __tablename__ = "responses"  # 指定表名
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     is_completed: Mapped[bool] = mapped_column(Boolean, default=False)
-    is_reviewed: Mapped[int] = mapped_column(Integer, default=0)  # 阅卷状态，0 待审核 1 已通过 2 已拒绝
+    is_reviewed: Mapped[ResponseStatus] = mapped_column(Integer, default=0)
     reviewer_uid: Mapped[int] = mapped_column(Integer, nullable=True)
     player_name: Mapped[str] = mapped_column(String(25), nullable=False)
     player_uuid: Mapped[str] = mapped_column(String(36), nullable=False)
@@ -347,26 +388,17 @@ class Guarantee(db.Model):
         return self.STATUS_MAP.get(self.status, "未知状态")
 
 
-class Whitelist(db.Model):
+class Whitelist(Base):
     __tablename__ = "whitelist"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=True, default=None)
+    id: Mapped[int] = mapped_column(primary_key=True, init=False)
+    user_id: Mapped[int] = mapped_column(ForeignKey("User.id", ondelete="CASCADE"), nullable=False)
+    user: Mapped[Optional["User"]] = relationship(foreign_keys=[user_id], back_populates="whitelist", init=False)
     player_name: Mapped[str] = mapped_column(String(25), nullable=False)
     player_uuid: Mapped[str] = mapped_column(String(36), nullable=False)
-    auditor_uid: Mapped[int] = mapped_column(ForeignKey("user.id"))
-    auditor = relationship("User", foreign_keys=[auditor_uid], lazy="noload")
-    auditor: Mapped[Optional["User"]] = relationship(foreign_keys=[auditor_uid], lazy="noload")
-    source: Mapped[int] = mapped_column(Integer, nullable=False)  # 0 代表考试，1代表担保，2代表其他
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=func.utc_timestamp(), server_default=func.utc_timestamp()
-    )
-
-    def __init__(self, user_id: int, player_name: str, player_uuid: str, source: int, auditor_uid: int):
-        self.user_id = user_id
-        self.player_name = player_name
-        self.player_uuid = player_uuid
-        self.source = source
-        self.auditor_uid = auditor_uid
+    auditor_uid: Mapped[int] = mapped_column(Integer, ForeignKey("User.id"), nullable=False)
+    auditor: Mapped[Optional["User"]] = relationship(foreign_keys=[auditor_uid], back_populates="whitelist", init=False)
+    source: Mapped[WhitelistType] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(TZ_AWARE_DATETIME, default=lambda: datetime.now(UTC), nullable=False)
 
 
 class Token(db.Model):
@@ -449,22 +481,22 @@ class ConfigModel(db.Model):
 
 
 # 投影信息表
-class Schematic(db.Model):
+class Schematic(Base):
     __tablename__ = "schematics"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    id: Mapped[int] = mapped_column(primary_key=True, init=False)
     name: Mapped[str] = mapped_column(String(100), nullable=False)  # 投影文件名 (30个汉字，这里设为100字符足够容纳)
-    uploader_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)  # 上传用户ID
-    uploader: Mapped["User"] = relationship("User", backref="schematics")  # 上传用户
-    original_author: Mapped[str] = mapped_column(String(100), nullable=True)  # 投影原作者
-    schematic_type: Mapped[SchematicType] = mapped_column(Integer, nullable=False)  # 投影类型
-    game_version: Mapped[str] = mapped_column(String(50), nullable=False)  # 投影版本
-    tag: Mapped[str] = mapped_column(String(200), nullable=True)  # 投影tag
-    description: Mapped[str] = mapped_column(Text, nullable=True)  # 投影描述
-    is_public: Mapped[bool] = mapped_column(Boolean, default=True)  # 是否公开
-    download_count: Mapped[int] = mapped_column(Integer, default=0)  # 下载量
-    file_size_KB: Mapped[int] = mapped_column(Integer, nullable=False)  # 投影大小（KB）
+    uploader_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
+    uploader: Mapped["User"] = relationship("User", backref="schematics", init=False)
+    original_author: Mapped[str] = mapped_column(String(100), nullable=True)
+    schematic_type: Mapped[SchematicType] = mapped_column(Integer, nullable=False)
+    game_version: Mapped[str] = mapped_column(String(50), nullable=False)
+    tag: Mapped[str] = mapped_column(String(200), nullable=True)
+    description: Mapped[str] = mapped_column(Text, nullable=True)
+    file_size_KB: Mapped[int] = mapped_column(Integer, nullable=False)
     backup_link: Mapped[str] = mapped_column(String(255), nullable=True)  # 文件备用链接
+    is_public: Mapped[bool] = mapped_column(Boolean, default=True)
+    download_count: Mapped[int] = mapped_column(Integer, default=0)
 
     upload_date: Mapped[datetime] = mapped_column(TZ_AWARE_DATETIME, default=lambda: datetime.now(UTC), nullable=False)
 
@@ -479,6 +511,7 @@ class Schematic(db.Model):
         uselist=False,
         # 这是实现一对一关系的核心参数。默认情况下，relationship 返回的是一个列表（一对多）。
         # 将其设置为 False 后，SQLAlchemy 知道这个属性返回的是单个对象而不是列表
+        default=None,
     )
 
     @staticmethod
@@ -502,10 +535,10 @@ class Schematic(db.Model):
 
 
 # 投影文件二进制分表
-class SchematicFile(db.Model):
+class SchematicFile(Base):
     __tablename__ = "schematic_files"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    id: Mapped[int] = mapped_column(primary_key=True, init=False)
     # 外键关联投影主表
     schematic_id: Mapped[int] = mapped_column(Integer, ForeignKey("schematics.id"), nullable=False, unique=True)
 
@@ -513,7 +546,7 @@ class SchematicFile(db.Model):
     file_blob: Mapped[bytes] = mapped_column(LargeBinary(524288), nullable=False)
 
     # 反向关联回主表
-    schematics: Mapped["Schematic"] = relationship(back_populates="file_data")
+    schematics: Mapped["Schematic"] = relationship(back_populates="file_data", init=False)
 
     def __repr__(self):
         return f"<SchematicFiles for ID {self.schematic_id}>"
