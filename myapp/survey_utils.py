@@ -2,10 +2,10 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import exists, select
+from sqlalchemy import exists, func, select
 
 from myapp import db
-from myapp.db_model import Question, QuestionCategory, Response, Survey, SurveySlot
+from myapp.db_model import Question, QuestionCategory, Response, ResponseScore, Survey, SurveySlot
 
 
 @dataclass
@@ -121,3 +121,8 @@ def is_survey_response_expired(survey_response: Response) -> bool:
     expired_datetime = survey_response.end_time.replace(tzinfo=UTC)
     current_datetime = datetime.now(UTC)
     return True if current_datetime > expired_datetime else False
+
+
+def get_response_total_score(response_id: int) -> float:
+    stmt = select(func.sum(ResponseScore.score)).where(ResponseScore.response_id == response_id)
+    return db.session.execute(stmt).scalar() or 0.0
