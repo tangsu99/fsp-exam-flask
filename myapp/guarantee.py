@@ -1,27 +1,33 @@
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
+from typing import Any, cast
 
 from flask import Blueprint, jsonify, request
-from flask_login import current_user, login_required
+from flask_login import (
+    current_user,
+    login_required,  # type: ignore[reportUnknownVariableType]
+)
+from sqlalchemy import select
 
-from myapp import db, APP
-from myapp.db_model import Guarantee, User, Whitelist
+from myapp import APP, db
+from myapp.db_model import Guarantee, GuaranteeStatus, User, Whitelist, WhitelistType
 from myapp.mail import guarantee_result_mail, send_mail
-from myapp.utils import status_check
+from myapp.utils import parse_dt_to_iso_utc, status_check
 
 guarantee = Blueprint("guarantee", __name__)
 
+
 def is_expired(expiration_time: datetime) -> bool:
-    expiration_time = expiration_time.replace(tzinfo=timezone.utc)
-    current_datetime = datetime.now(timezone.utc)
+    expiration_time = expiration_time.replace(tzinfo=UTC)
+    current_datetime = datetime.now(UTC)
     return current_datetime > expiration_time
 
 
 def is_player_in_whitelist(player_uuid: str) -> Whitelist | None:
-    # 如果只是判断是否存在，.count() > 0 的性能要优于 .first()
-    return db.session.query(Whitelist).filter(Whitelist.player_uuid == player_uuid).first()
+    return db.session.scalar(select(Whitelist).where(Whitelist.player_uuid == player_uuid))
 
-def check_guarantor(info: dict) -> dict:
-    player_uuid = info.get("player_uuid", "")
+
+def check_guarantor(info: dict[str, Any]) -> dict[str, Any]:
+    player_uuid: str = info.get("player_uuid", "")
     player = is_player_in_whitelist(player_uuid)
     if not player:
         return {"code": 1, "desc": "担保人不属于白名单成员，无法担保！"}
@@ -37,21 +43,22 @@ def check_guarantor(info: dict) -> dict:
     return {"code": 0, "guarantor_id": user_result.id}
 
 
-def check_applicant(info: dict) -> dict:
+def check_applicant(info: dict[str, Any]) -> dict[str, Any]:
     player_uuid = info.get("player_uuid", "")
 
     if is_player_in_whitelist(player_uuid):
         return {"code": 1, "desc": "你已经是白名单成员"}
 
-    g_result = db.session.query(Guarantee).filter(
-        Guarantee.player_uuid == info.get("player_uuid"),
-        Guarantee.status == 0,
-    ).all()
-
+    g_result = db.session.scalars(
+        select(Guarantee).where(
+            Guarantee.player_uuid == info.get("player_uuid"),
+            Guarantee.status == GuaranteeStatus.WAITING,
+        )
+    )
 
     for i in g_result:
         # 如果有未过期的
-        if datetime.now(timezone.utc).replace(tzinfo=None) < i.expiration_time.replace(tzinfo=None):
+        if datetime.now(UTC) < i.expiration_time.replace(tzinfo=UTC):
             return {"code": 1, "desc": "存在未过期的担保！个人中心担保查询里查看进度"}
 
     return {"code": 0}
@@ -66,10 +73,11 @@ def return_data(i: Guarantee):
         "avatar": i.applicant_user.avatar,
         "playerName": i.player_name,
         "playerUUID": i.player_uuid,
-        "createTime": i.create_time,
-        "expirationTime": i.expiration_time,
+        "createTime": parse_dt_to_iso_utc(i.create_time),
+        "expirationTime": parse_dt_to_iso_utc(i.expiration_time),
         "status": i.status,
     }
+
 
 @guarantee.route("/request", methods=["POST"])
 @login_required
@@ -101,26 +109,34 @@ def add_guarantee():
     if check_applicant_res["code"] == 1:
         return jsonify(check_applicant_res)
 
-    expiration = APP.config['GUARANTEE_EXPIRATION']
+    expiration: int = cast(int, APP.config["GUARANTEE_EXPIRATION"])
 
     _guarantee = Guarantee(
         guarantee_id=guarantor_id,
         applicant_id=current_user.id,
         player_name=applicant_info["player_name"],
         player_uuid=applicant_info["player_uuid"],
-        create_time=datetime.now(timezone.utc),
-        expiration_time=datetime.now(timezone.utc) + timedelta(hours=expiration)
+        expiration_time=datetime.now(UTC) + timedelta(hours=expiration),
     )
 
     db.session.add(_guarantee)
     db.session.commit()
-    return jsonify({"code": 0, "desc": "提交成功，有效期1小时，超时失效，1小时内不可再申请新的担保请求，除非对方手动拒绝或同意，担保结果会发往您的qq邮箱。"})
+    return jsonify(
+        {
+            "code": 0,
+            "desc": (
+                f"有效期{expiration}小时，超时失效，"
+                f"{expiration}小时内不可再申请新的担保请求，"
+                "除非对方手动拒绝或同意，担保结果会发往您的qq邮箱。"
+            ),
+        }
+    )
 
 
 @guarantee.route("/query_all", methods=["GET"])
 @login_required
 def query_all():
-    response_data = {
+    response_data: dict[str, Any] = {
         "code": 0,
         "desc": "yes",
         "data": {"guarantee": [], "applicant": []},
@@ -142,7 +158,10 @@ def guarantee_user_action():
     """
     操作用户担保
     """
-    data = request.get_json(silent=True) or {}
+    data = request.get_json(silent=True)
+
+    if not data:
+        return jsonify({"code": 1, "desc": "缺少数据！"})
 
     _id = data.get("id")
     action = data.get("action")
@@ -156,13 +175,11 @@ def guarantee_user_action():
     _guarantee: Guarantee | None = db.session.get(Guarantee, _id)
     if _guarantee and not is_expired(_guarantee.expiration_time):
         if action == "reject":
-            _guarantee.status = 2
+            _guarantee.status = GuaranteeStatus.REFUSE
             db.session.commit()
 
             mail_msg = guarantee_result_mail(
-                [_guarantee.applicant_user.user_qq + '@qq.com'],
-                _guarantee.guarantor.username,
-                False
+                [_guarantee.applicant_user.user_qq + "@qq.com"], _guarantee.guarantor.username, False
             )
             send_mail(APP, mail_msg)
 
@@ -172,21 +189,21 @@ def guarantee_user_action():
             if is_player_in_whitelist(_guarantee.player_uuid):
                 return jsonify({"code": 1, "desc": "此玩家存在已有白名单! "})
 
-            db.session.add(Whitelist(
+            db.session.add(
+                Whitelist(
                     user_id=_guarantee.applicant_id,
                     player_name=_guarantee.player_name,
                     player_uuid=_guarantee.player_uuid,
-                    source=1,
-                    auditor_uid=current_user.id
-            ))
+                    source=WhitelistType.GUARANTEE,
+                    auditor_uid=current_user.id,
+                )
+            )
 
-            _guarantee.status = 1
+            _guarantee.status = GuaranteeStatus.AGREEMENT
             db.session.commit()
 
             mail_msg = guarantee_result_mail(
-                [_guarantee.applicant_user.user_qq + '@qq.com'],
-                _guarantee.guarantor.username,
-                True
+                [_guarantee.applicant_user.user_qq + "@qq.com"], _guarantee.guarantor.username, True
             )
             send_mail(APP, mail_msg)
 
