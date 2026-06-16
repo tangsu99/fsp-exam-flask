@@ -133,8 +133,19 @@ def is_survey_response_expired(survey_response: Response) -> bool:
 
 
 def get_response_total_score(response_id: int) -> float:
+    """
+    获取答卷总分
+    """
     stmt = select(func.sum(ResponseScore.score)).where(ResponseScore.response_id == response_id)
-    return db.session.execute(stmt).scalar() or 0.0
+    return db.session.scalar(stmt) or 0.0
+
+
+def get_survey_total_score(survey_id: int) -> float:
+    """
+    获取问卷满分分数
+    """
+    stmt = select(func.sum(Question.score)).where(Question.survey_id == survey_id)
+    return db.session.scalar(stmt) or 0.0
 
 
 def get_response_objective_question_score(user_response: list[str], question: Question) -> float:
