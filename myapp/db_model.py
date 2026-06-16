@@ -19,9 +19,9 @@ from sqlalchemy import (
     update,
 )
 from sqlalchemy.dialects.mysql import LONGTEXT
-from sqlalchemy.orm import DeclarativeBase, Mapped, MappedAsDataclass, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from myapp import bcrypt, db
+from myapp import Base, bcrypt, db
 
 # steve avatar, auth.py import this
 DEFAULT_AVATAR = "8667ba71-b85a-4004-af54-457a9734eed7"
@@ -96,12 +96,6 @@ class WhitelistType(IntEnum):
     OTHER = 2
 
 
-class Base(MappedAsDataclass, DeclarativeBase):
-    pass
-    # DeclarativeBase 负责底层脏活：处理表结构映射、数据库交互、生成 Table 和 Mapper 对象。
-    # MappedAsDataclass 负责上层体验：自动生成类型安全的 __init__ 方法，提供现代化的类型注解支持。
-
-
 class User(UserMixin, Base):
     __tablename__ = "users"
     id: Mapped[int] = mapped_column(primary_key=True, init=False)
@@ -165,6 +159,21 @@ class User(UserMixin, Base):
         """查看用户是否拥有至少一个白名单"""
         stmt = select(exists().where(Whitelist.user_id == self.id))
         return db.session.execute(stmt).scalar()
+
+
+class Whitelist(Base):
+    __tablename__ = "whitelist"
+    id: Mapped[int] = mapped_column(primary_key=True, init=False)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    user: Mapped[Optional["User"]] = relationship(foreign_keys=[user_id], back_populates="whitelist", init=False)
+    player_name: Mapped[str] = mapped_column(String(25), nullable=False)
+    player_uuid: Mapped[str] = mapped_column(String(36), nullable=False)
+    auditor_uid: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
+    auditor: Mapped[Optional["User"]] = relationship(
+        foreign_keys=[auditor_uid], back_populates="audited_whitelist", init=False
+    )
+    source: Mapped[WhitelistType] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(TZ_AWARE_DATETIME, default=lambda: datetime.now(UTC), nullable=False)
 
 
 # 问卷插槽表
@@ -343,34 +352,19 @@ class Guarantee(Base):
         "User", foreign_keys=[applicant_id], back_populates="applicant_guarantees", init=False
     )
 
-    STATUS_MAP: dict[int, str] = {
-        0: "待同意",
-        1: "已同意",
-        2: "已拒绝",
-    }
-
     @property
     def status_text(self) -> str:
         """获取状态的中文含义"""
-        return self.STATUS_MAP.get(self.status, "未知状态")
-
-
-class Whitelist(Base):
-    __tablename__ = "whitelist"
-    id: Mapped[int] = mapped_column(primary_key=True, init=False)
-    user_id: Mapped[int] = mapped_column(ForeignKey("User.id", ondelete="CASCADE"), nullable=False)
-    user: Mapped[Optional["User"]] = relationship(foreign_keys=[user_id], back_populates="whitelist", init=False)
-    player_name: Mapped[str] = mapped_column(String(25), nullable=False)
-    player_uuid: Mapped[str] = mapped_column(String(36), nullable=False)
-    auditor_uid: Mapped[int] = mapped_column(Integer, ForeignKey("User.id"), nullable=False)
-    auditor: Mapped[Optional["User"]] = relationship(
-        foreign_keys=[auditor_uid], back_populates="audited_whitelist", init=False
-    )
-    source: Mapped[WhitelistType] = mapped_column(Integer, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(TZ_AWARE_DATETIME, default=lambda: datetime.now(UTC), nullable=False)
+        STATUS_MAP: dict[int, str] = {
+            0: "待同意",
+            1: "已同意",
+            2: "已拒绝",
+        }
+        return STATUS_MAP.get(self.status, "未知状态")
 
 
 class Token(Base):
+    __tablename__ = "token"
     id: Mapped[int] = mapped_column(primary_key=True, init=False)
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
     token_user: Mapped["User"] = relationship(foreign_keys=[user_id], back_populates="tokens", init=False)
@@ -390,6 +384,7 @@ class RegistrationLimit(Base):
 
 
 class ResetPasswordToken(Base):
+    __tablename__ = "reset_password_token"
     id: Mapped[int] = mapped_column(primary_key=True, init=False)
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     user_r_p_t: Mapped["User| None"] = relationship(back_populates="reset_password_token", init=False)
@@ -402,6 +397,7 @@ class ResetPasswordToken(Base):
 
 
 class ActivationToken(Base):
+    __tablename__ = "activation_token"
     id: Mapped[int] = mapped_column(primary_key=True, init=False)
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     token: Mapped[str] = mapped_column(String(256), unique=True, nullable=False)

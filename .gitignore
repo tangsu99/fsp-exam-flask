@@ -9,4 +9,5 @@ log/
 .env
 
 .idea/dataSources.xml
-migrations/
+migrations/versions/
+migrations/__pycache__/
