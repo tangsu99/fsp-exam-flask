@@ -13,6 +13,7 @@ from myapp.db_model import (
     User,
 )
 from myapp.survey_utils import get_response_total_score, get_survey_total_score
+from myapp.utils import parse_dt_to_iso_utc
 
 query = Blueprint("query", __name__)
 
@@ -48,7 +49,7 @@ def response():
             {
                 "id": res.id,
                 "survey_name": res.survey_name,
-                "responseTime": res.submit_time,
+                "responseTime": parse_dt_to_iso_utc(res.submit_time),
                 "state": res.is_reviewed,
                 "get_score": get_score,
                 "full_score": full_score,
