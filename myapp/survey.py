@@ -6,7 +6,7 @@ from flask_login import (
     current_user,
     login_required,  # type: ignore[reportUnknownVariableType]
 )
-from sqlalchemy import select
+from sqlalchemy import exists, select
 
 from myapp import APP, db
 from myapp.db_model import (
@@ -159,7 +159,7 @@ def start_survey():
     if not sid or not slot_name or not mc_name or not mc_uuid:
         return jsonify({"code": 1, "desc": "缺少信息！"})
 
-    is_in_whitelist = db.session.query(Whitelist).filter_by(player_uuid=mc_uuid).first()
+    is_in_whitelist = db.session.scalar(select(exists().where(Whitelist.player_uuid == mc_uuid)))
     if is_in_whitelist:
         return jsonify({"code": 2, "desc": "此玩家存在已有白名单! "})
 
