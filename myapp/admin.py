@@ -406,7 +406,7 @@ def whitelist():
             "playerUUID": item.player_uuid,
             "source": item.source,
             "auditorName": item.auditor.username if item.auditor else None,
-            "authorizationDate": item.created_at,
+            "authorizationDate": parse_dt_to_iso_utc(item.created_at),
         }
         for item in items
     ]
