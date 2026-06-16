@@ -8,7 +8,7 @@ from flask_login import (
     login_required,  # type: ignore[reportUnknownVariableType]
     login_user,  # type: ignore[reportUnknownVariableType]
 )
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 
 from myapp import APP, db
@@ -25,7 +25,8 @@ def login():
     if req_data:
         username = req_data["username"]
         password = req_data["password"]
-        user: User | None = db.session.query(User).filter_by(username=username).first()
+        stmt = select(User).where(User.username == username)
+        user = db.session.scalar(stmt)
         if user and user.check_password(password):
             login_user(user)
             token = create_token(user)
@@ -56,7 +57,9 @@ def logout():
         token: str | None = request.headers.get("Authorization")
         if token and token.startswith("Bearer "):
             token = token.replace("Bearer ", "", 1)
-        tk: Token | None = db.session.query(Token).filter_by(token=token).first()
+
+        stmt = select(Token).where(Token.token == token)
+        tk = db.session.scalar(stmt)
         if tk is None:
             return jsonify({"code": 4, "desc": "Token not found"})
         db.session.delete(tk)
@@ -100,7 +103,8 @@ def register():
     if not check_password_format(password):
         return jsonify({"code": 2, "desc": "密码不合法!"})
 
-    existing_user = db.session.query(User).filter(or_(User.username == username, User.user_qq == user_qq)).first()
+    stmt = select(User).where(or_(User.username == username, User.user_qq == user_qq))
+    existing_user = db.session.scalar(stmt)
 
     if existing_user:
         if existing_user.username == username:
@@ -180,21 +184,26 @@ def find_password():
     if check_ip_registration_limit(client_ip_split):
         return jsonify({"code": 5, "desc": "该IP注册次数过多，请稍后再试!"})
 
-    if request.json:
-        username = request.json.get("username")
-        qq = request.json.get("userQQ")
-        user = db.session.query(User).filter_by(user_qq=qq, username=username).first()
-        if not user:
-            return jsonify({"code": 4, "desc": "未找到用户!"})
-        send_reset_password(user)
-        return jsonify({"code": 0, "desc": "发送成功！请查找邮箱!"})
+    request_data = request.get_json(silent=True)
 
-    return jsonify({"code": 5, "desc": "缺少数据"})
+    if request_data is None:
+        return jsonify({"code": 5, "desc": "缺少数据"})
+
+    qq: str | None = request_data.get("userQQ")
+
+    user = db.session.scalar(select(User).where(User.user_qq == qq))
+    if user is None:
+        return jsonify({"code": 4, "desc": "未找到用户!"})
+
+    send_reset_password(user)
+    return jsonify({"code": 0, "desc": "发送成功！请查找邮箱!"})
 
 
 @auth.route("/findPassword", methods=["PUT"])
 def find_password_set():
-    token = db.session.query(ResetPasswordToken).filter_by(token=request.args.get("token", "")).first()
+    token_str = request.args.get("token", "")
+    stmt = select(ResetPasswordToken).where(ResetPasswordToken.token == token_str)
+    token = db.session.scalar(stmt)
     if not token:
         return jsonify({"code": 4, "desc": "无效token!"})
 
@@ -219,13 +228,14 @@ def find_password_set():
 @auth.route("/reqActivation", methods=["post"])
 @login_required
 def req_activation():
-    user: User | None = db.session.query(User).filter_by(username=current_user.username).first()
+    user = db.session.scalar(select(User).where(User.username == current_user.username))
     if user is None:
         return jsonify({"code": 4, "desc": "未找到用户!"}), 404
 
-    if user.status != 0:
-        if user.status == 1:
-            return jsonify({"code": 2, "desc": "账户状态正常！不需要进行激活！"})
+    if user.status == UserStatus.ACTIVE:
+        return jsonify({"code": 2, "desc": "账户状态正常！不需要进行激活！"})
+
+    if user.status != UserStatus.INACTIVE:
         return jsonify({"code": 2, "desc": "账户状态异常！无法进行激活！"})
 
     stmt = select(ActivationToken).where(
@@ -287,11 +297,11 @@ def send_reset_password(user: User):
 
 def check_ip_registration_limit(ip: str):
     one_hour_ago = datetime.now(UTC) - timedelta(hours=1)
-    registrations = (
-        db.session.query(RegistrationLimit)
-        .filter(RegistrationLimit.ip == ip, RegistrationLimit.register_time >= one_hour_ago)
-        .count()
+    stmt = select(func.count(RegistrationLimit.id)).where(
+        RegistrationLimit.ip == ip, RegistrationLimit.register_time >= one_hour_ago
     )
+    registrations = db.session.scalar(stmt) or 0
+
     return registrations >= 2
 
 
@@ -323,14 +333,14 @@ def create_token(user: User, expires_in: int = 3600 * 24 * 7):
 
 
 def revoke_token(token: str):
-    token_record = db.session.query(Token).filter_by(token=token).first()
+    token_record = db.session.scalar(select(Token).where(Token.token == token))
     if token_record:
         token_record.is_revoked = True
         db.session.commit()
 
 
 def is_token_revoked(token: str):
-    token_record = db.session.query(Token).filter_by(token=token).first()
+    token_record = db.session.scalar(select(Token).where(Token.token == token))
     if token_record and token_record.is_revoked:
         return True
     return False
