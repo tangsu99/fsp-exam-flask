@@ -6,7 +6,7 @@ from flask_login import (
     current_user,
     login_required,  # type: ignore[reportUnknownVariableType]
 )
-from sqlalchemy import or_, select, update
+from sqlalchemy import or_, select
 from sqlalchemy.orm import joinedload
 
 from myapp import db
@@ -326,7 +326,7 @@ def download_schematic():
     下载投影
     """
     schematic_id = request.args.get("id", 0, type=int)
-    schematic_item = db.session.query(Schematic).filter_by(id=schematic_id).first()
+    schematic_item = db.session.get(Schematic, schematic_id)
 
     if not schematic_item:
         return jsonify({"code": 1, "desc": "投影不存在"})
@@ -334,13 +334,12 @@ def download_schematic():
     if not check_user_permission(current_user, "download", schematic_item):
         return jsonify({"code": 1, "desc": "无权下载该私有投影"})
 
-    file_record = db.session.query(SchematicFile).filter_by(schematic_id=schematic_id).first()
+    file_record = schematic_item.file_data
+
     if not file_record or not file_record.file_blob:
         return jsonify({"code": 1, "desc": "投影文件数据缺失"})
 
-    db.session.execute(
-        update(Schematic).where(Schematic.id == schematic_id).values(download_count=Schematic.download_count + 1)
-    )
+    schematic_item.download_count += 1
     db.session.commit()
 
     safe_name = f"{schematic_item.name}.litematic"
