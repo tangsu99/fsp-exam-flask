@@ -7,9 +7,7 @@ from PIL import Image
 
 
 def get_skin_url(uuid: str) -> str:
-    player_info_url: str = (
-        f"https://sessionserver.mojang.com/session/minecraft/profile/{uuid}"
-    )
+    player_info_url: str = f"https://sessionserver.mojang.com/session/minecraft/profile/{uuid}"
     response = requests.get(player_info_url)
     base64_data: str = response.json()["properties"][0]["value"]
     decoded_data = base64.b64decode(base64_data).decode("utf-8")
@@ -18,10 +16,8 @@ def get_skin_url(uuid: str) -> str:
     return data_json["textures"]["SKIN"]["url"]
 
 
-def get_player_uuid(player_name: str) -> tuple | None:
-    player_profile_url: str = (
-        f"https://api.mojang.com/users/profiles/minecraft/{player_name}"
-    )
+def get_player_uuid(player_name: str) -> tuple[str, str] | None:
+    player_profile_url: str = f"https://api.mojang.com/users/profiles/minecraft/{player_name}"
     response = requests.get(player_profile_url)
     if response.status_code == 200:
         data = response.json()
@@ -31,11 +27,10 @@ def get_player_uuid(player_name: str) -> tuple | None:
     return None
 
 
-def image_to_binary(image) -> bytes:
-    img_byte_arr = BytesIO()
-    image.save(img_byte_arr, format="PNG")
-    img_byte_arr = img_byte_arr.getvalue()
-    return img_byte_arr
+def image_to_binary(image: Image.Image) -> bytes:
+    buf = BytesIO()
+    image.save(buf, format="PNG")
+    return buf.getvalue()
 
 
 def get_profile_pic(uuid: str) -> bytes:
