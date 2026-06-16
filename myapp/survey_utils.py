@@ -5,7 +5,16 @@ from typing import Any
 from sqlalchemy import exists, func, select
 
 from myapp import db
-from myapp.db_model import Question, QuestionCategory, Response, ResponseScore, Survey, SurveySlot
+from myapp.db_model import (
+    Option,
+    Question,
+    QuestionCategory,
+    Response,
+    ResponseDetail,
+    ResponseScore,
+    Survey,
+    SurveySlot,
+)
 
 
 @dataclass
@@ -126,3 +135,53 @@ def is_survey_response_expired(survey_response: Response) -> bool:
 def get_response_total_score(response_id: int) -> float:
     stmt = select(func.sum(ResponseScore.score)).where(ResponseScore.response_id == response_id)
     return db.session.execute(stmt).scalar() or 0.0
+
+
+def get_response_objective_question_score(user_response: list[str], question: Question) -> float:
+    """
+    获取答卷客观题的分数
+    """
+    # 获取问题的正确选项,列表元素的值为正确选项的ID
+    correct_options: list[int] = [option.id for option in question.options if option.is_correct]
+
+    if question.question_type == QuestionCategory.SINGLE_CHOICE.value:
+        if int(user_response[0]) in correct_options:
+            return question.score
+
+    elif question.question_type == QuestionCategory.MULTIPLE_CHOICE.value:
+        user_response_int: list[int] = [int(option) for option in user_response]
+        if set(user_response_int) == set(correct_options):
+            return question.score
+
+    elif question.question_type == QuestionCategory.FILL_IN_THE_BLANKS.value:
+        new_user_response: str = user_response[0]
+        correct_answer_id: int = correct_options[0]
+        option: Option | None = db.session.get(Option, correct_answer_id)
+        if option is not None:
+            correct_answer: str = option.option_text
+            if new_user_response == correct_answer:
+                return question.score
+
+    return 0.0
+
+
+def make_answer_details(
+    user_response: list[str], question: Question, response_id: int, question_id: int
+) -> list[ResponseDetail]:
+    if question.question_type == QuestionCategory.MULTIPLE_CHOICE.value:
+        return [
+            ResponseDetail(
+                response_id=response_id,
+                question_id=question_id,
+                answer=answer,
+            )
+            for answer in user_response
+        ]
+    else:
+        return [
+            ResponseDetail(
+                response_id=response_id,
+                question_id=question_id,
+                answer=user_response[0],
+            )
+        ]
