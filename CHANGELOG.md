@@ -3,7 +3,11 @@
 ## [0.2.2] (Developing)
 
 ### Refactor
+
 - 重构 admin 接口
+- 数据表类的基类从 `db.Model` 转为 `Base`，以获取更好的 pyright 等静态检查工具的支持
+- 重构 ORM 调用，从 sqlalchemy1.0 写法全面转换为 sqlalchemy2.0 写法
+- 为代码添加类型提示以提供更好的静态检查支持
 
 ## [0.2.1] (2026-06-10)
 

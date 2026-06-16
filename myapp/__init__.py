@@ -9,6 +9,7 @@ from flask_login import LoginManager
 from flask_mail import Mail
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import select
 from sqlalchemy.orm import DeclarativeBase, MappedAsDataclass
 
 
@@ -31,13 +32,13 @@ def create_app():
     load_dotenv()
     app = Flask(__name__)
     global APP
-    APP = app
+    APP = app  # type: ignore[reportConstantRedefinition]
     app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL")  # 测试数据库
     app.config["SESSION_PROTECTION"] = None  # 禁用会话保护
     app.template_folder = "../templates"
     app.static_folder = "../static"
 
-    login_manager.init_app(app)
+    login_manager.init_app(app)  # type: ignore[reportUnknownMemberType]
     db.init_app(app)
 
     from myapp.db_model import Token
@@ -47,7 +48,7 @@ def create_app():
 
     from .config import Config
 
-    my_config = Config(app, db)
+    Config(app, db)
 
     cors.init_app(
         app=app,
@@ -60,7 +61,7 @@ def create_app():
         },
     )
     migrate.init_app(app, db)
-    bcrypt.init_app(app)
+    bcrypt.init_app(app)  # type: ignore[reportUnknownMemberType]
     mail.init_app(app)
 
     # 导入蓝图
@@ -88,26 +89,27 @@ def create_app():
     #     return "Hello world!\nHello Flask!"
 
     # 未授权的用户重定向到登录页面
-    @login_manager.unauthorized_handler
-    def unauthorized():
+    @login_manager.unauthorized_handler  # type: ignore[reportUnknownMemberType]
+    def unauthorized():  # type: ignore[reportUnusedFunction]
         return jsonify({"code": 1, "desc": "用户未登录"})  # 重定向
 
     # 管理登录状态的，这个函数是在每次请求时被调用的，它需要从用户 ID 重新创建一个 User 对象
     # 这是因为 User 对象并不会在请求之间保持，所以我们需要在每次请求开始时重新创建它
     # 使用 request_loader 自定义加载逻辑
-    @login_manager.request_loader
-    def load_user_from_request(request: Request):
+    @login_manager.request_loader  # type: ignore[reportUnknownMemberType]
+    def load_user_from_request(request: Request):  # type: ignore[reportUnusedFunction]
         # 尝试从查询参数中获取 token
         token: str | None = request.headers.get("Authorization")
         if token and token.startswith("Bearer "):
-            token = token.replace("Bearer ", "", 1)  # 假设使用 Bearer 认证
-            token_record: Token | None = Token.query.filter_by(token=token).first()
+            token = token.replace("Bearer ", "", 1)
+            stmt = select(Token).where(Token.token == token)
+            token_record = db.session.scalar(stmt)
             if (
                 token_record
                 and not token_record.is_revoked
                 and token_record.expires_at.replace(tzinfo=UTC) > datetime.now(UTC)
             ):
-                return token_record.user
+                return token_record.token_user
         # 如果两种方式都未找到用户，返回 None
         return None
 
