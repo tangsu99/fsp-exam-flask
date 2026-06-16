@@ -1,15 +1,18 @@
+from typing import Any, cast
+
 from flask import Blueprint, jsonify
-from flask_login import login_required, current_user
-from sqlalchemy import desc
-from typing import cast
+from flask_login import (
+    current_user,
+    login_required,  # type: ignore[reportUnknownVariableType]
+)
+from sqlalchemy import desc, select
+
 from myapp import db
 from myapp.db_model import (
-    Question,
     Response,
-    Survey,
     User,
-    ResponseScore,
 )
+from myapp.survey_utils import get_response_total_score, get_survey_total_score
 
 query = Blueprint("query", __name__)
 
@@ -28,31 +31,17 @@ def response():
     """
     user: User = cast(User, current_user)
 
-    top_10_responses = (
-        db.session.query(Response)
-        .filter_by(user_id=user.id)
-        .order_by(desc(Response.id))  # 按 id 降序排序
-        .limit(10)  # 取前 10 条答卷
-        .all()
-    )
+    stmt = select(Response).where(Response.user_id == user.id).order_by(desc(Response.id)).limit(10)
+    top_10_responses = db.session.scalars(stmt)
 
-    response_data: list = []
+    response_data: list[dict[str, Any]] = []
     for res in top_10_responses:
-        # 计算得分是多少
-        # 如果是被批改完的卷子，就直接调取总分，否则计算一遍
-        total_score: float = 0
+        get_score: float | None = res.archive_score
 
         if res.archive_score is None:
-            scores = ResponseScore.query.filter_by(response_id=res.id).all()
-            total_score = sum(score.score for score in scores)  # 计算总分
+            get_score = get_response_total_score(res.id)
 
-        else:
-            total_score = res.archive_score
-
-
-        # 计算满分是多少
-        questionnaire: list = Question.query.filter_by(survey_id=res.survey_id).all()
-        full_score = sum(question.score for question in questionnaire)
+        full_score = get_survey_total_score(res.survey_id)
 
         # 构造返回数据
         response_data.append(
@@ -61,7 +50,7 @@ def response():
                 "survey_name": res.survey_name,
                 "responseTime": res.submit_time,
                 "state": res.is_reviewed,
-                "get_score": total_score,
+                "get_score": get_score,
                 "full_score": full_score,
             }
         )
