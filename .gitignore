@@ -8,6 +8,12 @@ log/
 
 .env
 
+# pytest-cov 覆盖率数据文件
+.coverage
+.coverage.*
+htmlcov/
+.pytest_cache/
+
 .idea/dataSources.xml
 migrations/versions/
 migrations/__pycache__/

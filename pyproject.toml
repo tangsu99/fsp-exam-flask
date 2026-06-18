@@ -36,6 +36,11 @@ dev = [
     "ruff>=0.15.17",
 ]
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-v --tb=short --cov=myapp --cov-report=term-missing --no-header"
+
 [tool.pyright]
 venvPath = "."
 venv = ".venv"
