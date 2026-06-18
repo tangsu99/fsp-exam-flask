@@ -134,9 +134,9 @@ class TestParseDtToIsoUtc:
         assert parse_dt_to_iso_utc(dt) == "2026-06-07T10:43:00+00:00"
 
     def test_other_timezone(self):
-        """其他时区的 datetime 会被替换为 UTC"""
+        """其他时区的 datetime 会被真正转换到 UTC（如 UTC+8 → UTC-8小时）"""
         from datetime import timedelta, timezone
 
         dt = datetime(2026, 6, 7, 18, 43, 0, tzinfo=timezone(timedelta(hours=8)))
         result = parse_dt_to_iso_utc(dt)
-        assert result == "2026-06-07T18:43:00+00:00"
+        assert result == "2026-06-07T10:43:00+00:00"
