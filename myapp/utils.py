@@ -127,7 +127,9 @@ def parse_frontend_time_to_utc(front_end_time: str) -> datetime:
 
 
 def parse_dt_to_iso_utc(dt: datetime) -> str:
-    return dt.replace(tzinfo=UTC).isoformat()
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=UTC)
+    return dt.astimezone(UTC).isoformat()
 
 
 def build_pagination_dict(
