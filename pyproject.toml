@@ -31,6 +31,8 @@ ignore = ["F401"] # Imported but unused
 [dependency-groups]
 dev = [
     "pyright>=1.1.410",
+    "pytest>=9.1.0",
+    "pytest-cov>=7.1.0",
     "ruff>=0.15.17",
 ]
 
