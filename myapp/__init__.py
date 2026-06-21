@@ -18,7 +18,6 @@ class Base(MappedAsDataclass, DeclarativeBase):
 
 
 login_manager: LoginManager = LoginManager()
-db: SQLAlchemy = SQLAlchemy()
 db = SQLAlchemy(model_class=Base)
 migrate = Migrate()
 bcrypt: Bcrypt = Bcrypt()
@@ -98,7 +97,6 @@ def create_app():
     # 使用 request_loader 自定义加载逻辑
     @login_manager.request_loader  # type: ignore[reportUnknownMemberType]
     def load_user_from_request(request: Request):  # type: ignore[reportUnusedFunction]
-        # 尝试从查询参数中获取 token
         token: str | None = request.headers.get("Authorization")
         if token and token.startswith("Bearer "):
             token = token.replace("Bearer ", "", 1)
@@ -110,7 +108,7 @@ def create_app():
                 and token_record.expires_at.replace(tzinfo=UTC) > datetime.now(UTC)
             ):
                 return token_record.token_user
-        # 如果两种方式都未找到用户，返回 None
+
         return None
 
     return app
