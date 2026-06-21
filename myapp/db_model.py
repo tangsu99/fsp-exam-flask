@@ -104,7 +104,7 @@ class User(UserMixin, Base):
     _password_hash: Mapped[str] = mapped_column("password", String(100), nullable=False, init=False)
     role: Mapped[UserRole] = mapped_column(String(100), nullable=False, default=UserRole.USER)
     registered_at: Mapped[datetime] = mapped_column(
-        TZ_AWARE_DATETIME, default=lambda: datetime.now(UTC), nullable=False
+        TZ_AWARE_DATETIME, default_factory=lambda: datetime.now(UTC), nullable=False
     )
     avatar: Mapped[str] = mapped_column(String(500), default=DEFAULT_AVATAR)  # 头像的 UUID
     status: Mapped[UserStatus] = mapped_column(Integer, nullable=False, default=0)
@@ -173,7 +173,9 @@ class Whitelist(Base):
         foreign_keys=[auditor_uid], back_populates="audited_whitelist", init=False
     )
     source: Mapped[WhitelistType] = mapped_column(Integer, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(TZ_AWARE_DATETIME, default=lambda: datetime.now(UTC), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        TZ_AWARE_DATETIME, default_factory=lambda: datetime.now(UTC), nullable=False
+    )
 
 
 # 问卷插槽表
@@ -190,7 +192,9 @@ class Survey(Base):
     id: Mapped[int] = mapped_column(primary_key=True, init=False)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     description: Mapped[str] = mapped_column(Text, default="", nullable=False)
-    create_time: Mapped[datetime] = mapped_column(TZ_AWARE_DATETIME, default=lambda: datetime.now(UTC), nullable=False)
+    create_time: Mapped[datetime] = mapped_column(
+        TZ_AWARE_DATETIME, default_factory=lambda: datetime.now(UTC), nullable=False
+    )
     questions: Mapped[list["Question"]] = relationship(back_populates="survey", cascade="all, delete", init=False)
     response_list: Mapped[list["Response"]] = relationship(
         back_populates="res_survey", cascade="all, delete", init=False
@@ -209,7 +213,9 @@ class Question(Base):
     question_type: Mapped[QuestionCategory] = mapped_column(Integer, nullable=False)
     score: Mapped[float] = mapped_column(Float, nullable=False)
     logical_deletion: Mapped[bool] = mapped_column(default=False)
-    create_time: Mapped[datetime] = mapped_column(TZ_AWARE_DATETIME, default=lambda: datetime.now(UTC), nullable=False)
+    create_time: Mapped[datetime] = mapped_column(
+        TZ_AWARE_DATETIME, default_factory=lambda: datetime.now(UTC), nullable=False
+    )
     img_list: Mapped[list["QuestionImgURL"]] = relationship(backref="image_question", cascade="all, delete", init=False)
     options: Mapped[list["Option"]] = relationship(backref="option_question", cascade="all, delete", init=False)
     response_details: Mapped[list["ResponseDetail"]] = relationship(
@@ -270,7 +276,7 @@ class QuestionImgURL(Base):
     )  # 所属问题id，外键，关联问题表，级联删除
     img_data: Mapped[str] = mapped_column(LONGTEXT, nullable=False)  # 图片数据，URL 或者 Base64 编码的图片
     img_alt: Mapped[str] = mapped_column(String(200), default="", nullable=False)
-    create_time: Mapped[datetime] = mapped_column(TZ_AWARE_DATETIME, default=lambda: datetime.now(UTC), nullable=False)
+    create_time: Mapped[datetime] = mapped_column(TZ_AWARE_DATETIME, default_factory=lambda: datetime.now(UTC))
 
 
 # 选项表模型
@@ -282,7 +288,7 @@ class Option(Base):
     )  # 所属问题id，外键，关联问题表，级联删除
     option_text: Mapped[str] = mapped_column(Text, nullable=False)  # 选项内容，不允许为空
     is_correct: Mapped[bool] = mapped_column(Boolean)  # 是否为正确选项，对于有标准答案的题目，可为空
-    create_time: Mapped[datetime] = mapped_column(TZ_AWARE_DATETIME, default=lambda: datetime.now(UTC), nullable=False)
+    create_time: Mapped[datetime] = mapped_column(TZ_AWARE_DATETIME, default_factory=lambda: datetime.now(UTC))
 
 
 # 答卷表模型
@@ -307,7 +313,7 @@ class Response(Base):
     archive_score: Mapped[float | None] = mapped_column(Float, nullable=True, init=False)
     submit_time: Mapped[datetime] = mapped_column(TZ_AWARE_DATETIME, nullable=True, init=False)
     end_time: Mapped[datetime] = mapped_column(TZ_AWARE_DATETIME, nullable=True, init=False)
-    create_time: Mapped[datetime] = mapped_column(TZ_AWARE_DATETIME, default=lambda: datetime.now(UTC), nullable=False)
+    create_time: Mapped[datetime] = mapped_column(TZ_AWARE_DATETIME, default_factory=lambda: datetime.now(UTC))
     is_completed: Mapped[bool] = mapped_column(Boolean, default=False)
 
     is_reviewed: Mapped[ResponseStatus] = mapped_column(Integer, default=ResponseStatus.PENDING)
@@ -330,7 +336,7 @@ class ResponseDetail(Base):
     answer: Mapped[str] = mapped_column(
         String(500), nullable=False
     )  # 用户答案，对于选择题存储选项id，对于简答题存储答案文本，不允许为空
-    create_time: Mapped[datetime] = mapped_column(TZ_AWARE_DATETIME, default=lambda: datetime.now(UTC), nullable=False)
+    create_time: Mapped[datetime] = mapped_column(TZ_AWARE_DATETIME, default_factory=lambda: datetime.now(UTC))
 
 
 class Guarantee(Base):
@@ -342,7 +348,7 @@ class Guarantee(Base):
     player_uuid: Mapped[str] = mapped_column(String(36), nullable=False)  # 被担保人UUID
     expiration_time: Mapped[datetime] = mapped_column(TZ_AWARE_DATETIME, nullable=False)
     status: Mapped[GuaranteeStatus] = mapped_column(Integer, nullable=False, default=GuaranteeStatus.WAITING)
-    create_time: Mapped[datetime] = mapped_column(TZ_AWARE_DATETIME, default=lambda: datetime.now(UTC), nullable=False)
+    create_time: Mapped[datetime] = mapped_column(TZ_AWARE_DATETIME, default_factory=lambda: datetime.now(UTC))
 
     guarantor: Mapped["User"] = relationship(
         "User", foreign_keys=[guarantee_id], back_populates="guarantees", init=False
@@ -369,9 +375,9 @@ class Token(Base):
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
     token_user: Mapped["User"] = relationship(foreign_keys=[user_id], back_populates="tokens", init=False)
     token: Mapped[str] = mapped_column(String(256), unique=True, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default_factory=lambda: datetime.now(UTC), nullable=False)
     expires_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(UTC) + timedelta(minutes=60), nullable=False
+        DateTime, default_factory=lambda: datetime.now(UTC) + timedelta(minutes=60), nullable=False
     )
     is_revoked: Mapped[bool] = mapped_column(Boolean, default=False)
 
@@ -380,7 +386,7 @@ class RegistrationLimit(Base):
     __tablename__ = "registration_limits"
     id: Mapped[int] = mapped_column(primary_key=True, init=False)
     ip: Mapped[str] = mapped_column(String(45), nullable=False)  # 支持IPv6的最大长度
-    register_time: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
+    register_time: Mapped[datetime] = mapped_column(DateTime, default_factory=lambda: datetime.now(UTC), nullable=False)
 
 
 class ResetPasswordToken(Base):
@@ -389,9 +395,9 @@ class ResetPasswordToken(Base):
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     user_r_p_t: Mapped["User| None"] = relationship(back_populates="reset_password_token", init=False)
     token: Mapped[str] = mapped_column(String(256), unique=True, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default_factory=lambda: datetime.now(UTC), nullable=False)
     expires_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(UTC) + timedelta(minutes=60), nullable=False
+        DateTime, default_factory=lambda: datetime.now(UTC) + timedelta(minutes=60), nullable=False
     )
     is_revoked: Mapped[bool] = mapped_column(Boolean, default=False)
 
@@ -402,9 +408,9 @@ class ActivationToken(Base):
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     token: Mapped[str] = mapped_column(String(256), unique=True, nullable=False)
     user_active: Mapped["User"] = relationship(back_populates="activation_token", init=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default_factory=lambda: datetime.now(UTC), nullable=False)
     expires_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(UTC) + timedelta(minutes=60), nullable=False
+        DateTime, default_factory=lambda: datetime.now(UTC) + timedelta(minutes=60), nullable=False
     )
     is_revoked: Mapped[bool] = mapped_column(Boolean, default=False)
 
@@ -415,9 +421,9 @@ class ConfigModel(Base):
     value: Mapped[str] = mapped_column(String(256), nullable=False)
     type: Mapped[str] = mapped_column(String(10), nullable=False)
     description: Mapped[str] = mapped_column(String(256), nullable=True)
-    create_time: Mapped[datetime] = mapped_column(TZ_AWARE_DATETIME, default=lambda: datetime.now(UTC), nullable=False)
+    create_time: Mapped[datetime] = mapped_column(TZ_AWARE_DATETIME, default_factory=lambda: datetime.now(UTC))
     update_time: Mapped[datetime] = mapped_column(
-        TZ_AWARE_DATETIME, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC), nullable=False
+        TZ_AWARE_DATETIME, default_factory=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC), nullable=False
     )
 
 
@@ -439,10 +445,10 @@ class Schematic(Base):
     is_public: Mapped[bool] = mapped_column(Boolean, default=True)
     download_count: Mapped[int] = mapped_column(Integer, default=0)
 
-    upload_date: Mapped[datetime] = mapped_column(TZ_AWARE_DATETIME, default=lambda: datetime.now(UTC), nullable=False)
+    upload_date: Mapped[datetime] = mapped_column(TZ_AWARE_DATETIME, default_factory=lambda: datetime.now(UTC))
 
     update_date: Mapped[datetime] = mapped_column(
-        TZ_AWARE_DATETIME, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC), nullable=False
+        TZ_AWARE_DATETIME, default_factory=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC), nullable=False
     )
 
     # 与文件分表建立一对一关系 (cascade确保删除主表时，关联的二进制文件也被删除)
