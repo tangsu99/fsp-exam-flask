@@ -67,6 +67,7 @@ def create_app():
     from myapp.admin import admin
     from myapp.api import api
     from myapp.auth import auth
+    from myapp.dashboard import dashboard
     from myapp.guarantee import guarantee
     from myapp.query import query
     from myapp.schematic import schematic
@@ -82,6 +83,7 @@ def create_app():
     app.register_blueprint(schematic, url_prefix="/schematic")
     app.register_blueprint(survey, url_prefix="/survey")
     app.register_blueprint(guarantee, url_prefix="/guarantee")
+    app.register_blueprint(dashboard, url_prefix="/dashboard")
 
     # @app.route("/")
     # def hello():
