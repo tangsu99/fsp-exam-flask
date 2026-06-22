@@ -11,8 +11,6 @@ from myapp.utils import token_check
 api = Blueprint("api", __name__)
 
 mc_users_info: dict[str, object] = {
-    "user_count": 0,
-    "user_w_list_count": 0,
     "online_players": [],
 }
 
