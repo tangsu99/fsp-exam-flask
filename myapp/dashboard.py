@@ -27,6 +27,12 @@ dashboard = Blueprint("dashboard", __name__)
 @login_required
 def users_info():
     mc_data = get_mc_users_info()
+    mc_data["user_count"] = db.session.scalar(
+        select(func.count()).select_from(User)
+    )
+    mc_data["user_w_list_count"] = db.session.scalar(
+        select(func.count()).select_from(Whitelist)
+    )
     return jsonify({"data": mc_data})
 
 
