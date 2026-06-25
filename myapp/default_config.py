@@ -85,8 +85,8 @@ DEFAULT_CONFIG = [
     },
     {
         "key": "MC_SERVER_ADDRESS",
-        "value": "24",
-        "type": "int",
+        "value": "example.com",
+        "type": "str",
         "description": "被采集的mc服务器地址",
     },
 ]

@@ -493,3 +493,11 @@ class SchematicFile(Base):
 
     def __repr__(self):
         return f"<SchematicFiles for ID {self.schematic_id}>"
+
+
+class StatusLog(Base):
+    __tablename__ = "statuslog"
+    id: Mapped[int] = mapped_column(primary_key=True, init=False)
+    server_address: Mapped[str] = mapped_column(String(100))
+    player_count: Mapped[int] = mapped_column(Integer)
+    create_time: Mapped[datetime] = mapped_column(TZ_AWARE_DATETIME, default_factory=lambda: datetime.now(UTC))
