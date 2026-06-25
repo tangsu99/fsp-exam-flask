@@ -73,4 +73,4 @@ def online_stats():
     count = [r.player_count for r in records]
     date = [r.create_time.strftime("%m-%d %H:%M") for r in records]
 
-    return jsonify({"total": len(records), "count": count, "date": date})
+    return jsonify({"code": 0, "data": {"total": len(records), "count": count, "date": date}})
