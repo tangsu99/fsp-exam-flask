@@ -10,7 +10,7 @@ def job1():
     with APP.app_context():
         server_address: str = APP.config.get("MC_SERVER_ADDRESS", "")  # type: ignore
         if not server_address or server_address == "example.com":
-            print("未配置 MC_SERVER_ADDRESS，跳过采集。")
+            APP.logger.info("未配置 MC_SERVER_ADDRESS，跳过采集。")
             return
 
         try:
