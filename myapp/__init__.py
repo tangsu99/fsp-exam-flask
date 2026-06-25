@@ -3,6 +3,7 @@ from datetime import UTC, datetime
 
 from dotenv import load_dotenv
 from flask import Flask, Request, jsonify
+from flask_apscheduler import APScheduler
 from flask_bcrypt import Bcrypt
 from flask_cors import CORS
 from flask_login import LoginManager
@@ -18,11 +19,13 @@ class Base(MappedAsDataclass, DeclarativeBase):
 
 
 login_manager: LoginManager = LoginManager()
+scheduler: APScheduler = APScheduler()
 db = SQLAlchemy(model_class=Base)
 migrate = Migrate()
 bcrypt: Bcrypt = Bcrypt()
 mail: Mail = Mail()
 cors = CORS()
+
 
 APP: Flask
 
@@ -38,7 +41,10 @@ def create_app():
     app.static_folder = "../static"
 
     login_manager.init_app(app)  # type: ignore[reportUnknownMemberType]
+
     db.init_app(app)
+
+    scheduler.init_app(app)  # type: ignore[reportUnknownMemberType]
 
     from myapp.db_model import Token
 
@@ -63,6 +69,12 @@ def create_app():
     bcrypt.init_app(app)  # type: ignore[reportUnknownMemberType]
     mail.init_app(app)
 
+    # Flask debug 模式的 reloader 会启动两个进程，只在子进程中启动 scheduler 避免重复执行
+    if not app.debug or os.environ.get("WERKZEUG_RUN_MAIN"):
+        import myapp.tasks  # type: ignore
+
+        scheduler.start()
+
     # 导入蓝图
     from myapp.admin import admin
     from myapp.api import api
@@ -71,6 +83,7 @@ def create_app():
     from myapp.guarantee import guarantee
     from myapp.query import query
     from myapp.schematic import schematic
+    from myapp.statuslog import statuslog
     from myapp.survey import survey
     from myapp.user import user
 
@@ -81,6 +94,7 @@ def create_app():
     app.register_blueprint(admin, url_prefix="/admin")
     app.register_blueprint(query, url_prefix="/query")
     app.register_blueprint(schematic, url_prefix="/schematic")
+    app.register_blueprint(statuslog, url_prefix="/statuslog")
     app.register_blueprint(survey, url_prefix="/survey")
     app.register_blueprint(guarantee, url_prefix="/guarantee")
     app.register_blueprint(dashboard, url_prefix="/dashboard")
@@ -92,7 +106,7 @@ def create_app():
     # 未授权的用户重定向到登录页面
     @login_manager.unauthorized_handler  # type: ignore[reportUnknownMemberType]
     def unauthorized():  # type: ignore[reportUnusedFunction]
-        return jsonify({"code": 1, "desc": "用户未登录"})  # 重定向
+        return jsonify({"code": 1, "desc": "用户未登录"})
 
     # 管理登录状态的，这个函数是在每次请求时被调用的，它需要从用户 ID 重新创建一个 User 对象
     # 这是因为 User 对象并不会在请求之间保持，所以我们需要在每次请求开始时重新创建它
