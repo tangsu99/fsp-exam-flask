@@ -126,7 +126,10 @@ def parse_frontend_time_to_utc(front_end_time: str) -> datetime:
     return datetime.fromisoformat(front_end_time.replace("Z", "+00:00"))
 
 
-def parse_dt_to_iso_utc(dt: datetime) -> str:
+def parse_dt_to_iso_utc(dt: datetime | None) -> str:
+    if dt is None:
+        return ""
+
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=UTC)
     return dt.astimezone(UTC).isoformat()
