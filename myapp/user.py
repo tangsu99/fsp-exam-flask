@@ -8,7 +8,7 @@ from flask_login import (
 from sqlalchemy import select
 
 from myapp import db
-from myapp.db_model import Guarantee, Token, User, Whitelist
+from myapp.db_model import Guarantee, Profile, Token, User, Whitelist
 from myapp.utils import parse_dt_to_iso_utc
 
 user = Blueprint("user", __name__)
@@ -138,6 +138,30 @@ def set_avatar():
     except Exception as e:
         db.session.rollback()
         return jsonify({"code": 3, "desc": f"头像修改失败：{str(e)}"}), 500
+
+
+@user.route("/profile/setBackground", methods=["POST"])
+@login_required
+def set_background():
+    """设置用户个人主页背景图"""
+    req_data: dict[str, Any] | None = request.get_json(silent=True)
+    if req_data is None:
+        return jsonify({"code": 1, "desc": "缺少信息！"})
+
+    if not req_data or "bg_url" not in req_data:
+        return jsonify({"code": 1, "desc": "缺少 bg_url 参数！"}), 400
+
+    try:
+        profile = current_user.profile
+        if profile is None:
+            profile = Profile(user_id=current_user.id)
+            db.session.add(profile)
+        profile.background_url = req_data["bg_url"]
+        db.session.commit()
+        return jsonify({"code": 0, "desc": "背景图设置成功！"})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"code": 3, "desc": f"背景图设置失败：{str(e)}"})
 
 
 def update_password(uid: int, token: str, new_password: str):
