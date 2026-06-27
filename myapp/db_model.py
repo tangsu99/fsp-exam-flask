@@ -176,7 +176,7 @@ class Profile(Base):
     user: Mapped["User"] = relationship(back_populates="profile", init=False)
     bio: Mapped[str | None] = mapped_column(Text, default=None)  # 个人简介
     website: Mapped[str | None] = mapped_column(String(500), default=None)
-    background_url: Mapped[str | None] = mapped_column(Text, default=None)
+    background_url: Mapped[str | None] = mapped_column(LONGTEXT, default=None)
     updated_at: Mapped[datetime] = mapped_column(
         TZ_AWARE_DATETIME,
         default_factory=lambda: datetime.now(UTC),
