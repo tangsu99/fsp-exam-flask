@@ -109,6 +109,9 @@ class User(UserMixin, Base):
     avatar: Mapped[str] = mapped_column(String(500), default=DEFAULT_AVATAR)  # 头像的 UUID
     status: Mapped[UserStatus] = mapped_column(Integer, nullable=False, default=0)
     tokens: Mapped[list["Token"]] = relationship(back_populates="token_user", init=False)
+    profile: Mapped[Optional["Profile"]] = relationship(
+        back_populates="user", uselist=False, cascade="all, delete-orphan", init=False
+    )
 
     # 拥有的白名单
     whitelist: Mapped[list["Whitelist"]] = relationship(
@@ -159,6 +162,27 @@ class User(UserMixin, Base):
         """查看用户是否拥有至少一个白名单"""
         stmt = select(exists().where(Whitelist.user_id == self.id))
         return db.session.execute(stmt).scalar()
+
+
+class Profile(Base):
+    __tablename__ = "profiles"
+
+    id: Mapped[int] = mapped_column(primary_key=True, init=False)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        unique=True,  # 1:1 关系
+        nullable=False,
+    )
+    user: Mapped["User"] = relationship(back_populates="profile", init=False)
+    bio: Mapped[str | None] = mapped_column(Text, default=None)  # 个人简介
+    website: Mapped[str | None] = mapped_column(String(500), default=None)
+    background_url: Mapped[str | None] = mapped_column(Text, default=None)
+    updated_at: Mapped[datetime] = mapped_column(
+        TZ_AWARE_DATETIME,
+        default_factory=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+        nullable=False,
+    )
 
 
 class Whitelist(Base):
