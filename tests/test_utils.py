@@ -7,6 +7,7 @@ import pytest
 from werkzeug.datastructures import FileStorage
 
 from myapp.utils import (
+    check_data_size,
     check_password_format,
     get_file_size,
     is_white_list_url,
@@ -140,3 +141,47 @@ class TestParseDtToIsoUtc:
         dt = datetime(2026, 6, 7, 18, 43, 0, tzinfo=timezone(timedelta(hours=8)))
         result = parse_dt_to_iso_utc(dt)
         assert result == "2026-06-07T10:43:00+00:00"
+
+
+class TestCheckDataSize:
+    """测试字符串数据大小校验"""
+
+    def test_within_kb_limit(self):
+        """1KB 以内的数据，限制 1KB 应通过"""
+        data = "a" * 500
+        assert check_data_size(data, "KB", 1) is True
+
+    def test_exceed_kb_limit(self):
+        """超过 1KB 的数据应被拒绝"""
+        data = "a" * 1500
+        assert check_data_size(data, "KB", 1) is False
+
+    def test_within_mb_limit(self):
+        """4MB 的数据，限制 5MB 应通过"""
+        data = "a" * (4 * 1024 * 1024)
+        assert check_data_size(data, "MB", 5) is True
+
+    def test_exceed_mb_limit(self):
+        """6MB 的数据，限制 5MB 应被拒绝"""
+        data = "a" * (6 * 1024 * 1024)
+        assert check_data_size(data, "MB", 5) is False
+
+    def test_gb_limit(self):
+        """500MB 的数据，限制 1GB 应通过"""
+        data = "a" * (500 * 1024 * 1024)
+        assert check_data_size(data, "GB", 1) is True
+
+    def test_exact_boundary(self):
+        """正好等于限制值应通过"""
+        data = "a" * (5 * 1024 * 1024)
+        assert check_data_size(data, "MB", 5) is True
+
+    def test_empty_string(self):
+        """空字符串应通过"""
+        assert check_data_size("", "MB", 5) is True
+
+    def test_unicode_data(self):
+        """中文字符（多字节编码）应正确计算大小"""
+        data = "你好世界"
+        # UTF-8 下每个中文 3 字节，共 12 字节
+        assert check_data_size(data, "KB", 1) is True

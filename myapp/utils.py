@@ -66,6 +66,21 @@ def check_password_format(password: str) -> bool:
     return bool(PASSWORD_PATTERN.match(password))
 
 
+def check_data_size(data: str, unit: Literal["KB", "MB", "GB"], value: int) -> bool:
+    """
+    检查字符串数据（如 base64 URL）的大小是否不超过指定限制。
+
+    :param data: 要检查的字符串
+    :param unit: 单位，支持 'KB', 'MB', 'GB'
+    :param value: 最大允许的数值（如 5MB 则 unit="MB", value=5）
+    :return: 不超过限制返回 True，否则返回 False
+    """
+    unit_factors = {"KB": 1024, "MB": 1024**2, "GB": 1024**3}
+    factor = unit_factors.get(unit.upper(), 1024)
+    size_bytes = len(data.encode("utf-8"))
+    return size_bytes <= value * factor
+
+
 # 定义白名单规则列表
 # 字符串代表严格匹配前缀，字典中的 'regex' 代表正则表达式匹配
 WHITE_LIST_RULES = [
