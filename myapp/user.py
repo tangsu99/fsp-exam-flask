@@ -9,7 +9,7 @@ from sqlalchemy import select
 
 from myapp import db
 from myapp.db_model import Guarantee, Profile, Token, User, Whitelist
-from myapp.utils import parse_dt_to_iso_utc
+from myapp.utils import check_data_size, parse_dt_to_iso_utc
 
 user = Blueprint("user", __name__)
 
@@ -151,6 +151,10 @@ def set_background():
     if not req_data or "bg_url" not in req_data:
         return jsonify({"code": 1, "desc": "缺少 bg_url 参数！"}), 400
 
+    bg_url = req_data["bg_url"]
+    if not check_data_size(bg_url, "MB", 5):
+        return jsonify({"code": 2, "desc": "背景图数据不能超过 5MB！"})
+
     try:
         profile = current_user.profile
         if profile is None:
@@ -161,7 +165,7 @@ def set_background():
         return jsonify({"code": 0, "desc": "背景图设置成功！"})
     except Exception as e:
         db.session.rollback()
-        return jsonify({"code": 3, "desc": f"背景图设置失败：{str(e)}"})
+        return jsonify({"code": 3, "desc": f"背景图设置失败：{str(e)}"}), 500
 
 
 def update_password(uid: int, token: str, new_password: str):
