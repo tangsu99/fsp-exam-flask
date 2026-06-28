@@ -32,7 +32,7 @@ def incomplete_survey_exist(response_list: list[Response]) -> Response | None:
             if not is_survey_response_expired(i):
                 return i
             i.is_completed = True
-            i.is_reviewed = ResponseStatus.REJECTED
+            i.is_reviewed = ResponseStatus.TIMEOUT
             db.session.flush()
 
     return None
