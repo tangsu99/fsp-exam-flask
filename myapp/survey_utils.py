@@ -127,6 +127,9 @@ def is_survey_response_expired(survey_response: Response) -> bool:
     """
     判断答卷是否过期
     """
+    if survey_response.end_time is None:
+        return False
+
     expired_datetime = survey_response.end_time.replace(tzinfo=UTC)
     current_datetime = datetime.now(UTC)
     return True if current_datetime > expired_datetime else False
