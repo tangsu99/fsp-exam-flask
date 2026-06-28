@@ -87,6 +87,7 @@ class ResponseStatus(IntEnum):
     PENDING = 0
     APPROVED = 1
     REJECTED = 2
+    TIMEOUT = 3
 
 
 @unique

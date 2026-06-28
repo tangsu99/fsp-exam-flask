@@ -597,7 +597,7 @@ def get_surveys():
                 not_completed_count += 1
             if expired:
                 i.is_completed = True
-                i.is_reviewed = ResponseStatus.REJECTED
+                i.is_reviewed = ResponseStatus.TIMEOUT
                 db.session.commit()
 
         stmt = select(func.count(Response.id)).where(
@@ -643,7 +643,7 @@ def get_responses():
         # 刷新一下是否过期
         if is_survey_response_expired(res):
             res.is_completed = True
-            res.is_reviewed = ResponseStatus.REJECTED
+            res.is_reviewed = ResponseStatus.TIMEOUT
             db.session.commit()
 
         total_score: float = 0.0
@@ -741,10 +741,17 @@ def reviewed_response():
     req_data = request.json
     if req_data:
         rid: int | None = req_data.get("response", None)
-        status: ResponseStatus | None = req_data.get("status", None)
+        raw_status: int | None = req_data.get("status", None)
 
-        if rid is None or status is None:
+        if rid is None or raw_status is None:
             return jsonify({"code": 1, "desc": "缺少参数! "})
+
+        try:
+            status: ResponseStatus = ResponseStatus(raw_status)
+        except ValueError:
+            return jsonify(
+                {"code": 1, "desc": f"无效的状态值: {raw_status}，有效值: {[s.value for s in ResponseStatus]}"}
+            )
 
         resp: Response | None = db.session.get(Response, rid)
 

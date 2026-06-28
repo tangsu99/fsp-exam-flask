@@ -1,10 +1,13 @@
 from datetime import UTC, datetime
 
 from flask import Blueprint, jsonify
-from flask_login import login_required
+from flask_login import (
+    login_required,  # type: ignore[reportUnknownVariableType]
+)
 from sqlalchemy import func, select
 
 from myapp import db
+from myapp.api import get_mc_users_info
 from myapp.db_model import (
     Guarantee,
     GuaranteeStatus,
@@ -17,8 +20,6 @@ from myapp.db_model import (
     UserStatus,
     Whitelist,
 )
-from myapp.api import get_mc_users_info
-
 
 dashboard = Blueprint("dashboard", __name__)
 
@@ -27,12 +28,8 @@ dashboard = Blueprint("dashboard", __name__)
 @login_required
 def users_info():
     mc_data = get_mc_users_info()
-    mc_data["user_count"] = db.session.scalar(
-        select(func.count()).select_from(User)
-    )
-    mc_data["user_w_list_count"] = db.session.scalar(
-        select(func.count()).select_from(Whitelist)
-    )
+    mc_data["user_count"] = db.session.scalar(select(func.count()).select_from(User))
+    mc_data["user_w_list_count"] = db.session.scalar(select(func.count()).select_from(Whitelist))
     return jsonify({"data": mc_data})
 
 
@@ -41,9 +38,7 @@ def users_info():
 def sys_info():
     now = datetime.now(UTC)
     ban_count = db.session.scalar(
-        select(func.count()).select_from(User).where(
-            User.status.in_([UserStatus.TEMP_BANNED, UserStatus.PERM_BANNED])
-        )
+        select(func.count()).select_from(User).where(User.status.in_([UserStatus.TEMP_BANNED, UserStatus.PERM_BANNED]))
     )
 
     ban_whitelist_count = db.session.scalar(
