@@ -1,11 +1,12 @@
 [project]
 name = "fsp-exam-flask"
-version = "0.2.1"
+version = "0.2.2"
 description = "Minecraft FSP Server Website Backend system"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "flask>=3.1.0",
+    "flask-apscheduler>=1.13.1",
     "flask-bcrypt==1.0.1",
     "flask-cors>=5.0.0",
     "flask-login==0.6.3",
@@ -14,9 +15,11 @@ dependencies = [
     "flask-sqlalchemy==3.1.1",
     "gunicorn>=26.0.0",
     "jsonschema>=4.26.0",
+    "mcstatus>=13.1.0",
     "pillow==11.1.0",
     "pyjwt==2.10.1",
     "pymysql>=1.2.0",
+    "pytest-mock>=3.15.1",
     "python-dotenv==1.0.1",
     "requests==2.32.3",
     "sqlalchemy>=2.0.0",
@@ -25,10 +28,25 @@ dependencies = [
 
 [tool.ruff]
 line-length = 120
-select = [
-    "F",
-    "E",
-    "W",
-    "UP",
+select = ["E", "F", "I", "B", "UP"]
+ignore = ["F401"] # Imported but unused
+
+[dependency-groups]
+dev = [
+    "pyright>=1.1.410",
+    "pytest>=9.1.0",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.15.17",
 ]
-ignore = ["F401"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-v --tb=short --cov=myapp --cov-report=term-missing --no-header"
+
+[tool.pyright]
+venvPath = "."
+venv = ".venv"
+typeCheckingMode = "strict"
+reportMissingTypeStubs = false
+reportMissingImports = false

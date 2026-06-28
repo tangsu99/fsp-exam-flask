@@ -1,25 +1,27 @@
-from datetime import datetime, timedelta, timezone
-from typing import cast
+from datetime import UTC, datetime, timedelta
+from typing import Any, cast
 
-from flask import Blueprint, jsonify, request, current_app
-from flask_login import current_user, login_required
-from sqlalchemy import select
-
-from myapp import db, APP
-from myapp.db_model import (
-    Option,
-    Question,
-    QuestionCategory,
-    SurveySlot,
-    Response,
-    ResponseDetail,
-    ResponseScore,
-    Survey,
-    User,
-    Whitelist
+from flask import Blueprint, current_app, jsonify, request
+from flask_login import (
+    current_user,
+    login_required,  # type: ignore[reportUnknownVariableType]
 )
-from myapp.mail import survey_complete_mail, send_mail
-from myapp.utils import is_survey_response_expired, status_check, parse_dt_to_iso_utc
+from sqlalchemy import exists, select
+
+from myapp import APP, db
+from myapp.db_model import (
+    Question,
+    Response,
+    ResponseScore,
+    ResponseStatus,
+    Survey,
+    SurveySlot,
+    User,
+    Whitelist,
+)
+from myapp.mail import send_mail, survey_complete_mail
+from myapp.survey_utils import get_response_objective_question_score, is_survey_response_expired, make_answer_details
+from myapp.utils import parse_dt_to_iso_utc, status_check
 
 survey = Blueprint("survey", __name__)
 
@@ -30,22 +32,20 @@ def incomplete_survey_exist(response_list: list[Response]) -> Response | None:
             if not is_survey_response_expired(i):
                 return i
             i.is_completed = True
-            i.is_reviewed = 2
+            i.is_reviewed = ResponseStatus.TIMEOUT
             db.session.flush()
 
     return None
 
-def build_survey_questions(survey_: Survey) -> list:
-    questions = []
+
+def build_survey_questions(survey_: Survey) -> list[dict[str, Any]]:
+    questions: list[dict[str, Any]] = []
     for question in survey_.questions:
         if question.logical_deletion:
             continue
 
         options_data = [
-            {
-                "id": opt.id,
-                "text": "此处作答" if question.question_type in (3, 4) else opt.option_text
-            }
+            {"id": opt.id, "text": "此处作答" if question.question_type in (3, 4) else opt.option_text}
             for opt in question.options
         ]
 
@@ -103,11 +103,13 @@ def get_survey(sid: int):
         if not i.is_completed:
             create_time = i.create_time
             end_time = i.end_time
+            if i.survey_id != sid:
+                return jsonify({"code": 1, "desc": "你选择的问卷不是这张！"})
             break
     else:
         return jsonify({"code": 1, "desc": "没有要填写的问卷"})
 
-    survey_data = {
+    survey_data: dict[str, Any] = {
         "id": survey_.id,
         "name": survey_.name,
         "description": survey_.description,
@@ -131,7 +133,6 @@ def check_survey():
         return jsonify({"code": 1, "desc": "您有未完成问卷！", "response": res.survey_id})
 
     return jsonify({"code": 0, "desc": "暂无问卷! "})
-
 
 
 @survey.route("/start_survey", methods=["POST"])
@@ -160,7 +161,7 @@ def start_survey():
     if not sid or not slot_name or not mc_name or not mc_uuid:
         return jsonify({"code": 1, "desc": "缺少信息！"})
 
-    is_in_whitelist = db.session.query(Whitelist).filter_by(player_uuid=mc_uuid).first()
+    is_in_whitelist = db.session.scalar(select(exists().where(Whitelist.player_uuid == mc_uuid)))
     if is_in_whitelist:
         return jsonify({"code": 2, "desc": "此玩家存在已有白名单! "})
 
@@ -179,95 +180,63 @@ def start_survey():
     db.session.add(new_response)
     db.session.flush()
 
-    val = current_app.config["RESPONSE_VALIDITY_PERIOD"]
+    val = cast(int, current_app.config["RESPONSE_VALIDITY_PERIOD"])
     validity_period = timedelta(hours=val)
     new_response.end_time = new_response.create_time + validity_period
 
     db.session.commit()
 
-    return jsonify({"code": 0, "desc": "问卷开始！", "response": new_response.survey_id,})
-
-
-def objective_question_scoring(user_response: list[str], question: Question) -> float:
-    # 获取问题的正确选项,列表元素的值为正确选项的ID
-    correct_options: list[int] = [option.id for option in question.options if option.is_correct]
-
-    if question.question_type == QuestionCategory.SINGLE_CHOICE.value:
-        if int(user_response[0]) in correct_options:
-            return question.score
-
-    elif question.question_type == QuestionCategory.MULTIPLE_CHOICE.value:
-        user_response_int: list[int] = [int(option) for option in user_response]
-        if set(user_response_int) == set(correct_options):
-            return question.score
-
-    elif question.question_type == QuestionCategory.FILL_IN_THE_BLANKS.value:
-        new_user_response: str = user_response[0]
-        correct_answer_id: int = correct_options[0]
-        option: Option | None = db.session.get(Option, correct_answer_id)
-        if option is not None:
-            correct_answer: str = option.option_text
-            if new_user_response == correct_answer:
-                return question.score
-
-    return 0
-
-
-def make_answer_details(
-    user_response: list[str], question: Question, response_id: int, question_id: int
-) -> list[ResponseDetail]:
-    if question.question_type == QuestionCategory.MULTIPLE_CHOICE.value:
-        return [
-            ResponseDetail(
-                response_id=response_id,
-                question_id=question_id,
-                answer=answer,
-            )
-            for answer in user_response
-        ]
-    else:
-        return [
-            ResponseDetail(
-                response_id=response_id,
-                question_id=question_id,
-                answer=user_response[0],
-            )
-        ]
+    return jsonify(
+        {
+            "code": 0,
+            "desc": "问卷开始！",
+            "response": new_response.survey_id,
+        }
+    )
 
 
 @survey.route("/complete_survey", methods=["POST"])
 @login_required
 def complete_survey():
     """
-    交卷
+    用户交卷接口
     """
-    data = request.get_json()
+    req_data: dict[str, Any] | None = request.get_json(silent=True)
+
+    if req_data is None:
+        return jsonify({"code": 1, "desc": "缺少数据！"})
+
     user: User = cast(User, current_user)
     res: Response | None = incomplete_survey_exist(user.responses)
     if res is None:
         return jsonify({"code": 1, "desc": "你没有要提交的问卷！"})
 
-    response_id: int = res.id # 答卷ID
+    survey_id: int | None = req_data.get("surveyId", None)
+    answers: list[Any] = req_data.get("answers", [])
+
+    if survey_id != res.survey_id:
+        return jsonify({"code": 1, "desc": "提交的问卷ID与系统记录不符！"})
 
     # 客观题分数
     count_score: float = 0
+    response_id: int = res.id
 
-    for i in data:
-        question_id: int = i.get("id") # 问题ID
-        answer: list | None = i.get("answer") # 用户答案
+    for i in answers:
+        question_id: int | None = i.get("id", None)
+        answer: list[str] | None = i.get("answer", None)
 
         # 允许空题
-        if answer is None:
+        if answer is None or question_id is None:
             continue
 
-        question: Question | None = db.session.get(Question, question_id)
+        question = db.session.get(Question, question_id)
 
         # 如果这道题已经被删除，就算了
         if question is None:
             continue
 
         # 累加分数
-        score_ = objective_question_scoring(answer, question)
+        score_ = get_response_objective_question_score(answer, question)
         count_score += score_
         if score_ != 0:
             db.session.add(ResponseScore(question.score, question.id, response_id))
@@ -278,19 +247,20 @@ def complete_survey():
             db.session.add(detail)
 
     # 标记答卷为已完成
+    now: datetime = datetime.now(UTC)
     res.is_completed = True
-    res.submit_time = datetime.now(timezone.utc)
+    res.submit_time = now
     db.session.commit()
 
-    send_survey_complete(user.username, res.submit_time.replace(tzinfo=timezone.utc).isoformat(), res.id)
+    send_survey_complete(user.username, now.isoformat(), response_id)
 
     return jsonify({"code": 0, "desc": "提交成功！", "score": count_score}), 200
 
 
 def send_survey_complete(username: str, response_time: str, id_: int):
     with APP.app_context():
-        stmt = select(User).filter_by(role='admin')
-        admins: list[User] = db.session.execute(stmt).scalars().all()
+        stmt = select(User).filter_by(role="admin")
+        admins = db.session.scalars(stmt).all()
         if not admins:
             return
 
