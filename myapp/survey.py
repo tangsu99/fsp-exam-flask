@@ -103,6 +103,8 @@ def get_survey(sid: int):
         if not i.is_completed:
             create_time = i.create_time
             end_time = i.end_time
+            if i.survey_id != sid:
+                return jsonify({"code": 1, "desc": "你选择的问卷不是这张！"})
             break
     else:
         return jsonify({"code": 1, "desc": "没有要填写的问卷"})
@@ -197,25 +199,34 @@ def start_survey():
 @login_required
 def complete_survey():
     """
-    交卷
+    用户交卷接口
     """
-    data = request.get_json()
+    req_data: dict[str, Any] | None = request.get_json(silent=True)
+
+    if req_data is None:
+        return jsonify({"code": 1, "desc": "缺少数据！"})
+
     user: User = cast(User, current_user)
     res: Response | None = incomplete_survey_exist(user.responses)
     if res is None:
         return jsonify({"code": 1, "desc": "你没有要提交的问卷！"})
 
-    response_id: int = res.id
+    survey_id: int | None = req_data.get("surveyId", None)
+    answers: list[Any] = req_data.get("answers", [])
+
+    if survey_id != res.survey_id:
+        return jsonify({"code": 1, "desc": "提交的问卷ID与系统记录不符！"})
 
     # 客观题分数
     count_score: float = 0
+    response_id: int = res.id
 
-    for i in data:
-        question_id: int = i.get("id")
-        answer: list[str] | None = i.get("answer")
+    for i in answers:
+        question_id: int | None = i.get("id", None)
+        answer: list[str] | None = i.get("answer", None)
 
         # 允许空题
-        if answer is None:
+        if answer is None or question_id is None:
             continue
 
         question = db.session.get(Question, question_id)
@@ -240,7 +251,7 @@ def complete_survey():
     res.submit_time = datetime.now(UTC)
     db.session.commit()
 
-    send_survey_complete(user.username, res.submit_time.replace(tzinfo=UTC).isoformat(), res.id)
+    send_survey_complete(user.username, res.submit_time.replace(tzinfo=UTC).isoformat(), response_id)
 
     return jsonify({"code": 0, "desc": "提交成功！", "score": count_score}), 200
 
