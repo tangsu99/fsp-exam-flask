@@ -6,6 +6,7 @@ from sqlalchemy import desc, select
 
 from myapp import db
 from myapp.db_model import StatusLog
+from myapp.utils import parse_dt_to_iso_utc
 
 statuslog = Blueprint("statuslog", __name__)
 
@@ -71,6 +72,6 @@ def online_stats():
             records.reverse()  # 正序返回
 
     count = [r.player_count for r in records]
-    date = [r.create_time.strftime("%m-%d %H:%M") for r in records]
+    date = [parse_dt_to_iso_utc(r.create_time) for r in records]
 
     return jsonify({"code": 0, "data": {"total": len(records), "count": count, "date": date}})
