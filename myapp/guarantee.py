@@ -64,6 +64,75 @@ def check_applicant(info: dict[str, Any]) -> dict[str, Any]:
     return {"code": 0}
 
 
+def build_trust_chain(player_uuid: str, max_depth: int = 10) -> list[dict[str, Any]]:
+    """
+    Build a trust chain list.
+    Returns: [{"guarantor": {...}, "applicant": {...}}, ...]
+             Ordered from direct guarantor -> top-level guarantor.
+    """
+    chain: list[dict[str, Any]] = []
+    visited_user_ids: set[int] = set()
+
+    whitelist_entry = db.session.scalar(select(Whitelist).where(Whitelist.player_uuid == player_uuid))
+    if not whitelist_entry or not whitelist_entry.user_id:
+        return chain
+
+    current_applicant_id = whitelist_entry.user_id
+    visited_user_ids.add(current_applicant_id)
+
+    depth = 0
+    while depth < max_depth:
+        guarantee = db.session.scalar(select(Guarantee).where(Guarantee.applicant_id == current_applicant_id))
+        if not guarantee:
+            break
+
+        guarantor = guarantee.guarantor
+        applicant = guarantee.applicant_user
+
+        if guarantor.id in visited_user_ids:
+            chain.append(
+                {
+                    "guarantor": {
+                        "id": guarantor.id,
+                        "username": guarantor.username,
+                        "user_qq": guarantor.user_qq,
+                        "avatar": guarantor.avatar,
+                        "warning": "Circular guarantee detected",
+                    },
+                    "applicant": {
+                        "id": applicant.id,
+                        "username": applicant.username,
+                        "user_qq": applicant.user_qq,
+                        "avatar": applicant.avatar,
+                    },
+                }
+            )
+            break
+
+        chain.append(
+            {
+                "guarantor": {
+                    "id": guarantor.id,
+                    "username": guarantor.username,
+                    "user_qq": guarantor.user_qq,
+                    "avatar": guarantor.avatar,
+                },
+                "applicant": {
+                    "id": applicant.id,
+                    "username": applicant.username,
+                    "user_qq": applicant.user_qq,
+                    "avatar": applicant.avatar,
+                },
+            }
+        )
+
+        visited_user_ids.add(guarantor.id)
+        current_applicant_id = guarantor.id
+        depth += 1
+
+    return chain
+
+
 def return_data(i: Guarantee):
     return {
         "uid": i.applicant_user.id,

@@ -8,83 +8,11 @@ from flask_login import (
 from sqlalchemy import select
 
 from myapp import db
-from myapp.db_model import Guarantee, Profile, Token, User, Whitelist
+from myapp.db_model import Profile, Token, User, Whitelist
+from myapp.guarantee import build_trust_chain
 from myapp.utils import check_data_size, parse_dt_to_iso_utc
 
 user = Blueprint("user", __name__)
-
-
-def build_trust_chain(player_uuid: str, max_depth: int = 10) -> list[dict[str, Any]]:
-    """
-    构建信任链列表
-    Returns: [{"guarantor": {...}, "applicant": {...}}, ...]
-             列表顺序为：从直接担保人 -> 最顶层担保人
-    """
-    chain: list[dict[str, Any]] = []
-    visited_user_ids: set[int] = set()  # 防止环形担保导致无限循环
-
-    # 1. 找到目标玩家的白名单记录及关联用户
-    whitelist_entry = db.session.scalar(select(Whitelist).where(Whitelist.player_uuid == player_uuid))
-    if not whitelist_entry or not whitelist_entry.user_id:
-        return chain
-
-    current_applicant_id = whitelist_entry.user_id
-    visited_user_ids.add(current_applicant_id)
-
-    # 2. 逐层向上追溯担保关系
-    depth = 0
-    while depth < max_depth:
-        # 查找当前用户作为申请人的担保记录
-        guarantee = db.session.scalar(select(Guarantee).where(Guarantee.applicant_id == current_applicant_id))
-        if not guarantee:
-            break  # 没有更多担保记录，到达信任链顶端
-
-        guarantor = guarantee.guarantor
-        applicant = guarantee.applicant_user
-
-        # 安全检查：如果担保人已访问过，说明存在环，立即终止
-        if guarantor.id in visited_user_ids:
-            chain.append(
-                {
-                    "guarantor": {
-                        "id": guarantor.id,
-                        "username": guarantor.username,
-                        "user_qq": guarantor.user_qq,
-                        "avatar": guarantor.avatar,
-                        "warning": "检测到环形担保",
-                    },
-                    "applicant": {
-                        "id": applicant.id,
-                        "username": applicant.username,
-                        "user_qq": applicant.user_qq,
-                        "avatar": applicant.avatar,
-                    },
-                }
-            )
-            break
-
-        chain.append(
-            {
-                "guarantor": {
-                    "id": guarantor.id,
-                    "username": guarantor.username,
-                    "user_qq": guarantor.user_qq,
-                    "avatar": guarantor.avatar,
-                },
-                "applicant": {
-                    "id": applicant.id,
-                    "username": applicant.username,
-                    "user_qq": applicant.user_qq,
-                    "avatar": applicant.avatar,
-                },
-            }
-        )
-
-        visited_user_ids.add(guarantor.id)
-        current_applicant_id = guarantor.id  # 继续向上追溯
-        depth += 1
-
-    return chain
 
 
 @user.route("/getInfo")
