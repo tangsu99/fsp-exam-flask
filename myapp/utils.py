@@ -8,8 +8,10 @@ from typing import Any, Literal, cast
 from flask import abort, current_app, jsonify, request
 from flask_login import current_user
 from flask_sqlalchemy.pagination import Pagination
+from sqlalchemy import select
 from werkzeug.datastructures import FileStorage
 
+from myapp import db
 from myapp.db_model import User
 
 # 密码强度校验的正则，要求密码 8~16 位，且必须同时包含大写字母、小写字母、数字、特殊字符四种字符
@@ -166,3 +168,33 @@ def build_pagination_dict(
         result["total"] = pagination.total
 
     return result
+
+
+def validate_username(username: str, exclude_user_id: int | None = None) -> dict[str, Any]:
+    """
+    验证用户名是否合法。
+
+    检查规则：
+    - 不能为空
+    - 长度不能超过 100 个字符
+    - 不能与其他用户重复
+
+    :param username: 待校验的用户名
+    :param exclude_user_id: 排除的用户 ID（修改用户名时使用，跳过该用户自身的检查）
+    :return: {"code": 0} 表示合法，否则返回 {"code": ..., "desc": "..."}
+    """
+    username = username.strip()
+    if not username:
+        return {"code": 1, "desc": "用户名不能为空！"}
+
+    if len(username) > 100:
+        return {"code": 2, "desc": "用户名长度不能超过 100 个字符！"}
+
+    stmt = select(User).where(User.username == username)
+    if exclude_user_id is not None:
+        stmt = stmt.where(User.id != exclude_user_id)
+    existing = db.session.scalar(stmt)
+    if existing is not None:
+        return {"code": 3, "desc": "该用户名已被使用！"}
+
+    return {"code": 0, "username": username}

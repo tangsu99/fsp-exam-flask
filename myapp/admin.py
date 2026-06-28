@@ -43,6 +43,7 @@ from myapp.utils import (
     parse_dt_to_iso_utc,
     parse_frontend_time_to_utc,
     required_role,
+    validate_username,
 )
 
 admin = Blueprint("admin", __name__)
@@ -483,14 +484,13 @@ def add_user():
         if not username or not user_qq or not role or not password:
             return jsonify({"code": 1, "desc": "缺少必填字段！"}), 400
 
-        # 检查用户名是否已存在
-        stmt = select(User).where(User.username == username)
-        res = db.session.execute(stmt).scalar()
+        # 验证用户名
+        username_result = validate_username(username)
+        if username_result["code"] != 0:
+            return jsonify(username_result)
+        validated_username: str = username_result["username"]
 
-        if res:
-            return jsonify({"code": 2, "desc": "用户名已存在！"})
-
-        new_user = User(username=username, user_qq=user_qq, role=role)
+        new_user = User(username=validated_username, user_qq=user_qq, role=role)
         new_user.password = password
         db.session.add(new_user)
         db.session.commit()
@@ -524,7 +524,10 @@ def set_user():
 
         # 更新用户信息
         if username:
-            user.username = username
+            username_result = validate_username(username, exclude_user_id=user_id)
+            if username_result["code"] != 0:
+                return jsonify(username_result)
+            user.username = username_result["username"]
 
         if password is not None and check_password_format(password):
             user.password = password

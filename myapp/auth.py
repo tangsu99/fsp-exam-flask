@@ -8,13 +8,13 @@ from flask_login import (
     login_required,  # type: ignore[reportUnknownVariableType]
     login_user,  # type: ignore[reportUnknownVariableType]
 )
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
 from myapp import APP, db
 from myapp.db_model import ActivationToken, RegistrationLimit, ResetPasswordToken, Token, User, UserStatus
 from myapp.mail import activation_mail, reset_password_mail, send_mail
-from myapp.utils import check_password_format
+from myapp.utils import check_password_format, validate_username
 
 auth = Blueprint("auth", __name__)
 
@@ -86,14 +86,20 @@ def register():
     if check_ip_registration_limit(client_ip_split):
         return jsonify({"code": 5, "desc": "该IP注册次数过多，请稍后再试!"})
 
-    username = req_data.get("username").strip()
-    user_qq = req_data.get("userQQ").strip()
-    password = req_data.get("password").strip()
-    re_password = req_data.get("passwordAgain").strip()
+    raw_username = req_data.get("username", "")
+    user_qq = req_data.get("userQQ", "").strip()
+    password = req_data.get("password", "").strip()
+    re_password = req_data.get("passwordAgain", "").strip()
 
     # 验证必填字段
-    if not all([username, password, re_password]):
+    if not all([raw_username, password, re_password]):
         return jsonify({"code": 1, "desc": "表单错误!"})
+
+    # 验证用户名
+    username_result = validate_username(raw_username)
+    if username_result["code"] != 0:
+        return jsonify(username_result)
+    username = username_result["username"]
 
     # 验证密码一致性
     if password != re_password:
@@ -103,12 +109,11 @@ def register():
     if not check_password_format(password):
         return jsonify({"code": 2, "desc": "密码不合法!"})
 
-    stmt = select(User).where(or_(User.username == username, User.user_qq == user_qq))
+    # 验证 QQ 号
+    stmt = select(User).where(User.user_qq == user_qq)
     existing_user = db.session.scalar(stmt)
 
     if existing_user:
-        if existing_user.username == username:
-            return jsonify({"code": 3, "desc": "用户名已存在!"})
         return jsonify({"code": 3, "desc": "QQ号已存在!"})
 
     # 创建用户

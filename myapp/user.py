@@ -8,9 +8,9 @@ from flask_login import (
 from sqlalchemy import select
 
 from myapp import db
-from myapp.db_model import Profile, Token, User, Whitelist
+from myapp.db_model import Profile, Whitelist
 from myapp.guarantee import build_trust_chain
-from myapp.utils import check_data_size, parse_dt_to_iso_utc
+from myapp.utils import check_data_size, parse_dt_to_iso_utc, validate_username
 
 user = Blueprint("user", __name__)
 
@@ -96,24 +96,24 @@ def set_background():
         return jsonify({"code": 3, "desc": f"背景图设置失败：{str(e)}"}), 500
 
 
-def update_password(uid: int, token: str, new_password: str):
+# def update_password(uid: int, token: str, new_password: str):
 
-    user_: User | None = db.session.get(User, uid)
-    if not user_:
-        return "用户不存在"
+#     user_: User | None = db.session.get(User, uid)
+#     if not user_:
+#         return "用户不存在"
 
-    if not user_.check_password(new_password):
-        return "新旧密码不能相同"
+#     if not user_.check_password(new_password):
+#         return "新旧密码不能相同"
 
-    token_record = db.session.scalar(select(Token).where(Token.token == token, Token.user_id == uid))
-    if token_record is None:
-        return "token未找到"
+#     token_record = db.session.scalar(select(Token).where(Token.token == token, Token.user_id == uid))
+#     if token_record is None:
+#         return "token未找到"
 
-    user_.password = new_password
+#     user_.password = new_password
 
-    db.session.delete(token_record)
-    db.session.commit()
-    return "修改成功"
+#     db.session.delete(token_record)
+#     db.session.commit()
+#     return "修改成功"
 
 
 @user.route("/getChainOfTrust", methods=["GET"])
@@ -141,3 +141,28 @@ def get_chain_of_trust():
             },
         }
     )
+
+
+@user.route("/profile/setUsername", methods=["POST"])
+@login_required
+def set_username():
+    """修改用户名"""
+    req_data: dict[str, str] | None = request.get_json(silent=True)
+    if req_data is None:
+        return jsonify({"code": 1, "desc": "缺少信息！"})
+
+    new_username: str | None = req_data.get("newUsername", None)
+    if new_username is None:
+        return jsonify({"code": 1, "desc": "缺少字段 newUsername！"})
+
+    result = validate_username(new_username, exclude_user_id=current_user.id)
+    if result["code"] != 0:
+        return jsonify(result)
+
+    try:
+        current_user.username = result["username"]
+        db.session.commit()
+        return jsonify({"code": 0, "desc": "用户名修改成功！"})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"code": 3, "desc": f"用户名修改失败：{str(e)}"}), 500
