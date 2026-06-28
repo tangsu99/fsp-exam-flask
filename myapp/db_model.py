@@ -336,8 +336,8 @@ class Response(Base):
     )
     reviewer_uid: Mapped[int | None] = mapped_column(Integer, nullable=True, init=False)
     archive_score: Mapped[float | None] = mapped_column(Float, nullable=True, init=False)
-    submit_time: Mapped[datetime] = mapped_column(TZ_AWARE_DATETIME, nullable=True, init=False)
-    end_time: Mapped[datetime] = mapped_column(TZ_AWARE_DATETIME, nullable=True, init=False)
+    submit_time: Mapped[datetime | None] = mapped_column(TZ_AWARE_DATETIME, nullable=True, init=False)
+    end_time: Mapped[datetime | None] = mapped_column(TZ_AWARE_DATETIME, nullable=True, init=False)
     create_time: Mapped[datetime] = mapped_column(TZ_AWARE_DATETIME, default_factory=lambda: datetime.now(UTC))
     is_completed: Mapped[bool] = mapped_column(Boolean, default=False)
 
