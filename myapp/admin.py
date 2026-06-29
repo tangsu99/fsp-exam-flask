@@ -714,7 +714,7 @@ def get_survey(sid: int):
         }
 
         for img in question.img_list:
-            question_data["img_list"].append({"id": img.id, "alt": img.img_alt, "data": img.img_data})
+            question_data["images"].append({"id": img.id, "alt": img.img_alt, "data": img.img_data})
 
         # 查询题目中的所有选项
         for option in question.options:
