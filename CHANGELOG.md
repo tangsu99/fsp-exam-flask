@@ -11,7 +11,7 @@
 ### Bug Fixes
 
 - 修复 `/admin/config/set` 的字段问题
-- 修复 `/admin/survey/<int:sid>` 中图片列表的字段错误
+- 修复 `/admin/survey/<int:sid>` 和 `/survey/survey/<int:sid>` 中图片列表的字段错误
 
 ## [0.2.2] (2026-06-29)
 
