@@ -89,4 +89,10 @@ DEFAULT_CONFIG = [
         "type": "str",
         "description": "被采集的mc服务器地址",
     },
+    {
+        "key": "SERVER_LAUNCH_DATE",
+        "value": "2024-07-05",
+        "type": "str",
+        "description": "开服日期，格式：2024-07-05",
+    },
 ]
