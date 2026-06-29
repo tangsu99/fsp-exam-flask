@@ -55,7 +55,7 @@ def build_survey_questions(survey_: Survey) -> list[dict[str, Any]]:
             "title": question.question_text,
             "type": question.question_type,
             "score": question.score,
-            "img_list": [{"alt": img.img_alt, "data": img.img_data} for img in question.img_list],
+            "images": [{"alt": img.img_alt, "data": img.img_data} for img in question.img_list],
             "options": options_data,
         }
 
