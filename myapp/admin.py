@@ -81,7 +81,7 @@ def set_config():
     key = str(data.get("key") or "").strip()
     value = str(data.get("value") or "").strip()
     type_ = str(data.get("type") or "").strip()
-    description = str(data.get("description") or "").strip()
+    description = str(data.get("desc") or "").strip()
 
     if not key:
         return jsonify({"code": 1, "desc": "need key!"})
