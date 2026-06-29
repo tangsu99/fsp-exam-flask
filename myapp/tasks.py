@@ -3,8 +3,9 @@ from mcstatus import JavaServer
 from myapp import APP, db, scheduler
 from myapp.db_model import StatusLog
 
+_interval_minutes: int = APP.config.get("MC_PLAYER_COLLECT_INTERVAL_MINUTES", 10)  # type: ignore[reportUnknownMemberType]
 
-@scheduler.task("interval", id="mcstatus", seconds=600, misfire_grace_time=900)  # type: ignore[reportUnknownMemberType]
+
 def job1():
     """定时采集 MC 服务器在线人数，保存到 StatusLog 表"""
     with APP.app_context():
@@ -26,3 +27,12 @@ def job1():
         except Exception:
             db.session.rollback()
             APP.logger.info("[mcstatus] 采集失败！")
+
+
+scheduler.add_job(  # type: ignore[reportUnknownMemberType]
+    id="mcstatus",
+    func=job1,
+    trigger="interval",
+    minutes=_interval_minutes,
+    misfire_grace_time=900,
+)

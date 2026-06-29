@@ -90,8 +90,14 @@ DEFAULT_CONFIG = [
         "description": "被采集的mc服务器地址",
     },
     {
+        "key": "MC_PLAYER_COLLECT_INTERVAL_MINUTES",
+        "value": "10",
+        "type": "int",
+        "description": "MC 服务器在线人数采集间隔，单位：分钟",
+    },
+    {
         "key": "SERVER_LAUNCH_DATE",
-        "value": "2024-07-05",
+        "value": "",
         "type": "str",
         "description": "开服日期，格式：2024-07-05",
     },
