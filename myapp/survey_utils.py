@@ -107,7 +107,7 @@ def build_dc_questions(
                     DCOption(text=item.get("text", ""), is_correct=item.get("isCorrect", False)) for item in raw_options
                 ],
                 images=[DCImage(data=item.get("data", ""), alt=item.get("alt", "")) for item in raw_images],
-                display_order=question.get("displayOrder", None),
+                display_order=question.get("display_order", None),
                 id=question.get("id", None),
             )
 
