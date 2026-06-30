@@ -182,7 +182,12 @@ def add_question():
     前端提供一个题目列表，每个列表元素包含：问卷ID、题目标题、类型、分数、选项和排序 ID 六个参数
     排序 ID 为 0 代表题目加入到末尾，其他值则为插入
     """
-    data = request.get_json()
+    data = request.get_json(silent=True)
+
+    if data is None or not isinstance(data, dict):
+        return jsonify({"code": 4, "desc": "数据格式有误"}), 400
+
+    data = cast(dict[str, Any], data)
     question_list = data.get("questions", [])
     survey_id = data.get("surveyId", None)
 
@@ -202,6 +207,9 @@ def add_question():
                 target_display_order=question.display_order,
             )
 
+            db.session.add(new_question)
+            db.session.flush()
+
             option_objs = [
                 Option(question_id=new_question.id, option_text=opt.text, is_correct=opt.is_correct)
                 for opt in question.options
@@ -212,7 +220,6 @@ def add_question():
                 for img in question.images
             ]
 
-            db.session.add(new_question)
             db.session.add_all(option_objs)
             db.session.add_all(image_objs)
 
@@ -693,7 +700,7 @@ def get_survey(sid: int):
         "id": survey.id,
         "name": survey.name,
         "description": survey.description,
-        "create_time": parse_dt_to_iso_utc(survey.create_time),
+        "createTime": parse_dt_to_iso_utc(survey.create_time),
         "questions": [],
     }
 
