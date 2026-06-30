@@ -850,12 +850,12 @@ def get_detail(resp_id: int):
             "score": question.score,
             "userGetScore": score,
             "options": [],
-            "img_list": [],
+            "images": [],
             "text_answer": "",
         }
 
         for img in question.img_list:
-            question_data["img_list"].append({"alt": img.img_alt, "data": img.img_data})
+            question_data["images"].append({"alt": img.img_alt, "data": img.img_data})
 
         # 标注用户选择的选项
         if (

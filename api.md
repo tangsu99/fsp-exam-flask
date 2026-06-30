@@ -17,9 +17,9 @@
 
 ```json
 {
-  "code": 0,
-  "desc": "success",
-  "data": {}
+    "code": 0,
+    "desc": "success",
+    "data": {}
 }
 ```
 
@@ -44,15 +44,15 @@
 
 ```json
 {
-  "user_count": 123,
-  "user_w_list_count": 45,
-  "online_players": [
-    {
-      "playerName": "player1",
-      "playerUuid": "uuid-1234",
-      "currentServer": "server-1"
-    }
-  ]
+    "user_count": 123,
+    "user_w_list_count": 45,
+    "online_players": [
+        {
+            "playerName": "player1",
+            "playerUuid": "uuid-1234",
+            "currentServer": "server-1"
+        }
+    ]
 }
 ```
 
@@ -69,8 +69,8 @@
 
 ```json
 {
-  "code": 0,
-  "desc": "上报成功"
+    "code": 0,
+    "desc": "上报成功"
 }
 ```
 
@@ -78,15 +78,15 @@
 
 ```json
 {
-  "code": 1,
-  "desc": "请求数据格式错误"
+    "code": 1,
+    "desc": "请求数据格式错误"
 }
 ```
 
 ```json
 {
-  "code": 1,
-  "desc": "字段类型错误"
+    "code": 1,
+    "desc": "字段类型错误"
 }
 ```
 
@@ -103,17 +103,17 @@
 
 ```json
 {
-  "data": {
-    "user_count": 123,
-    "user_w_list_count": 45,
-    "online_players": [
-      {
-        "playerName": "player1",
-        "playerUuid": "uuid-1234",
-        "currentServer": "server-1"
-      }
-    ]
-  }
+    "data": {
+        "user_count": 123,
+        "user_w_list_count": 45,
+        "online_players": [
+            {
+                "playerName": "player1",
+                "playerUuid": "uuid-1234",
+                "currentServer": "server-1"
+            }
+        ]
+    }
 }
 ```
 
@@ -128,16 +128,16 @@
 
 ```json
 {
-  "data": {
-    "ban_wl_count": 0,
-    "ban_count": 0,
-    "whitelist_block_count": 0,
-    "response_not_reviewed_count": 0,
-    "guarantee_not_passed_count": 0,
-    "question_count": 0,
-    "survey_count": 0,
-    "schematic_count": 0
-  }
+    "data": {
+        "ban_wl_count": 0,
+        "ban_count": 0,
+        "whitelist_block_count": 0,
+        "response_not_reviewed_count": 0,
+        "guarantee_not_passed_count": 0,
+        "question_count": 0,
+        "survey_count": 0,
+        "schematic_count": 0
+    }
 }
 ```
 
@@ -166,8 +166,8 @@
 
 ```json
 {
-  "uuid": "uuid-1234",
-  "name": "player1"
+    "uuid": "uuid-1234",
+    "name": "player1"
 }
 ```
 
@@ -175,10 +175,10 @@
 
 ```json
 {
-  "code": 0,
-  "desc": "在白名单中",
-  "uuid": "uuid-1234",
-  "name": "player1"
+    "code": 0,
+    "desc": "在白名单中",
+    "uuid": "uuid-1234",
+    "name": "player1"
 }
 ```
 
@@ -186,15 +186,15 @@
 
 ```json
 {
-  "code": 1,
-  "desc": "not fond"
+    "code": 1,
+    "desc": "not fond"
 }
 ```
 
 ```json
 {
-  "code": 3,
-  "desc": "账户状态异常！"
+    "code": 3,
+    "desc": "账户状态异常！"
 }
 ```
 
@@ -208,8 +208,8 @@
 
 ```json
 {
-  "uuid": "uuid-1234",
-  "name": "player1"
+    "uuid": "uuid-1234",
+    "name": "player1"
 }
 ```
 
@@ -217,8 +217,8 @@
 
 ```json
 {
-  "code": 0,
-  "desc": "成功"
+    "code": 0,
+    "desc": "成功"
 }
 ```
 
@@ -235,8 +235,8 @@
 
 ```json
 {
-  "username": "user1",
-  "password": "pass123"
+    "username": "user1",
+    "password": "pass123"
 }
 ```
 
@@ -244,12 +244,12 @@
 
 ```json
 {
-  "code": 0,
-  "token": "<jwt-token>",
-  "username": "user1",
-  "avatar": "avatar-uuid",
-  "isAdmin": false,
-  "play_permission": true
+    "code": 0,
+    "token": "<jwt-token>",
+    "username": "user1",
+    "avatar": "avatar-uuid",
+    "isAdmin": false,
+    "play_permission": true
 }
 ```
 
@@ -263,8 +263,8 @@
 
 ```json
 {
-  "code": 0,
-  "desc": "退出成功"
+    "code": 0,
+    "desc": "退出成功"
 }
 ```
 
@@ -277,10 +277,10 @@
 
 ```json
 {
-  "username": "user1",
-  "userQQ": "123456789",
-  "password": "pass123",
-  "passwordAgain": "pass123"
+    "username": "user1",
+    "userQQ": "123456789",
+    "password": "pass123",
+    "passwordAgain": "pass123"
 }
 ```
 
@@ -288,12 +288,12 @@
 
 ```json
 {
-  "code": 0,
-  "desc": "注册成功",
-  "token": "<jwt-token>",
-  "username": "user1",
-  "avatar": "avatar-uuid",
-  "isAdmin": false
+    "code": 0,
+    "desc": "注册成功",
+    "token": "<jwt-token>",
+    "username": "user1",
+    "avatar": "avatar-uuid",
+    "isAdmin": false
 }
 ```
 
@@ -306,11 +306,11 @@
 
 ```json
 {
-  "code": 0,
-  "username": "user1",
-  "avatar": "avatar-uuid",
-  "isAdmin": false,
-  "play_permission": true
+    "code": 0,
+    "username": "user1",
+    "avatar": "avatar-uuid",
+    "isAdmin": false,
+    "play_permission": true
 }
 ```
 
@@ -318,9 +318,9 @@
 
 ```json
 {
-  "code": 1,
-  "desc": "User is not logged in",
-  "avatar": "b83565e6-b0d0-4265-bb4f-fdb5e8d00655"
+    "code": 1,
+    "desc": "User is not logged in",
+    "avatar": "b83565e6-b0d0-4265-bb4f-fdb5e8d00655"
 }
 ```
 
@@ -333,7 +333,7 @@
 
 ```json
 {
-  "userQQ": "123456789"
+    "userQQ": "123456789"
 }
 ```
 
@@ -341,8 +341,8 @@
 
 ```json
 {
-  "code": 0,
-  "desc": "发送成功！请查找邮箱!"
+    "code": 0,
+    "desc": "发送成功！请查找邮箱!"
 }
 ```
 
@@ -355,7 +355,7 @@
 
 ```json
 {
-  "password": "newPass123"
+    "password": "newPass123"
 }
 ```
 
@@ -369,8 +369,8 @@
 
 ```json
 {
-  "code": 0,
-  "desc": "发送成功！请查找邮箱!"
+    "code": 0,
+    "desc": "发送成功！请查找邮箱!"
 }
 ```
 
@@ -383,7 +383,7 @@
 
 ```json
 {
-  "username": "user1"
+    "username": "user1"
 }
 ```
 
@@ -391,8 +391,8 @@
 
 ```json
 {
-  "code": 0,
-  "desc": "激活成功！"
+    "code": 0,
+    "desc": "激活成功！"
 }
 ```
 
@@ -410,17 +410,17 @@
 
 ```json
 {
-  "code": 0,
-  "data": {
-    "id": 1,
-    "username": "user1",
-    "user_qq": "123456789",
-    "role": "user",
-    "addtime": "2026-01-01T00:00:00+00:00",
-    "avatar": "avatar-uuid",
-    "status": 1,
-    "play_permission": true
-  }
+    "code": 0,
+    "data": {
+        "id": 1,
+        "username": "user1",
+        "user_qq": "123456789",
+        "role": "user",
+        "addtime": "2026-01-01T00:00:00+00:00",
+        "avatar": "avatar-uuid",
+        "status": 1,
+        "play_permission": true
+    }
 }
 ```
 
@@ -434,10 +434,8 @@
 
 ```json
 {
-  "code": 0,
-  "list": [
-    {"id": 1, "name": "player1", "uuid": "uuid-1234"}
-  ]
+    "code": 0,
+    "list": [{ "id": 1, "name": "player1", "uuid": "uuid-1234" }]
 }
 ```
 
@@ -451,7 +449,7 @@
 
 ```json
 {
-  "uuid": "avatar-uuid"
+    "uuid": "avatar-uuid"
 }
 ```
 
@@ -459,8 +457,8 @@
 
 ```json
 {
-  "code": 0,
-  "desc": "头像修改成功！"
+    "code": 0,
+    "desc": "头像修改成功！"
 }
 ```
 
@@ -478,28 +476,28 @@
 
 ```json
 {
-  "code": 0,
-  "desc": "success",
-  "data": {
-    "playerUUID": "uuid-1234",
-    "playerName": "player1",
-    "chain": [
-      {
-        "guarantor": {
-          "id": 2,
-          "username": "guarantor1",
-          "user_qq": "123456789",
-          "avatar": "avatar-uuid"
-        },
-        "applicant": {
-          "id": 1,
-          "username": "applicant1",
-          "user_qq": "987654321",
-          "avatar": "avatar-uuid"
-        }
-      }
-    ]
-  }
+    "code": 0,
+    "desc": "success",
+    "data": {
+        "playerUUID": "uuid-1234",
+        "playerName": "player1",
+        "chain": [
+            {
+                "guarantor": {
+                    "id": 2,
+                    "username": "guarantor1",
+                    "user_qq": "123456789",
+                    "avatar": "avatar-uuid"
+                },
+                "applicant": {
+                    "id": 1,
+                    "username": "applicant1",
+                    "user_qq": "987654321",
+                    "avatar": "avatar-uuid"
+                }
+            }
+        ]
+    }
 }
 ```
 
@@ -525,18 +523,18 @@
 
 ```json
 {
-  "code": 0,
-  "desc": "成功! ",
-  "list": [
-    {
-      "id": 1,
-      "survey_name": "问卷名称",
-      "responseTime": "2026-01-01T00:00:00+00:00",
-      "state": false,
-      "get_score": 90.0,
-      "full_score": 100.0
-    }
-  ]
+    "code": 0,
+    "desc": "成功! ",
+    "list": [
+        {
+            "id": 1,
+            "survey_name": "问卷名称",
+            "responseTime": "2026-01-01T00:00:00+00:00",
+            "state": false,
+            "get_score": 90.0,
+            "full_score": 100.0
+        }
+    ]
 }
 ```
 
@@ -554,11 +552,9 @@
 
 ```json
 {
-  "code": 0,
-  "desc": "成功! ",
-  "list": [
-    {"id": 1, "slotName": "插槽A", "mountedSID": 2}
-  ]
+    "code": 0,
+    "desc": "成功! ",
+    "list": [{ "id": 1, "slotName": "插槽A", "mountedSID": 2 }]
 }
 ```
 
@@ -572,24 +568,22 @@
 
 ```json
 {
-  "id": 2,
-  "name": "问卷名称",
-  "description": "描述",
-  "create_time": "2026-01-01T00:00:00+00:00",
-  "ddl": "2026-01-01T01:00:00+00:00",
-  "questions": [
-    {
-      "display_order": 1,
-      "id": 10,
-      "title": "题目一",
-      "type": 1,
-      "score": 5,
-      "img_list": [],
-      "options": [
-        {"id": 101, "text": "选项A"}
-      ]
-    }
-  ]
+    "id": 2,
+    "name": "问卷名称",
+    "description": "描述",
+    "create_time": "2026-01-01T00:00:00+00:00",
+    "ddl": "2026-01-01T01:00:00+00:00",
+    "questions": [
+        {
+            "display_order": 1,
+            "id": 10,
+            "title": "题目一",
+            "type": 1,
+            "score": 5,
+            "images": [],
+            "options": [{ "id": 101, "text": "选项A" }]
+        }
+    ]
 }
 ```
 
@@ -603,8 +597,8 @@
 
 ```json
 {
-  "code": 0,
-  "desc": "暂无问卷! "
+    "code": 0,
+    "desc": "暂无问卷! "
 }
 ```
 
@@ -612,9 +606,9 @@
 
 ```json
 {
-  "code": 1,
-  "desc": "您有未完成问卷！",
-  "response": 2
+    "code": 1,
+    "desc": "您有未完成问卷！",
+    "response": 2
 }
 ```
 
@@ -628,10 +622,10 @@
 
 ```json
 {
-  "sid": 2,
-  "slot_name": "问卷名称",
-  "playerName": "player1",
-  "playerUUID": "uuid-1234"
+    "sid": 2,
+    "slot_name": "问卷名称",
+    "playerName": "player1",
+    "playerUUID": "uuid-1234"
 }
 ```
 
@@ -639,9 +633,9 @@
 
 ```json
 {
-  "code": 0,
-  "desc": "问卷开始！",
-  "response": 2
+    "code": 0,
+    "desc": "问卷开始！",
+    "response": 2
 }
 ```
 
@@ -655,8 +649,8 @@
 
 ```json
 [
-  {"id": 10, "answer": ["A"]},
-  {"id": 11, "answer": ["B"]}
+    { "id": 10, "answer": ["A"] },
+    { "id": 11, "answer": ["B"] }
 ]
 ```
 
@@ -664,9 +658,9 @@
 
 ```json
 {
-  "code": 0,
-  "desc": "提交成功！",
-  "score": 95.0
+    "code": 0,
+    "desc": "提交成功！",
+    "score": 95.0
 }
 ```
 
@@ -705,8 +699,8 @@
 
 ```json
 {
-  "code": 0,
-  "desc": "投影上传成功! "
+    "code": 0,
+    "desc": "投影上传成功! "
 }
 ```
 
@@ -791,14 +785,14 @@
 
 ```json
 {
-  "userInfo": {
-    "playerName": "player1",
-    "playerUUID": "uuid-1234"
-  },
-  "guarantorInfo": {
-    "playerName": "player2",
-    "playerUUID": "uuid-5678"
-  }
+    "userInfo": {
+        "playerName": "player1",
+        "playerUUID": "uuid-1234"
+    },
+    "guarantorInfo": {
+        "playerName": "player2",
+        "playerUUID": "uuid-5678"
+    }
 }
 ```
 
@@ -806,8 +800,8 @@
 
 ```json
 {
-  "code": 0,
-  "desc": "有效期<小时>..."
+    "code": 0,
+    "desc": "有效期<小时>..."
 }
 ```
 
@@ -821,12 +815,12 @@
 
 ```json
 {
-  "code": 0,
-  "desc": "yes",
-  "data": {
-    "guarantee": [],
-    "applicant": []
-  }
+    "code": 0,
+    "desc": "yes",
+    "data": {
+        "guarantee": [],
+        "applicant": []
+    }
 }
 ```
 
@@ -840,8 +834,8 @@
 
 ```json
 {
-  "id": 1,
-  "action": "accept"
+    "id": 1,
+    "action": "accept"
 }
 ```
 
@@ -870,10 +864,10 @@
 
 ```json
 {
-  "key": "site_name",
-  "value": "FSP",
-  "type": "string",
-  "description": "站点名称"
+    "key": "site_name",
+    "value": "FSP",
+    "type": "string",
+    "description": "站点名称"
 }
 ```
 
@@ -886,7 +880,7 @@
 
 ```json
 {
-  "key": "site_name"
+    "key": "site_name"
 }
 ```
 
@@ -901,8 +895,8 @@
 
 ```json
 {
-  "name": "问卷A",
-  "description": "描述"
+    "name": "问卷A",
+    "description": "描述"
 }
 ```
 
@@ -915,7 +909,7 @@
 
 ```json
 {
-  "id": 2
+    "id": 2
 }
 ```
 
@@ -928,9 +922,9 @@
 
 ```json
 {
-  "id": 2,
-  "name": "问卷A",
-  "desc": "新描述"
+    "id": 2,
+    "name": "问卷A",
+    "desc": "新描述"
 }
 ```
 
@@ -945,20 +939,18 @@
 
 ```json
 {
-  "surveyId": 2,
-  "questions": [
-    {
-      "surveyId": 2,
-      "title": "题目1",
-      "type": 1,
-      "score": 5,
-      "display_order": 0,
-      "options": [
-        {"text": "A", "is_correct": true}
-      ],
-      "images": []
-    }
-  ]
+    "surveyId": 2,
+    "questions": [
+        {
+            "surveyId": 2,
+            "title": "题目1",
+            "type": 1,
+            "score": 5,
+            "display_order": 0,
+            "options": [{ "text": "A", "is_correct": true }],
+            "images": []
+        }
+    ]
 }
 ```
 
@@ -971,8 +963,8 @@
 
 ```json
 {
-  "target_sid": 3,
-  "qid": 10
+    "target_sid": 3,
+    "qid": 10
 }
 ```
 
@@ -985,18 +977,16 @@
 
 ```json
 {
-  "question": {
-    "id": 10,
-    "surveyId": 2,
-    "title": "题目1修改",
-    "type": 1,
-    "score": 6,
-    "display_order": 1,
-    "options": [
-      {"text": "A", "is_correct": true}
-    ],
-    "images": []
-  }
+    "question": {
+        "id": 10,
+        "surveyId": 2,
+        "title": "题目1修改",
+        "type": 1,
+        "score": 6,
+        "display_order": 1,
+        "options": [{ "text": "A", "is_correct": true }],
+        "images": []
+    }
 }
 ```
 
@@ -1009,7 +999,7 @@
 
 ```json
 {
-  "id": 10
+    "id": 10
 }
 ```
 
@@ -1022,8 +1012,8 @@
 
 ```json
 [
-  {"id": 10, "display_order": 1},
-  {"id": 11, "display_order": 2}
+    { "id": 10, "display_order": 1 },
+    { "id": 11, "display_order": 2 }
 ]
 ```
 
@@ -1056,10 +1046,10 @@
 
 ```json
 {
-  "username": "admin2",
-  "userQQ": "123456789",
-  "role": "admin",
-  "password": "pass123"
+    "username": "admin2",
+    "userQQ": "123456789",
+    "role": "admin",
+    "password": "pass123"
 }
 ```
 
@@ -1072,13 +1062,13 @@
 
 ```json
 {
-  "id": 3,
-  "username": "admin2",
-  "password": "newpass",
-  "userQQ": "987654321",
-  "addtime": "2026-01-01T00:00:00+00:00",
-  "role": "admin",
-  "status": 1
+    "id": 3,
+    "username": "admin2",
+    "password": "newpass",
+    "userQQ": "987654321",
+    "addtime": "2026-01-01T00:00:00+00:00",
+    "role": "admin",
+    "status": 1
 }
 ```
 
@@ -1091,7 +1081,7 @@
 
 ```json
 {
-  "id": 3
+    "id": 3
 }
 ```
 
@@ -1122,8 +1112,8 @@
 
 ```json
 {
-  "response": 5,
-  "status": 1
+    "response": 5,
+    "status": 1
 }
 ```
 
@@ -1141,9 +1131,9 @@
 
 ```json
 {
-  "score": 5,
-  "questionId": 10,
-  "responseId": 5
+    "score": 5,
+    "questionId": 10,
+    "responseId": 5
 }
 ```
 
@@ -1158,8 +1148,8 @@
 
 ```json
 {
-  "slotName": "插槽A",
-  "mountedSID": 2
+    "slotName": "插槽A",
+    "mountedSID": 2
 }
 ```
 
@@ -1172,8 +1162,8 @@
 
 ```json
 {
-  "id": 1,
-  "mountedSID": 3
+    "id": 1,
+    "mountedSID": 3
 }
 ```
 
@@ -1186,7 +1176,7 @@
 
 ```json
 {
-  "id": 1
+    "id": 1
 }
 ```
 
