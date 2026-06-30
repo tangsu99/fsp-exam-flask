@@ -158,7 +158,7 @@ def mod_survey():
     data = request.get_json()
     id_ = int(data.get("id") or 0)
     name = str(data.get("name") or "")
-    desc = str(data.get("desc") or "")
+    desc = str(data.get("description") or "")
 
     if id_ == 0 or not name:
         return jsonify({"code": 1, "desc": "必须填写名称!"})
