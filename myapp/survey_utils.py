@@ -280,7 +280,7 @@ def build_dict_question(
         if details is None:
             raise ValueError("admin-review 模式必须提供 details 参数")
         result["options"] = [
-            build_dict_option("admin-review", question.question_type, option, details) for option in question.options
+            build_dict_option(type, question.question_type, option, details) for option in question.options
         ]
         result["userGetScore"] = response_score.score if response_score is not None else 0
 
