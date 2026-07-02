@@ -15,7 +15,6 @@ from myapp.db_model import (
     Guarantee,
     Option,
     Question,
-    QuestionCategory,
     QuestionImgURL,
     Response,
     ResponseDetail,
@@ -33,9 +32,11 @@ from myapp.mail import send_mail, survey_result_mail
 from myapp.survey_utils import (
     DCQuestion,
     build_dc_questions,
+    build_dict_question,
     get_response_total_score,
     is_survey_mounted,
     is_survey_response_expired,
+    user_answered_question,
 )
 from myapp.utils import (
     build_pagination_dict,
@@ -690,52 +691,98 @@ def get_responses():
 @required_role("admin")
 def get_survey(sid: int):
     """
-    查询指定问卷
+    管理员预览问卷
     """
     survey: Survey | None = db.session.get(Survey, sid)
     if not survey:
-        return jsonify({"code": 1, "desc": "未找到问卷"}), 404
+        return jsonify({"code": 1, "desc": "问卷不存在"})
 
     survey_data: dict[str, Any] = {
         "id": survey.id,
         "name": survey.name,
         "description": survey.description,
         "createTime": parse_dt_to_iso_utc(survey.create_time),
+        "questions": [
+            build_dict_question("admin-view", question)
+            for question in survey.questions
+            if not question.logical_deletion
+        ],
+    }
+
+    return jsonify({"code": 0, "desc": "success", "data": survey_data})
+
+
+@admin.route("/detail/<int:resp_id>", methods=["GET"])
+@login_required
+@required_role("admin")
+def review_survey(resp_id: int):
+    """
+    批改问卷
+    """
+    res: Response | None = db.session.get(Response, resp_id)
+    if res is None:
+        return jsonify({"code": 1, "desc": "答卷不存在"})
+
+    survey: Survey | None = db.session.get(Survey, res.survey_id)
+
+    if survey is None:
+        return jsonify({"code": 1, "desc": "未找到答卷对应的问卷"})
+
+    survey_data: dict[str, Any] = {
+        "id": res.id,
+        "name": survey.name,
+        "description": survey.description,
+        "createTime": parse_dt_to_iso_utc(survey.create_time),
+        "isReviewed": res.is_reviewed,
         "questions": [],
     }
 
     # 查询问卷中的所有题目
     for question in survey.questions:
-        # 不返回被逻辑删除的题目
-        if question.logical_deletion:
+        response_score: ResponseScore | None = db.session.execute(
+            select(ResponseScore).where(ResponseScore.question_id == question.id, ResponseScore.response_id == resp_id)
+        ).scalar()
+
+        # 查询题目中的所有选项详情，多选题会创建多个ResponseDetail，每个里面的answer是一个选择的选项ID
+        stmt = select(ResponseDetail).where(
+            ResponseDetail.question_id == question.id, ResponseDetail.response_id == resp_id
+        )
+        details = db.session.execute(stmt).scalars().all()
+
+        # 如果题目被逻辑删除，并且用户未作答，则不显示
+        if question.logical_deletion and not user_answered_question(details):
             continue
 
-        question_data: dict[str, Any] = {
-            "display_order": question.display_order,
-            "id": question.id,
-            "title": question.question_text,
-            "type": question.question_type,
-            "score": question.score,
-            "images": [],
-            "options": [],
-        }
+        survey_data["questions"].append(build_dict_question("admin-review", question, details, response_score))
+    return jsonify(survey_data)
 
-        for img in question.img_list:
-            question_data["images"].append({"id": img.id, "alt": img.img_alt, "data": img.img_data})
 
-        # 查询题目中的所有选项
-        for option in question.options:
-            question_data["options"].append(
-                {
-                    "id": option.id,
-                    "text": option.option_text,
-                    "isCorrect": option.is_correct,
-                }
-            )
+@admin.route("/detail_score", methods=["POST"])
+@login_required
+@required_role("admin")
+def set_score():
+    """
+    批改某个题目，前端提供题目ID，答卷ID，和分数
+    """
+    req_data = request.json
+    if req_data:
+        score = req_data.get("score")
+        question_id = req_data.get("questionId")
+        response_id = req_data.get("responseId")
+        if not all([score, response_id, question_id]):
+            return jsonify({"code": 2, "desc": "字段无效！"}), 400
 
-        survey_data["questions"].append(question_data)
-
-    return jsonify({"code": 0, "desc": "success", "data": survey_data})
+        stmt = select(ResponseScore).where(
+            ResponseScore.question_id == question_id, ResponseScore.response_id == response_id
+        )
+        res = db.session.scalar(stmt)
+        if res is not None:
+            res.score = score
+        else:
+            db.session.add(ResponseScore(score, question_id, response_id))
+        db.session.commit()
+        return jsonify({"code": 0, "desc": "批改成功！"})
+    return jsonify({"code": 1, "desc": "缺少信息！"})
 
 
 @admin.route("/reviewed", methods=["POST"])
@@ -800,119 +847,6 @@ def reviewed_response():
         return jsonify({"code": 0, "desc": "操作成功"})
 
     return jsonify({"code": 4, "desc": "缺少数据! "})
-
-
-@admin.route("/detail/<int:resp_id>", methods=["GET"])
-@login_required
-@required_role("admin")
-def get_detail(resp_id: int):
-    """
-    查询指定问卷
-    """
-    res: Response | None = db.session.get(Response, resp_id)
-    if res is None:
-        return jsonify({"code": 1, "desc": "答卷不存在"})
-
-    survey: Survey | None = db.session.get(Survey, res.survey_id)
-
-    if survey is None:
-        return jsonify({"code": 1, "desc": "未找到问卷"})
-
-    survey_data: dict[str, Any] = {
-        "id": res.id,
-        "name": survey.name,
-        "description": survey.description,
-        "create_time": parse_dt_to_iso_utc(survey.create_time),
-        "isReviewed": res.is_reviewed,
-        "questions": [],
-    }
-
-    # 查询问卷中的所有题目
-    for question in survey.questions:
-        response_score: ResponseScore | None = db.session.execute(
-            select(ResponseScore).where(ResponseScore.question_id == question.id, ResponseScore.response_id == resp_id)
-        ).scalar()
-
-        # 查询题目中的所有选项详情
-        stmt = select(ResponseDetail).where(
-            ResponseDetail.question_id == question.id, ResponseDetail.response_id == resp_id
-        )
-        details = db.session.execute(stmt).scalars().all()
-
-        # 如果题目被逻辑删除，并且用户未作答，则不显示
-        if question.logical_deletion and len(details) == 0:
-            continue
-
-        score = 0
-        user_selected_option: list[int] = []
-
-        if response_score is not None:
-            score = response_score.score
-
-        question_data: dict[str, Any] = {
-            "display_order": question.display_order,
-            "id": question.id,
-            "title": question.question_text,
-            "type": question.question_type,
-            "score": question.score,
-            "userGetScore": score,
-            "options": [],
-            "images": [],
-            "text_answer": "",
-        }
-
-        for img in question.img_list:
-            question_data["images"].append({"alt": img.img_alt, "data": img.img_data})
-
-        # 标注用户选择的选项
-        if (
-            question.question_type == QuestionCategory.SINGLE_CHOICE.value
-            or question.question_type == QuestionCategory.MULTIPLE_CHOICE.value
-        ):
-            for detail in details:
-                user_selected_option.append(int(detail.answer))
-
-        for option in question.options:
-            question_data["options"].append(
-                {
-                    "id": option.id,
-                    "text": option.option_text,
-                    "isCorrect": option.is_correct,
-                    "isSelected": True if option.id in user_selected_option else False,
-                    "inputText": details[0].answer if question.question_type in [3, 4] and len(details) != 0 else "",
-                }
-            )
-
-        survey_data["questions"].append(question_data)
-    return jsonify(survey_data)
-
-
-@admin.route("/detail_score", methods=["POST"])
-@login_required
-@required_role("admin")
-def set_score():
-    """
-    批改某个题目，前端提供题目ID，答卷ID，和分数
-    """
-    req_data = request.json
-    if req_data:
-        score = req_data.get("score")
-        question_id = req_data.get("questionId")
-        response_id = req_data.get("responseId")
-        if not all([score, response_id, question_id]):
-            return jsonify({"code": 2, "desc": "字段无效！"}), 400
-
-        stmt = select(ResponseScore).where(
-            ResponseScore.question_id == question_id, ResponseScore.response_id == response_id
-        )
-        res = db.session.scalar(stmt)
-        if res is not None:
-            res.score = score
-        else:
-            db.session.add(ResponseScore(score, question_id, response_id))
-        db.session.commit()
-        return jsonify({"code": 0, "desc": "批改成功！"})
-    return jsonify({"code": 1, "desc": "缺少信息！"})
 
 
 @admin.route("/slot/add", methods=["POST"])
