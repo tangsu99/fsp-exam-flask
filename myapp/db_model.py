@@ -45,7 +45,7 @@ TZ_AWARE_DATETIME = DateTime(timezone=True)
 
 
 @unique
-class QuestionCategory(IntEnum):
+class QuestionType(IntEnum):
     SINGLE_CHOICE = 1
     MULTIPLE_CHOICE = 2
     FILL_IN_THE_BLANKS = 3
@@ -235,7 +235,7 @@ class Question(Base):
     survey: Mapped["Survey"] = relationship(back_populates="questions", init=False)
     display_order: Mapped[int] = mapped_column(Integer, nullable=False)
     question_text: Mapped[str] = mapped_column(String(500), nullable=False)
-    question_type: Mapped[QuestionCategory] = mapped_column(Integer, nullable=False)
+    question_type: Mapped[QuestionType] = mapped_column(Integer, nullable=False)
     score: Mapped[float] = mapped_column(Float, nullable=False)
     logical_deletion: Mapped[bool] = mapped_column(default=False)
     create_time: Mapped[datetime] = mapped_column(
@@ -254,7 +254,7 @@ class Question(Base):
         cls,
         survey_id: int,
         question_text: str,
-        question_type: QuestionCategory,
+        question_type: QuestionType,
         score: float,
         target_display_order: int | None = None,
     ) -> Self:
