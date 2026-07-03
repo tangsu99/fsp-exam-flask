@@ -183,12 +183,11 @@ def add_question():
     前端提供一个题目列表，每个列表元素包含：问卷ID、题目标题、类型、分数、选项和排序 ID 六个参数
     排序 ID 为 0 代表题目加入到末尾，其他值则为插入
     """
-    data = request.get_json(silent=True)
+    data: dict[str, Any] | None = request.get_json(silent=True)
 
-    if data is None or not isinstance(data, dict):
+    if data is None:
         return jsonify({"code": 4, "desc": "数据格式有误"}), 400
 
-    data = cast(dict[str, Any], data)
     question_list = data.get("questions", [])
     survey_id = data.get("surveyId", None)
 
@@ -284,11 +283,12 @@ def edit_question():
     """
     data = request.get_json()
     question_data = data.get("question", None)
+    survey_id = question_data.get("surveyId", None)
 
     if question_data is None:
         return jsonify({"code": 1, "desc": "fail"})
 
-    is_valid, error_info_or_list = build_dc_questions([question_data], question_data.get("surveyId", None))
+    is_valid, error_info_or_list = build_dc_questions([question_data], survey_id)
     if not is_valid:
         return jsonify({"code": 1, "desc": error_info_or_list})
 
