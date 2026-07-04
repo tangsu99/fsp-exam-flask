@@ -798,7 +798,7 @@ def reviewed_response():
         raw_status: int | None = req_data.get("status", None)
 
         if rid is None or raw_status is None:
-            return jsonify({"code": 1, "desc": "缺少参数! "})
+            return jsonify({"code": 1, "desc": "缺少参数! "}), 400
 
         try:
             status: ResponseStatus = ResponseStatus(raw_status)
