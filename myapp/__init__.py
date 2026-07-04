@@ -38,6 +38,7 @@ def create_app():
     APP = app  # type: ignore[reportConstantRedefinition]
     app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL")  # 测试数据库
     app.config["SESSION_PROTECTION"] = None  # 禁用会话保护
+    app.debug = os.getenv("GUNICORN_RUNNING") != "1"  # gunicorn 下强制关闭 debug 模式
     app.template_folder = "../templates"
     app.static_folder = "../static"
 
@@ -128,7 +129,6 @@ def create_app():
 
         return None
 
-    
     # OPTIONS 预检请求统一返回 204（after_request 中会加 CORS 头）
     @app.before_request  # type: ignore[reportUnknownMemberType]
     def handle_options_preflight() -> Response | None:  # type: ignore[reportUnusedFunction]
