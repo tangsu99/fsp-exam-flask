@@ -11,6 +11,7 @@
 ### Refactor
 
 - 重构问卷和阅卷相关代码
+- OPTIONS 预检请求统一返回 204
 
 ### Bug Fixes
 
