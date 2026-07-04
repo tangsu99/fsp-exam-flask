@@ -66,7 +66,7 @@ def get_all_exam():
     slots = db.session.execute(stmt).scalars().all()
     res_data = {
         "code": 0,
-        "desc": "成功! ",
+        "desc": "success",
         "data": [
             {
                 "id": slot.id,
@@ -138,15 +138,18 @@ def start_survey():
     if res:
         return jsonify({"code": 1, "desc": "您有未完成问卷！", "data": res.survey_id})
 
-    data = request.get_json()
+    data: dict[str, Any] | None = request.get_json(silent=True)
 
-    sid: int = data.get("sid")
-    slot_name: str = data.get("slotName")
-    mc_name: str = data.get("playerName")
-    mc_uuid: str = data.get("playerUUID")
+    if data is None:
+        return jsonify({"code": 2, "desc": "缺少信息！"}), 400
+
+    sid: int | None = data.get("sid", None)
+    slot_name: str | None = data.get("slotName")
+    mc_name: str | None = data.get("playerName")
+    mc_uuid: str | None = data.get("playerUUID")
 
     if not sid or not slot_name or not mc_name or not mc_uuid:
-        return jsonify({"code": 2, "desc": "缺少信息！"})
+        return jsonify({"code": 2, "desc": "缺少信息！"}), 400
 
     is_in_whitelist = db.session.scalar(select(exists().where(Whitelist.player_uuid == mc_uuid)))
     if is_in_whitelist:
@@ -191,7 +194,7 @@ def complete_survey():
     req_data: dict[str, Any] | None = request.get_json(silent=True)
 
     if req_data is None:
-        return jsonify({"code": 1, "desc": "缺少数据！"})
+        return jsonify({"code": 1, "desc": "缺少数据！"}), 400
 
     user: User = cast(User, current_user)
     res: Response | None = incomplete_survey_exist(user.responses)
@@ -199,7 +202,10 @@ def complete_survey():
         return jsonify({"code": 1, "desc": "你没有要提交的问卷！"})
 
     survey_id: int | None = req_data.get("surveyId", None)
-    answers: list[Any] = req_data.get("answers", [])
+    answers: list[Any] | None = req_data.get("answers", None)
+
+    if not survey_id or not answers:
+        return jsonify({"code": 1, "desc": "缺少数据！"}), 400
 
     if survey_id != res.survey_id:
         return jsonify({"code": 1, "desc": "提交的问卷ID与系统记录不符！"})
