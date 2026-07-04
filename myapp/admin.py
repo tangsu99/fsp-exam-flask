@@ -754,7 +754,7 @@ def review_survey(resp_id: int):
             continue
 
         survey_data["questions"].append(build_dict_question("admin-review", question, details, response_score))
-    return jsonify(survey_data)
+    return jsonify({"code": 1, "desc": "未找到答卷对应的问卷", "data": survey_data})
 
 
 @admin.route("/detail_score", methods=["POST"])
