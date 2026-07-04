@@ -1,8 +1,9 @@
 import os
 from datetime import UTC, datetime
+from typing import cast
 
 from dotenv import load_dotenv
-from flask import Flask, Request, jsonify
+from flask import Flask, Request, Response, jsonify, request
 from flask_apscheduler import APScheduler
 from flask_bcrypt import Bcrypt
 from flask_cors import CORS
@@ -126,5 +127,27 @@ def create_app():
                 return token_record.token_user
 
         return None
+
+    
+    # OPTIONS 预检请求统一返回 204（after_request 中会加 CORS 头）
+    @app.before_request  # type: ignore[reportUnknownMemberType]
+    def handle_options_preflight() -> Response | None:  # type: ignore[reportUnusedFunction]
+        if request.method == "OPTIONS":
+            return app.make_response(("", 204))
+
+    # 流程：flask-cors 拿到你的 origins 列表，检查请求的 Origin 是否在其中
+    # 如果匹配，就把那个具体的源写到 Access-Control-Allow-Origin 响应头里回给浏览器
+    # flask-cors 对 404 等错误响应不会加 CORS 头，这里无条件补上
+    @app.after_request  # type: ignore[reportUnknownMemberType]
+    def add_cors_headers(response: Response) -> Response:  # type: ignore[reportUnusedFunction]
+        allowed_origins = cast(list[str], app.config["ALLOWED_ORIGINS"])
+        origin = request.headers.get("Origin", "")
+
+        if origin in allowed_origins or "*" in allowed_origins:
+            response.headers["Access-Control-Allow-Origin"] = origin
+
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+        return response
 
     return app
