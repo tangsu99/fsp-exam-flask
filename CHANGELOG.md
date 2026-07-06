@@ -1,6 +1,8 @@
 # Changelog
 
-## [0.2.3] (Developing)
+## [0.2.4] (Developing)
+
+## [0.2.3] (2026-07-06)
 
 ### Features
 
