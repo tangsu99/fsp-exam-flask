@@ -20,7 +20,12 @@ from myapp.db_model import (
     Whitelist,
 )
 from myapp.mail import send_mail, survey_complete_mail
-from myapp.survey_utils import get_response_objective_question_score, is_survey_response_expired, make_answer_details
+from myapp.survey_utils import (
+    build_dict_question,
+    get_response_objective_question_score,
+    is_survey_response_expired,
+    make_answer_details,
+)
 from myapp.utils import parse_dt_to_iso_utc, status_check
 
 survey = Blueprint("survey", __name__)
@@ -38,30 +43,19 @@ def incomplete_survey_exist(response_list: list[Response]) -> Response | None:
     return None
 
 
-def build_survey_questions(survey_: Survey) -> list[dict[str, Any]]:
-    questions: list[dict[str, Any]] = []
-    for question in survey_.questions:
-        if question.logical_deletion:
-            continue
-
-        options_data = [
-            {"id": opt.id, "text": "此处作答" if question.question_type in (3, 4) else opt.option_text}
-            for opt in question.options
-        ]
-
-        question_data = {
-            "display_order": question.display_order,
-            "id": question.id,
-            "title": question.question_text,
-            "type": question.question_type,
-            "score": question.score,
-            "img_list": [{"alt": img.img_alt, "data": img.img_data} for img in question.img_list],
-            "options": options_data,
-        }
-
-        questions.append(question_data)
-
-    return questions
+def build_answer_survey(target_survey: Survey, create_time: datetime, end_time: datetime) -> dict[str, Any]:
+    return {
+        "id": target_survey.id,
+        "name": target_survey.name,
+        "description": target_survey.description,
+        "startAnswerTime": parse_dt_to_iso_utc(create_time),
+        "ddl": parse_dt_to_iso_utc(end_time),
+        "questions": [
+            build_dict_question("answer", question)
+            for question in target_survey.questions
+            if not question.logical_deletion
+        ],
+    }
 
 
 @survey.route("/get_slots", methods=["GET"])
@@ -72,8 +66,8 @@ def get_all_exam():
     slots = db.session.execute(stmt).scalars().all()
     res_data = {
         "code": 0,
-        "desc": "成功! ",
-        "list": [
+        "desc": "success",
+        "data": [
             {
                 "id": slot.id,
                 "slotName": slot.slot_name,
@@ -90,7 +84,7 @@ def get_all_exam():
 @login_required
 def get_survey(sid: int):
     """
-    获取问卷
+    获取待作答问卷
     """
     user: User = cast(User, current_user)
 
@@ -105,20 +99,13 @@ def get_survey(sid: int):
             end_time = i.end_time
             if i.survey_id != sid:
                 return jsonify({"code": 1, "desc": "你选择的问卷不是这张！"})
+            if end_time is None:
+                return jsonify({"code": 5, "desc": "内部错误"}), 500
             break
     else:
         return jsonify({"code": 1, "desc": "没有要填写的问卷"})
 
-    survey_data: dict[str, Any] = {
-        "id": survey_.id,
-        "name": survey_.name,
-        "description": survey_.description,
-        "create_time": parse_dt_to_iso_utc(create_time),
-        "ddl": parse_dt_to_iso_utc(end_time),
-        "questions": build_survey_questions(survey_),
-    }
-
-    return jsonify(survey_data)
+    return jsonify({"code": 0, "desc": "ok", "data": build_answer_survey(survey_, create_time, end_time)})
 
 
 @survey.route("/check_survey", methods=["POST"])
@@ -130,9 +117,9 @@ def check_survey():
     res = incomplete_survey_exist(existing_response_list)
 
     if res:
-        return jsonify({"code": 1, "desc": "您有未完成问卷！", "response": res.survey_id})
+        return jsonify({"code": 0, "desc": "您有未完成问卷！", "data": res.survey_id})
 
-    return jsonify({"code": 0, "desc": "暂无问卷! "})
+    return jsonify({"code": 1, "desc": "暂无未完成的问卷! "})
 
 
 @survey.route("/start_survey", methods=["POST"])
@@ -149,17 +136,20 @@ def start_survey():
     res: Response | None = incomplete_survey_exist(existing_response_list)
 
     if res:
-        return jsonify({"code": 1, "desc": "您有未完成问卷！", "response": res.survey_id})
+        return jsonify({"code": 1, "desc": "您有未完成问卷！", "data": res.survey_id})
 
-    data = request.get_json()
+    data: dict[str, Any] | None = request.get_json(silent=True)
 
-    sid: int = data.get("sid")
-    slot_name: str = data.get("slot_name")
-    mc_name: str = data.get("playerName")
-    mc_uuid: str = data.get("playerUUID")
+    if data is None:
+        return jsonify({"code": 2, "desc": "缺少信息！"}), 400
+
+    sid: int | None = data.get("sid", None)
+    slot_name: str | None = data.get("slotName")
+    mc_name: str | None = data.get("playerName")
+    mc_uuid: str | None = data.get("playerUUID")
 
     if not sid or not slot_name or not mc_name or not mc_uuid:
-        return jsonify({"code": 1, "desc": "缺少信息！"})
+        return jsonify({"code": 2, "desc": "缺少信息！"}), 400
 
     is_in_whitelist = db.session.scalar(select(exists().where(Whitelist.player_uuid == mc_uuid)))
     if is_in_whitelist:
@@ -167,7 +157,7 @@ def start_survey():
 
     survey_exist = db.session.get(Survey, sid)
     if survey_exist is None:
-        return jsonify({"code": 1, "desc": "问卷不存在！"})
+        return jsonify({"code": 2, "desc": "问卷不存在！"})
 
     new_response = Response(
         user_id=user.id,
@@ -189,8 +179,8 @@ def start_survey():
     return jsonify(
         {
             "code": 0,
-            "desc": "问卷开始！",
-            "response": new_response.survey_id,
+            "desc": "开始作答！",
+            "data": new_response.survey_id,
         }
     )
 
@@ -204,7 +194,7 @@ def complete_survey():
     req_data: dict[str, Any] | None = request.get_json(silent=True)
 
     if req_data is None:
-        return jsonify({"code": 1, "desc": "缺少数据！"})
+        return jsonify({"code": 1, "desc": "缺少数据！"}), 400
 
     user: User = cast(User, current_user)
     res: Response | None = incomplete_survey_exist(user.responses)
@@ -212,7 +202,10 @@ def complete_survey():
         return jsonify({"code": 1, "desc": "你没有要提交的问卷！"})
 
     survey_id: int | None = req_data.get("surveyId", None)
-    answers: list[Any] = req_data.get("answers", [])
+    answers: list[Any] | None = req_data.get("answers", None)
+
+    if not survey_id or not answers:
+        return jsonify({"code": 1, "desc": "缺少数据！"}), 400
 
     if survey_id != res.survey_id:
         return jsonify({"code": 1, "desc": "提交的问卷ID与系统记录不符！"})
@@ -254,7 +247,7 @@ def complete_survey():
 
     send_survey_complete(user.username, now.isoformat(), response_id)
 
-    return jsonify({"code": 0, "desc": "提交成功！", "score": count_score}), 200
+    return jsonify({"code": 0, "desc": "提交成功！", "data": count_score})
 
 
 def send_survey_complete(username: str, response_time: str, id_: int):

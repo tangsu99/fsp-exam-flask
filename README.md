@@ -46,6 +46,49 @@ flask --app main.py db upgrade
 uv run pytest
 ```
 
+## Database Schema Sync
+
+Compare the DDL differences between two databases (e.g., development vs. production) and generate synchronization SQL.
+
+### Prerequisites
+
+- `mysqldump` installed and accessible via PATH
+- Database connection credentials
+
+### Usage
+
+```shell
+# Option 1: Compare two live databases directly
+python scripts/sync_db_schema.py \
+    --source root:pass@localhost:3306/dev_db \
+    --target root:pass@prod_host:3306/prod_db
+
+# Option 2: Compare from existing DDL dump files
+mysqldump -u root -p --no-data dev_db > dev_ddl.sql
+mysqldump -u root -p --no-data prod_db > prod_ddl.sql
+python scripts/sync_db_schema.py \
+    --source-dump dev_ddl.sql \
+    --target-dump prod_ddl.sql
+
+# Option 3: Only dump DDL for a single database
+python scripts/sync_db_schema.py --dump-only root:pass@localhost:3306/mydb
+
+# Save output to a file
+python scripts/sync_db_schema.py \
+    --source root:pass@localhost:3306/dev_db \
+    --target root:pass@prod_host:3306/prod_db \
+    -o sync.sql
+```
+
+The script will generate:
+
+1. `CREATE TABLE` statements for tables missing in the target
+2. `ALTER TABLE` statements for column definition differences
+3. `ALTER TABLE` / `CREATE INDEX` statements for missing indexes and constraints
+4. Warnings for tables that exist only in the target database
+
+> ⚠️ Always review the generated SQL before executing it against a production database.
+
 ## Run
 
 - Before running the Flask application, please ensure that the MySQL service is started!

@@ -1,6 +1,25 @@
 # Changelog
 
-## [0.2.3] (Developing)
+## [0.2.4] (Developing)
+
+## [0.2.3] (2026-07-06)
+
+### Features
+
+- 添加生产环境的数据库迁移脚本
+- 默认配置添加'开服日期'项
+- 默认配置添加'在线人数采集间隔'项
+- 生产环境用 gunicorn 跑的时候自动关闭 debug 模式
+
+### Refactor
+
+- 重构问卷和阅卷相关代码
+- OPTIONS 预检请求统一返回 204
+
+### Bug Fixes
+
+- 修复 `/admin/config/set` 的字段问题
+- 修复 `/admin/survey/<int:sid>` 和 `/survey/survey/<int:sid>` 中图片列表的字段错误
 
 ## [0.2.2] (2026-06-29)
 

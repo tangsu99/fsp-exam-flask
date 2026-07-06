@@ -30,7 +30,7 @@ def users_info():
     mc_data = get_mc_users_info()
     mc_data["user_count"] = db.session.scalar(select(func.count()).select_from(User))
     mc_data["user_w_list_count"] = db.session.scalar(select(func.count()).select_from(Whitelist))
-    return jsonify({"data": mc_data})
+    return jsonify({"code": 0, "desc": "success", "data": mc_data})
 
 
 @dashboard.route("/sysInfo", methods=["GET"])
@@ -69,6 +69,8 @@ def sys_info():
 
     return jsonify(
         {
+            "code": 0,
+            "desc": "success",
             "data": {
                 "ban_wl_count": ban_whitelist_count or 0,
                 "ban_count": ban_count or 0,
@@ -78,6 +80,6 @@ def sys_info():
                 "question_count": question_count or 0,
                 "survey_count": survey_count or 0,
                 "schematic_count": schematic_count or 0,
-            }
+            },
         }
     )

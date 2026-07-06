@@ -1,6 +1,7 @@
 from datetime import UTC, datetime
+from typing import cast
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, current_app, jsonify, request
 from flask_login import current_user
 from sqlalchemy import desc, select
 
@@ -25,6 +26,7 @@ def online_stats():
     start_time_str = request.args.get("start_time", type=str)
     end_time_str = request.args.get("end_time", type=str)
     is_anonymous = not current_user.is_authenticated
+    SERVER_LAUNCH_DATE = cast(str, current_app.config["SERVER_LAUNCH_DATE"])
 
     # 指定了时间段参数：直接按时间段查询
     if start_time_str or end_time_str:
@@ -74,4 +76,9 @@ def online_stats():
     count = [r.player_count for r in records]
     date = [parse_dt_to_iso_utc(r.create_time) for r in records]
 
-    return jsonify({"code": 0, "data": {"total": len(records), "count": count, "date": date}})
+    return jsonify(
+        {
+            "code": 0,
+            "data": {"total": len(records), "count": count, "date": date, "serverLaunchDate": SERVER_LAUNCH_DATE},
+        }
+    )
