@@ -63,7 +63,7 @@ def report_users_info():
     if not isinstance(data, dict):
         return jsonify({"code": 1, "desc": "请求数据格式错误"}), 400
 
-    online_players = data.get("online_players")
+    online_players = data.get("onlinePlayers")
 
     if not isinstance(online_players, list):
         return jsonify({"code": 1, "desc": "字段类型错误"}), 400
