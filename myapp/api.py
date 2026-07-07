@@ -63,15 +63,11 @@ def report_users_info():
     if not isinstance(data, dict):
         return jsonify({"code": 1, "desc": "请求数据格式错误"}), 400
 
-    user_count = data.get("user_count")
-    user_w_list_count = data.get("user_w_list_count")
     online_players = data.get("online_players")
 
-    if not isinstance(user_count, int) or not isinstance(user_w_list_count, int) or not isinstance(online_players, list):
+    if not isinstance(online_players, list):
         return jsonify({"code": 1, "desc": "字段类型错误"}), 400
 
-    mc_users_info["user_count"] = user_count
-    mc_users_info["user_w_list_count"] = user_w_list_count
     mc_users_info["online_players"] = []
 
     for player in online_players:
