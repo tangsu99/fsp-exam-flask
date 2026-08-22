@@ -770,7 +770,7 @@ def set_score():
         score = req_data.get("score")
         question_id = req_data.get("questionId")
         response_id = req_data.get("responseId")
-        if not all([score, response_id, question_id]):
+        if score is None or response_id is None or question_id is None:
             return jsonify({"code": 2, "desc": "字段无效！"}), 400
 
         stmt = select(ResponseScore).where(
