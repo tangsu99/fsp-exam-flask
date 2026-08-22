@@ -1,6 +1,15 @@
 # Changelog
 
-## Unreleased
+## [0.2.4] (2026-08-22)
+
+### Breaking Changes
+
+- 涉及数据库结构变更：新增 `responses.reject_reason` 字段，发布后需执行 `uv run flask --app main.py db upgrade` 迁移
+- 修复了已提交答卷被误标为超时的问题。若线上已有"已提交却被误标为超时"的答卷，需手动改回待审核：
+    ```sql
+    UPDATE responses SET is_reviewed = 0 WHERE is_completed = 1 AND is_reviewed = 3;
+    ```
+- 注册及管理后台新增 QQ 号格式校验，不再接受 `@qq.com` 邮箱格式
 
 ### Features
 
