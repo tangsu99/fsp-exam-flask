@@ -734,6 +734,7 @@ def review_survey(resp_id: int):
         "description": survey.description,
         "createTime": parse_dt_to_iso_utc(survey.create_time),
         "isReviewed": res.is_reviewed,
+        "rejectReason": res.reject_reason,
         "questions": [],
     }
 
@@ -815,9 +816,16 @@ def reviewed_response():
         if resp.is_reviewed:
             return jsonify({"code": 1, "desc": "已被审核! "})
 
+        # 拒绝时需要提供理由
+        reason = str(req_data.get("reason") or "").strip()
+        if status == ResponseStatus.REJECTED and not reason:
+            return jsonify({"code": 1, "desc": "请填写拒绝理由! "}), 400
+
         resp.is_reviewed = status
         resp.reviewer_uid = current_user.id
         resp.is_completed = True
+        # 仅拒绝时保存理由，其他状态清空，避免残留旧理由
+        resp.reject_reason = reason if status == ResponseStatus.REJECTED else None
 
         # 已审核的问卷不可再批分，向归档分数字段添加分数
         total_score = get_response_total_score(rid)
@@ -841,7 +849,12 @@ def reviewed_response():
                 )
             )
 
-        send_mail(APP, survey_result_mail([f"{resp.user.user_qq}@qq.com"], str(total_score)))
+        send_mail(
+            APP,
+            survey_result_mail(
+                [f"{resp.user.user_qq}@qq.com"], str(total_score), reason if status == ResponseStatus.REJECTED else None
+            ),
+        )
 
         db.session.commit()
         return jsonify({"code": 0, "desc": "操作成功"})
