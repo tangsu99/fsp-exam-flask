@@ -16,7 +16,27 @@ def send_async_mail(app: Flask, mail_msg: Message):
         flask_mail_app.send(mail_msg)
 
 
+def _is_mail_configured(app: Flask) -> bool:
+    """
+    邮件是否具备发送条件：
+    - MAIL_ENABLED 显式关闭时返回 False
+    - 账号/密码为空，或仍是默认占位符（your_*）时视为未配置，返回 False
+    """
+    if not app.config.get("MAIL_ENABLED", True):
+        return False
+    username: str = app.config.get("MAIL_USERNAME", "") or ""
+    password: str = app.config.get("MAIL_PASSWORD", "") or ""
+    if not username or not password:
+        return False
+    if username.startswith("your_") or password.startswith("your_"):
+        return False
+    return True
+
+
 def send_mail(app: Flask, mail_msg: Message):
+    if not _is_mail_configured(app):
+        app.logger.info("邮件未启用或未配置真实账号，跳过发送: %s", mail_msg.subject)
+        return
     return Thread(target=send_async_mail, args=[app, mail_msg]).start()
 
 

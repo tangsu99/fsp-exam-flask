@@ -36,6 +36,12 @@ DEFAULT_CONFIG = [
         "description": "前端地址",
     },
     {
+        "key": "MAIL_ENABLED",
+        "value": "True",
+        "type": "bool",
+        "description": "是否启用邮件发送。测试/开发环境可设为 False 屏蔽所有邮件；即使为 True，若账号仍是默认占位符配置也会自动跳过发送。",
+    },
+    {
         "key": "MAIL_SERVER",
         "value": "smtp.qq.com",
         "type": "str",
