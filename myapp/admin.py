@@ -493,6 +493,10 @@ def add_user():
         if not username or not user_qq or not role or not password:
             return jsonify({"code": 1, "desc": "缺少必填字段！"}), 400
 
+        # 校验 QQ 号格式（QQ 号不能带邮箱后缀）
+        if "@qq.com" in user_qq.lower():
+            return jsonify({"code": 2, "desc": "请填写纯QQ号，不要带 @qq.com 后缀!"}), 400
+
         # 验证用户名
         username_result = validate_username(username)
         if username_result["code"] != 0:
@@ -542,6 +546,9 @@ def set_user():
             user.password = password
 
         if user_qq:
+            # 校验 QQ 号格式（QQ 号不能带邮箱后缀）
+            if "@qq.com" in user_qq.lower():
+                return jsonify({"code": 2, "desc": "请填写纯QQ号，不要带 @qq.com 后缀!"}), 400
             user.user_qq = user_qq
 
         if registered_at_iso_str:
