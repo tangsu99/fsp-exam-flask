@@ -3,13 +3,19 @@ DEFAULT_CONFIG = [
         "key": "SECRET_KEY",
         "value": "c4329f5e3bc9daf6cd2b82bf9355a5d2",
         "type": "str",
-        "description": "这是 Flask 应用的“主密码”，主要用于保护用户 Cookie、Session 数据不被篡改。在生产环境中，建议使用环境变量注入，避免直接硬编码在代码或数据库里。",
+        "description": (
+            "这是 Flask 应用的“主密码”，主要用于保护用户 Cookie、Session 数据不被篡改。"
+            "在生产环境中，建议使用环境变量注入，避免直接硬编码在代码或数据库里。"
+        ),
     },
     {
         "key": "API_TOKEN",
         "value": "5d0f1a51226e42a8b35908823eadfcab",
         "type": "str",
-        "description": "用于对外 API 接口鉴权的访问令牌，客户端需在请求头中携带此 Token 以通过身份验证，相当于接口的“钥匙”。如果你的后端接口需要被第三方或特定客户端调用，通常会校验这个 Token，防止接口被随意滥用。",
+        "description": (
+            "用于对外 API 接口鉴权的访问令牌，客户端需在请求头中携带此 Token 以通过身份验证，相当于接口的“钥匙”。"
+            "如果你的后端接口需要被第三方或特定客户端调用，通常会校验这个 Token，防止接口被随意滥用。"
+        ),
     },
     {
         "key": "ALLOWED_ORIGINS",
@@ -34,6 +40,15 @@ DEFAULT_CONFIG = [
         "value": "http://localhost:5173",
         "type": "str",
         "description": "前端地址",
+    },
+    {
+        "key": "MAIL_ENABLED",
+        "value": "True",
+        "type": "bool",
+        "description": (
+            "是否启用邮件发送。测试/开发环境可设为 False 屏蔽所有邮件；"
+            "即使为 True，若账号仍是默认占位符配置也会自动跳过发送。"
+        ),
     },
     {
         "key": "MAIL_SERVER",

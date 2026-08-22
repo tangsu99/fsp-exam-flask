@@ -1,6 +1,33 @@
 # Changelog
 
-## [0.2.4] (Developing)
+## [0.2.4] (2026-08-22)
+
+### Breaking Changes
+
+- 涉及数据库结构变更：新增 `responses.reject_reason` 字段，发布后需执行 `uv run flask --app main.py db upgrade` 迁移
+- 修复了已提交答卷被误标为超时的问题。若线上已有"已提交却被误标为超时"的答卷，需手动改回待审核：
+    ```sql
+    UPDATE responses SET is_reviewed = 0 WHERE is_completed = 1 AND is_reviewed = 3;
+    ```
+- 注册及管理后台新增 QQ 号格式校验，不再接受 `@qq.com` 邮箱格式
+
+### Features
+
+- 答卷审核支持填写拒绝理由，理由将随邮件发送给用户（新增 `responses.reject_reason` 字段，涉及数据库结构变更）
+- 支持关闭邮件提醒功能
+- 添加 github CI workflow
+- 邮件时间统一为东八区显示（答卷完成时间、考试批改日期、担保处理日期）
+
+### Refactor
+
+- 统一全部邮件模板样式：所有邮件继承 `mail_base.html` 母版（含网站 logo、统一页脚），邮件主题与正文大标题统一由代码单点定义
+
+### Bug Fixes
+
+- 修复答题问题
+- 修复不支持题目分数批改为 0 分的问题
+- 修复已提交答卷被误标记为超时的问题（仅"超时未提交"的答卷才标记为超时，已提交的保持待批改）
+- 注册及管理后台添加/修改用户时，校验 QQ 号不允许带 `@qq.com` 邮箱后缀
 
 ## [0.2.3] (2026-07-06)
 

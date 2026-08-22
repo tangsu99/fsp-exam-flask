@@ -109,6 +109,10 @@ def register():
     if not check_password_format(password):
         return jsonify({"code": 2, "desc": "密码不合法!"})
 
+    # 验证 QQ 号格式（QQ 号不能带邮箱后缀）
+    if "@qq.com" in user_qq.lower():
+        return jsonify({"code": 2, "desc": "请填写纯QQ号，不要带 @qq.com 后缀!"})
+
     # 验证 QQ 号
     stmt = select(User).where(User.user_qq == user_qq)
     existing_user = db.session.scalar(stmt)

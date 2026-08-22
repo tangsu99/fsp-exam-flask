@@ -160,6 +160,10 @@ def get_response_objective_question_score(user_response: list[str], question: Qu
     # 获取问题的正确选项,列表元素的值为正确选项的ID
     correct_options: list[int] = [option.id for option in question.options if option.is_correct]
 
+    # 未作答（空答案）计 0 分
+    if not user_response:
+        return 0.0
+
     if question.question_type == QuestionType.SINGLE_CHOICE.value:
         if int(user_response[0]) in correct_options:
             return question.score
@@ -193,14 +197,18 @@ def make_answer_details(
             )
             for answer in user_response
         ]
-    else:
-        return [
-            ResponseDetail(
-                response_id=response_id,
-                question_id=question_id,
-                answer=user_response[0],
-            )
-        ]
+
+    # 未作答（空答案）不生成答题详情
+    if not user_response:
+        return []
+
+    return [
+        ResponseDetail(
+            response_id=response_id,
+            question_id=question_id,
+            answer=user_response[0],
+        )
+    ]
 
 
 def user_answered_question(details: Sequence[ResponseDetail]) -> bool:

@@ -1,6 +1,6 @@
 [project]
 name = "fsp-exam-flask"
-version = "0.2.3"
+version = "0.2.4"
 description = "Minecraft FSP Server Website Backend system"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -28,6 +28,8 @@ dependencies = [
 
 [tool.ruff]
 line-length = 120
+
+[tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP"]
 ignore = ["F401"] # Imported but unused
 
@@ -50,3 +52,10 @@ venv = ".venv"
 typeCheckingMode = "strict"
 reportMissingTypeStubs = false
 reportMissingImports = false
+exclude = [
+    "migrations",
+    "**/node_modules",
+    "**/__pycache__",
+    "**/.*",
+    ".venv",
+]
