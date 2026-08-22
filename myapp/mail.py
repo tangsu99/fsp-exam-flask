@@ -61,31 +61,47 @@ def _format_cn_datetime(iso_str: str) -> str:
 
 
 def reset_password_mail(recipients: list[str], token: str) -> Message:
+    subject = "像素仙缘-密码重置"
     reset_password_url: str = current_app.config["RESET_PASSWORD_URL"]  # type: ignore[reportUnknownMemberType]
-    mail_msg = Message("重置密码", recipients=_recipients_list(recipients))
-    mail_msg.html = render_template("mail_reset_password.html", url=reset_password_url + token)
+    mail_msg = Message(subject, recipients=_recipients_list(recipients))
+    mail_msg.html = render_template("mail_reset_password.html", heading=subject, url=reset_password_url + token)
     return mail_msg
 
 
 def activation_mail(recipients: list[str], token: str) -> Message:
+    subject = "像素仙缘-账户激活"
     activation_url = current_app.config["ACTIVATION_URL"]  # type: ignore[reportUnknownMemberType]
-    mail_msg = Message("账户激活", recipients=_recipients_list(recipients))
-    mail_msg.html = render_template("mail_activation.html", url=activation_url + token)
+    mail_msg = Message(subject, recipients=_recipients_list(recipients))
+    mail_msg.html = render_template("mail_activation.html", heading=subject, url=activation_url + token)
     return mail_msg
 
 
 def survey_complete_mail(recipients: list[str], username: str, response_time: str, id_: int) -> Message:
+    subject = "像素仙缘-新的待批改答卷"
     url: str = current_app.config["FRONT_END_BASE_URL"] + "/admin/response?id=" + str(id_)  # type: ignore[reportUnknownMemberType]
-    mail_msg = Message("答卷完成", recipients=_recipients_list(recipients))
+    mail_msg = Message(subject, recipients=_recipients_list(recipients))
     mail_msg.html = render_template(
-        "mail_survey_complete.html", username=username, response_time=_format_cn_datetime(response_time), url=url
+        "mail_survey_complete.html",
+        heading=subject,
+        username=username,
+        response_time=_format_cn_datetime(response_time),
+        url=url,
     )
     return mail_msg
 
 
-def guarantee_result_mail(recipients: list[str], guarantor: str, result: bool) -> Message:
-    mail_msg = Message("担保结果", recipients=_recipients_list(recipients))
-    html_content = render_template("mail_guarantee_result.html", guarantor=guarantor, result=result)
+def guarantee_result_mail(
+    recipients: list[str], guarantor: str, result: bool, handle_time: str | None = None
+) -> Message:
+    subject = "像素仙缘-担保结果"
+    mail_msg = Message(subject, recipients=_recipients_list(recipients))
+    html_content = render_template(
+        "mail_guarantee_result.html",
+        heading=subject,
+        guarantor=guarantor,
+        result=result,
+        handle_time=_format_cn_datetime(handle_time) if handle_time else None,
+    )
     # 附加图片
     try:
         attach_image(mail_msg, "../static/images/qrcode_fsp.jpg", "qrcode")
@@ -98,8 +114,18 @@ def guarantee_result_mail(recipients: list[str], guarantor: str, result: bool) -
     return mail_msg
 
 
-def survey_result_mail(recipients: list[str], score: str, reason: str | None = None) -> Message:
+def survey_result_mail(
+    recipients: list[str], score: str, reason: str | None = None, review_time: str | None = None
+) -> Message:
+    subject = "像素仙缘-考试结果"
     url = current_app.config["FRONT_END_BASE_URL"] + "/Query/Examination"  # type: ignore[reportUnknownMemberType]
-    mail_msg = Message("考试结果", recipients=_recipients_list(recipients))
-    mail_msg.html = render_template("mail_survey_result.html", score=score, url=url, reason=reason)
+    mail_msg = Message(subject, recipients=_recipients_list(recipients))
+    mail_msg.html = render_template(
+        "mail_survey_result.html",
+        heading=subject,
+        score=score,
+        url=url,
+        reason=reason,
+        review_time=_format_cn_datetime(review_time) if review_time else None,
+    )
     return mail_msg

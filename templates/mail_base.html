@@ -1,0 +1,47 @@
+<div
+    style="
+        margin: 0 auto;
+        max-width: 600px;
+        padding: 24px 16px;
+        font-family: Arial, &quot;Microsoft YaHei&quot;, sans-serif;
+        background-color: #f4f6f8;
+    "
+>
+    <div
+        style="
+            background-color: #ffffff;
+            border-radius: 10px;
+            padding: 36px 28px;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+        "
+    >
+        <img
+            src="https://exam.fsp.ink/favicon.ico"
+            alt="像素仙缘"
+            style="
+                width: 48px;
+                height: 48px;
+                margin: 0 auto 12px;
+                display: block;
+            "
+        />
+        <h1 style="margin: 0 0 20px; font-size: 22px; color: #333333">
+            {% block heading %}像素仙缘{% endblock %}
+        </h1>
+        <div style="color: #555555; font-size: 14px; line-height: 1.7">
+            {% block content %}{% endblock %}
+        </div>
+    </div>
+    <p
+        style="
+            text-align: center;
+            color: #999999;
+            font-size: 12px;
+            margin-top: 18px;
+            line-height: 1.6;
+        "
+    >
+        {% block footer %}此邮件由像素仙缘系统自动发送，请勿回复。{% endblock %}
+    </p>
+</div>

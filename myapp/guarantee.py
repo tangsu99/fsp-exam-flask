@@ -248,7 +248,10 @@ def guarantee_user_action():
             db.session.commit()
 
             mail_msg = guarantee_result_mail(
-                [_guarantee.applicant_user.user_qq + "@qq.com"], _guarantee.guarantor.username, False
+                [_guarantee.applicant_user.user_qq + "@qq.com"],
+                _guarantee.guarantor.username,
+                False,
+                handle_time=datetime.now(UTC).isoformat(),
             )
             send_mail(APP, mail_msg)
 
@@ -272,7 +275,10 @@ def guarantee_user_action():
             db.session.commit()
 
             mail_msg = guarantee_result_mail(
-                [_guarantee.applicant_user.user_qq + "@qq.com"], _guarantee.guarantor.username, True
+                [_guarantee.applicant_user.user_qq + "@qq.com"],
+                _guarantee.guarantor.username,
+                True,
+                handle_time=datetime.now(UTC).isoformat(),
             )
             send_mail(APP, mail_msg)
 

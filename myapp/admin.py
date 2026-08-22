@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from typing import Any, cast
 
 from flask import Blueprint, jsonify, request
@@ -853,7 +854,10 @@ def reviewed_response():
         send_mail(
             APP,
             survey_result_mail(
-                [f"{resp.user.user_qq}@qq.com"], str(total_score), reason if status == ResponseStatus.REJECTED else None
+                [f"{resp.user.user_qq}@qq.com"],
+                str(total_score),
+                reason if status == ResponseStatus.REJECTED else None,
+                review_time=datetime.now(UTC).isoformat(),
             ),
         )
 
