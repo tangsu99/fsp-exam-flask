@@ -102,13 +102,14 @@ def guarantee_result_mail(
         result=result,
         handle_time=_format_cn_datetime(handle_time) if handle_time else None,
     )
-    # 附加图片
-    try:
-        attach_image(mail_msg, "../static/images/qrcode_fsp.jpg", "qrcode")
-    except Exception as e:
-        current_app.logger.warning(f"无法附加图片: {e}")
-        # 如果图片附加失败，使用备选文本
-        html_content = html_content.replace("cid:qrcode", "qrcode")
+    # 仅担保通过时附加加群二维码
+    if result:
+        try:
+            attach_image(mail_msg, "../static/images/qrcode_fsp.jpg", "qrcode")
+        except Exception as e:
+            current_app.logger.warning(f"无法附加图片: {e}")
+            # 如果图片附加失败，使用备选文本
+            html_content = html_content.replace("cid:qrcode", "qrcode")
 
     mail_msg.html = html_content
     return mail_msg
@@ -120,7 +121,7 @@ def survey_result_mail(
     subject = "像素仙缘-考试结果"
     url = current_app.config["FRONT_END_BASE_URL"] + "/Query/Examination"  # type: ignore[reportUnknownMemberType]
     mail_msg = Message(subject, recipients=_recipients_list(recipients))
-    mail_msg.html = render_template(
+    html_content = render_template(
         "mail_survey_result.html",
         heading=subject,
         score=score,
@@ -128,4 +129,14 @@ def survey_result_mail(
         reason=reason,
         review_time=_format_cn_datetime(review_time) if review_time else None,
     )
+    # 仅答卷通过（无拒绝理由）时附加加群二维码
+    if reason is None:
+        try:
+            attach_image(mail_msg, "../static/images/qrcode_fsp.jpg", "qrcode")
+        except Exception as e:
+            current_app.logger.warning(f"无法附加图片: {e}")
+            # 如果图片附加失败，使用备选文本
+            html_content = html_content.replace("cid:qrcode", "qrcode")
+
+    mail_msg.html = html_content
     return mail_msg
