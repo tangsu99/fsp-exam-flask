@@ -6,6 +6,10 @@
 
 - 答卷审核支持填写拒绝理由，理由将随邮件发送给用户（新增 `responses.reject_reason` 字段，涉及数据库结构变更）
 
+### Fixes
+
+- 修复答题问题
+
 ## [0.2.3] (2026-07-06)
 
 ### Features
@@ -20,7 +24,7 @@
 - 重构问卷和阅卷相关代码
 - OPTIONS 预检请求统一返回 204
 
-### Bug Fixes
+### Fixes
 
 - 修复 `/admin/config/set` 的字段问题
 - 修复 `/admin/survey/<int:sid>` 和 `/survey/survey/<int:sid>` 中图片列表的字段错误
