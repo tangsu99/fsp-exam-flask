@@ -1,0 +1,52 @@
+name: CI
+
+on:
+    push:
+        branches: [dev, main, master]
+    pull_request:
+
+jobs:
+    lint:
+        name: Lint & Format
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+            - uses: astral-sh/setup-uv@v5
+              with:
+                  enable-cache: true
+            - name: Install dependencies
+              run: uv sync --dev
+            - name: Ruff lint
+              run: uv run ruff check .
+            - name: Ruff format check
+              run: uv run ruff format --check .
+
+    type-check:
+        name: Type check (pyright)
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+            # pyright pip 包运行依赖 Node.js
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 20
+            - uses: astral-sh/setup-uv@v5
+              with:
+                  enable-cache: true
+            - name: Install dependencies
+              run: uv sync --dev
+            - name: Pyright
+              run: uv run pyright
+
+    test:
+        name: Tests
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+            - uses: astral-sh/setup-uv@v5
+              with:
+                  enable-cache: true
+            - name: Install dependencies
+              run: uv sync --dev
+            - name: Run pytest (with coverage)
+              run: uv run pytest
