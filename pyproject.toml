@@ -28,6 +28,8 @@ dependencies = [
 
 [tool.ruff]
 line-length = 120
+
+[tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP"]
 ignore = ["F401"] # Imported but unused
 
@@ -50,3 +52,4 @@ venv = ".venv"
 typeCheckingMode = "strict"
 reportMissingTypeStubs = false
 reportMissingImports = false
+exclude = ["migrations", "**/__pycache__", "**/.*"]

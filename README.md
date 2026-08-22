@@ -48,6 +48,14 @@ uv run flask --app main.py db upgrade
 uv run pytest
 ```
 
+### Code Quality
+
+```shell
+uv run pyright       # type-check
+uv run ruff check    # lint
+uv run ruff format   # format
+```
+
 ## Database Schema Sync
 
 Compare the DDL differences between two databases (e.g., development vs. production) and generate synchronization SQL.

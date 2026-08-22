@@ -1,0 +1,56 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "type-check",
+            "type": "shell",
+            "command": "uv run pyright",
+            "group": "build",
+            "problemMatcher": [],
+            "detail": "Run pyright type checking (strict)"
+        },
+        {
+            "label": "lint",
+            "type": "shell",
+            "command": "uv run ruff check",
+            "group": "build",
+            "problemMatcher": [],
+            "detail": "Lint with ruff"
+        },
+        {
+            "label": "lint:fix",
+            "type": "shell",
+            "command": "uv run ruff check --fix",
+            "group": "build",
+            "problemMatcher": [],
+            "detail": "Lint with ruff and auto-fix"
+        },
+        {
+            "label": "format",
+            "type": "shell",
+            "command": "uv run ruff format",
+            "group": "build",
+            "problemMatcher": [],
+            "detail": "Format code with ruff"
+        },
+        {
+            "label": "format:check",
+            "type": "shell",
+            "command": "uv run ruff format --check",
+            "group": "build",
+            "problemMatcher": [],
+            "detail": "Check formatting without modifying files"
+        },
+        {
+            "label": "test",
+            "type": "shell",
+            "command": "uv run pytest",
+            "group": {
+                "kind": "test",
+                "isDefault": true
+            },
+            "problemMatcher": [],
+            "detail": "Run pytest test suite"
+        }
+    ]
+}

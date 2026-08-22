@@ -1,4 +1,6 @@
+from collections.abc import Mapping
 from threading import Thread
+from typing import BinaryIO, cast
 
 from flask import Flask, current_app, render_template
 from flask_mail import Message
@@ -7,8 +9,10 @@ from myapp import mail as flask_mail_app
 
 
 def attach_image(msg: Message, image_path: str, cid: str):
-    with current_app.open_resource(image_path) as fp:
-        msg.attach(cid, "image/jpeg", fp.read(), headers={"Content-ID": cid})
+    fp = cast(BinaryIO, current_app.open_resource(image_path))
+    with fp:
+        data: bytes = fp.read()
+        msg.attach(cid, "image/jpeg", data, headers={"Content-ID": cid})
 
 
 def send_async_mail(app: Flask, mail_msg: Message):
@@ -22,10 +26,11 @@ def _is_mail_configured(app: Flask) -> bool:
     - MAIL_ENABLED 显式关闭时返回 False
     - 账号/密码为空，或仍是默认占位符（your_*）时视为未配置，返回 False
     """
-    if not app.config.get("MAIL_ENABLED", True):
+    config = cast("Mapping[str, object]", app.config)
+    if not cast(bool, config.get("MAIL_ENABLED", True)):
         return False
-    username: str = app.config.get("MAIL_USERNAME", "") or ""
-    password: str = app.config.get("MAIL_PASSWORD", "") or ""
+    username: str = str(config.get("MAIL_USERNAME", "") or "")
+    password: str = str(config.get("MAIL_PASSWORD", "") or "")
     if not username or not password:
         return False
     if username.startswith("your_") or password.startswith("your_"):
@@ -40,23 +45,28 @@ def send_mail(app: Flask, mail_msg: Message):
     return Thread(target=send_async_mail, args=[app, mail_msg]).start()
 
 
+def _recipients_list(recipients: list[str]) -> "list[str | tuple[str, str]]":
+    """转换收件人列表类型以匹配 flask_mail Message 的签名"""
+    return cast("list[str | tuple[str, str]]", recipients)
+
+
 def reset_password_mail(recipients: list[str], token: str) -> Message:
     reset_password_url: str = current_app.config["RESET_PASSWORD_URL"]  # type: ignore[reportUnknownMemberType]
-    mail_msg = Message("重置密码", recipients=recipients)
+    mail_msg = Message("重置密码", recipients=_recipients_list(recipients))
     mail_msg.html = render_template("mail_reset_password.html", url=reset_password_url + token)
     return mail_msg
 
 
 def activation_mail(recipients: list[str], token: str) -> Message:
     activation_url = current_app.config["ACTIVATION_URL"]  # type: ignore[reportUnknownMemberType]
-    mail_msg = Message("账户激活", recipients=recipients)
+    mail_msg = Message("账户激活", recipients=_recipients_list(recipients))
     mail_msg.html = render_template("mail_activation.html", url=activation_url + token)
     return mail_msg
 
 
 def survey_complete_mail(recipients: list[str], username: str, response_time: str, id_: int) -> Message:
     url: str = current_app.config["FRONT_END_BASE_URL"] + "/admin/response?id=" + str(id_)  # type: ignore[reportUnknownMemberType]
-    mail_msg = Message("答卷完成", recipients=recipients)
+    mail_msg = Message("答卷完成", recipients=_recipients_list(recipients))
     mail_msg.html = render_template(
         "mail_survey_complete.html", username=username, response_time=response_time, url=url
     )
@@ -64,7 +74,7 @@ def survey_complete_mail(recipients: list[str], username: str, response_time: st
 
 
 def guarantee_result_mail(recipients: list[str], guarantor: str, result: bool) -> Message:
-    mail_msg = Message("担保结果", recipients=recipients)
+    mail_msg = Message("担保结果", recipients=_recipients_list(recipients))
     html_content = render_template("mail_guarantee_result.html", guarantor=guarantor, result=result)
     # 附加图片
     try:
@@ -80,6 +90,6 @@ def guarantee_result_mail(recipients: list[str], guarantor: str, result: bool) -
 
 def survey_result_mail(recipients: list[str], score: str, reason: str | None = None) -> Message:
     url = current_app.config["FRONT_END_BASE_URL"] + "/Query/Examination"  # type: ignore[reportUnknownMemberType]
-    mail_msg = Message("考试结果", recipients=recipients)
+    mail_msg = Message("考试结果", recipients=_recipients_list(recipients))
     mail_msg.html = render_template("mail_survey_result.html", score=score, url=url, reason=reason)
     return mail_msg

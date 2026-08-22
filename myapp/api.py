@@ -63,22 +63,26 @@ def report_users_info():
     if not isinstance(data, dict):
         return jsonify({"code": 1, "desc": "请求数据格式错误"}), 400
 
-    online_players = data.get("onlinePlayers")
+    data_map = cast("dict[str, object]", data)
+    raw_online_players = data_map.get("onlinePlayers")
 
-    if not isinstance(online_players, list):
+    if not isinstance(raw_online_players, list):
         return jsonify({"code": 1, "desc": "字段类型错误"}), 400
 
-    mc_users_info["online_players"] = []
-
-    for player in online_players:
+    player_list = cast("list[object]", raw_online_players)
+    players: list[dict[str, str]] = []
+    for player in player_list:
         if not isinstance(player, dict):
             continue
-        mc_users_info["online_players"].append(
+        player_map = cast("dict[str, object]", player)
+        players.append(
             {
-                "playerName": player.get("playerName", ""),
-                "playerUuid": player.get("playerUuid", ""),
-                "currentServer": player.get("currentServer", ""),
+                "playerName": str(player_map.get("playerName", "")),
+                "playerUuid": str(player_map.get("playerUuid", "")),
+                "currentServer": str(player_map.get("currentServer", "")),
             }
         )
+
+    mc_users_info["online_players"] = players
 
     return jsonify({"code": 0, "desc": "上报成功"})

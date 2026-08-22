@@ -83,7 +83,7 @@ def parse_tables(ddl_text: str) -> dict[str, str]:
 def extract_columns(ddl: str) -> dict[str, str]:
     """提取表中的列定义（排除索引、约束等）"""
     body = ddl[ddl.index("(") + 1 : ddl.rindex(")")]
-    result = {}
+    result: dict[str, str] = {}
     for line in body.split(",\n"):
         line = line.strip().rstrip(",")
         if not line:
@@ -102,7 +102,7 @@ def extract_columns(ddl: str) -> dict[str, str]:
 def extract_indexes(ddl: str) -> list[str]:
     """提取索引和约束定义"""
     body = ddl[ddl.index("(") + 1 : ddl.rindex(")")]
-    result = []
+    result: list[str] = []
     for line in body.split(",\n"):
         line = line.strip().rstrip(",")
         if not line:
@@ -125,7 +125,7 @@ def compare(source_file: str, target_file: str) -> str:
     src_tables = parse_tables(source_ddl)
     tgt_tables = parse_tables(target_ddl)
 
-    output = []
+    output: list[str] = []
     output.append("-- =============================================")
     output.append("-- 数据库结构同步 SQL")
     output.append(f"-- 源库: {source_file}")
@@ -183,9 +183,6 @@ def compare(source_file: str, target_file: str) -> str:
                     name = m_key.group(2)
                     if kw == "CONSTRAINT":
                         # 外键约束，从原 DDL 提取
-                        fk_match = re.search(
-                            r"FOREIGN KEY\s*\(`?(\w+)`?\)\s*REFERENCES\s*`?(\w+)`?\s*\(`?(\w+)`?\)", idx
-                        )
                         ref_match = re.search(r"REFERENCES\s*`?(\w+)`?\s*\(`?(\w+)`?\)", idx)
                         on_delete = re.search(r"ON DELETE (\w+)", idx)
                         if ref_match:
@@ -193,7 +190,10 @@ def compare(source_file: str, target_file: str) -> str:
                             ref_col = ref_match.group(2)
                             fk_col_match = re.search(r"FOREIGN KEY\s*\(`?(\w+)`?\)", idx)
                             fk_col = fk_col_match.group(1) if fk_col_match else ""
-                            sql = f"ALTER TABLE `{t}` ADD CONSTRAINT `{name}` FOREIGN KEY (`{fk_col}`) REFERENCES `{ref_table}` (`{ref_col}`)"
+                            sql = (
+                                f"ALTER TABLE `{t}` ADD CONSTRAINT `{name}` FOREIGN KEY (`{fk_col}`) "
+                                f"REFERENCES `{ref_table}` (`{ref_col}`)"
+                            )
                             if on_delete:
                                 sql += f" ON DELETE {on_delete.group(1)}"
                             sql += ";"
@@ -275,9 +275,10 @@ def main():
     source_file = args.source_dump
     target_file = args.target_dump
 
+    tmp_dir = Path("_ddl_cache")
+
     if args.source and args.target:
         # 自动导出 DDL
-        tmp_dir = Path("_ddl_cache")
         tmp_dir.mkdir(exist_ok=True)
 
         source_file = str(tmp_dir / "source_ddl.sql")
