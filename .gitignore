@@ -15,5 +15,4 @@ htmlcov/
 .pytest_cache/
 
 .idea/dataSources.xml
-migrations/versions/
 migrations/__pycache__/
