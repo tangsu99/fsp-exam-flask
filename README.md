@@ -26,18 +26,20 @@ DATABASE_URL=mysql+pymysql://root:123456@localhost:3306/fsp_exam
 
 ### Database
 
+> 本项目使用 uv 管理环境，所有 `flask` 命令请通过 `uv run flask` 执行（直接运行 `flask` 会因未激活虚拟环境而报 "flask 命令找不到"）。
+
 - Initial
 
 ```
-flask --app main.py db init
-flask --app main.py db migrate -m "Initial migration."
+uv run flask --app main.py db init
+uv run flask --app main.py db migrate -m "Initial migration."
 ```
 
 - Migration Database
 
 ```
-flask --app main.py db migrate -m "xxx update."
-flask --app main.py db upgrade
+uv run flask --app main.py db migrate -m "xxx update."
+uv run flask --app main.py db upgrade
 ```
 
 ### Test
@@ -59,22 +61,22 @@ Compare the DDL differences between two databases (e.g., development vs. product
 
 ```shell
 # Option 1: Compare two live databases directly
-python scripts/sync_db_schema.py \
+uv run python scripts/sync_db_schema.py \
     --source root:pass@localhost:3306/dev_db \
     --target root:pass@prod_host:3306/prod_db
 
 # Option 2: Compare from existing DDL dump files
 mysqldump -u root -p --no-data dev_db > dev_ddl.sql
 mysqldump -u root -p --no-data prod_db > prod_ddl.sql
-python scripts/sync_db_schema.py \
+uv run python scripts/sync_db_schema.py \
     --source-dump dev_ddl.sql \
     --target-dump prod_ddl.sql
 
 # Option 3: Only dump DDL for a single database
-python scripts/sync_db_schema.py --dump-only root:pass@localhost:3306/mydb
+uv run python scripts/sync_db_schema.py --dump-only root:pass@localhost:3306/mydb
 
 # Save output to a file
-python scripts/sync_db_schema.py \
+uv run python scripts/sync_db_schema.py \
     --source root:pass@localhost:3306/dev_db \
     --target root:pass@prod_host:3306/prod_db \
     -o sync.sql

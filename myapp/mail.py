@@ -58,8 +58,8 @@ def guarantee_result_mail(recipients: list[str], guarantor: str, result: bool) -
     return mail_msg
 
 
-def survey_result_mail(recipients: list[str], score: str) -> Message:
+def survey_result_mail(recipients: list[str], score: str, reason: str | None = None) -> Message:
     url = current_app.config["FRONT_END_BASE_URL"] + "/Query/Examination"  # type: ignore[reportUnknownMemberType]
     mail_msg = Message("考试结果", recipients=recipients)
-    mail_msg.html = render_template("mail_survey_result.html", score=score, url=url)
+    mail_msg.html = render_template("mail_survey_result.html", score=score, url=url, reason=reason)
     return mail_msg
