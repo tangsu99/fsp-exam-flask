@@ -5,6 +5,7 @@
 ### Features
 
 - 答卷审核支持填写拒绝理由，理由将随邮件发送给用户（新增 `responses.reject_reason` 字段，涉及数据库结构变更）
+- 支持关闭邮件提醒功能
 
 ### Fixes
 
