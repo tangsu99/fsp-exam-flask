@@ -603,7 +603,8 @@ def get_surveys():
             expired = is_survey_response_expired(i)
             if expired is False and i.is_completed is False:
                 not_completed_count += 1
-            if expired and i.is_reviewed == ResponseStatus.PENDING:
+            # 仅"超时未提交"的答卷标记为超时，已提交的保持待批改
+            if expired and not i.is_completed:
                 i.is_completed = True
                 i.is_reviewed = ResponseStatus.TIMEOUT
                 db.session.commit()
@@ -648,8 +649,8 @@ def get_responses():
     response_list: list[dict[str, Any]] = []
 
     for res in items:
-        # 刷新一下是否过期（仅未审核的答卷标记为超时）
-        if is_survey_response_expired(res) and res.is_reviewed == ResponseStatus.PENDING:
+        # 仅"超时未提交"的答卷标记为超时，已提交的保持待批改
+        if is_survey_response_expired(res) and not res.is_completed:
             res.is_completed = True
             res.is_reviewed = ResponseStatus.TIMEOUT
             db.session.commit()
