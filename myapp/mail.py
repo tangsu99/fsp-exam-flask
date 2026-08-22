@@ -1,4 +1,5 @@
 from collections.abc import Mapping
+from datetime import UTC, datetime, timedelta, timezone
 from threading import Thread
 from typing import BinaryIO, cast
 
@@ -50,6 +51,15 @@ def _recipients_list(recipients: list[str]) -> "list[str | tuple[str, str]]":
     return cast("list[str | tuple[str, str]]", recipients)
 
 
+def _format_cn_datetime(iso_str: str) -> str:
+    """将 ISO 时间字符串格式化为东八区时间，例如 2026-08-22 14:51 (UTC + 8 )"""
+    dt = datetime.fromisoformat(iso_str)
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=UTC)
+    cn_tz = timezone(timedelta(hours=8))
+    return dt.astimezone(cn_tz).strftime("%Y-%m-%d %H:%M (UTC + 8 )")
+
+
 def reset_password_mail(recipients: list[str], token: str) -> Message:
     reset_password_url: str = current_app.config["RESET_PASSWORD_URL"]  # type: ignore[reportUnknownMemberType]
     mail_msg = Message("重置密码", recipients=_recipients_list(recipients))
@@ -68,7 +78,7 @@ def survey_complete_mail(recipients: list[str], username: str, response_time: st
     url: str = current_app.config["FRONT_END_BASE_URL"] + "/admin/response?id=" + str(id_)  # type: ignore[reportUnknownMemberType]
     mail_msg = Message("答卷完成", recipients=_recipients_list(recipients))
     mail_msg.html = render_template(
-        "mail_survey_complete.html", username=username, response_time=response_time, url=url
+        "mail_survey_complete.html", username=username, response_time=_format_cn_datetime(response_time), url=url
     )
     return mail_msg
 
