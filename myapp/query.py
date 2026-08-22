@@ -53,6 +53,7 @@ def response():
                 "state": res.is_reviewed,
                 "get_score": get_score,
                 "full_score": full_score,
+                "reject_reason": res.reject_reason,
             }
         )
 
