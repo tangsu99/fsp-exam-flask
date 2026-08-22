@@ -1,5 +1,11 @@
-<div style="text-align: center">
-    <h1>像素仙缘-账户激活</h1>
-    <p>请10分钟内前往此链接激活您的账户！</p>
-    <p><b><a href="{{url}}">{{ url }}</a></b></p>
-</div>
+{% extends "mail_base.html" %} {% block heading %}{{ heading }}{% endblock %} {%
+block content %}
+<p>请10分钟内前往此链接激活您的账户！</p>
+<p>
+    <b
+        ><a href="{{ url }}" style="color: #1890ff; word-break: break-all"
+            >{{ url }}</a
+        ></b
+    >
+</p>
+{% endblock %}

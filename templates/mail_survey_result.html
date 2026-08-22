@@ -1,10 +1,20 @@
-<div style="text-align: center">
-    <h1>像素仙缘-考试结果</h1>
-    <p>您的成绩</p>
-    <p style="font-size: 3em; font-weight: 600">{{ score }}<span style="font-size: .8em">分</span></p>
-    {% if reason %}
-    <p style="color: #d9534f">很遗憾，您的答卷未通过审核</p>
-    <p style="color: #d9534f">拒绝理由：{{ reason }}</p>
-    {% endif %}
-    <p>前往此页面进一步查询<b><a href="{{url}}">{{ url }}</a></b></p>
-</div>
+{% extends "mail_base.html" %} {% block heading %}{{ heading }}{% endblock %} {%
+block content %}
+<p>您的成绩</p>
+<p style="font-size: 3em; font-weight: 600; margin: 8px 0">
+    {{ score }}<span style="font-size: 0.8em">分</span>
+</p>
+{% if reason %}
+<p style="color: #d9534f">很遗憾，您的答卷未通过审核</p>
+<p style="color: #d9534f">拒绝理由：{{ reason }}</p>
+{% endif %} {% if review_time %}
+<p>批改日期：{{ review_time }}</p>
+{% endif %}
+<p>
+    前往此页面进一步查询<b
+        ><a href="{{ url }}" style="color: #1890ff; word-break: break-all"
+            >{{ url }}</a
+        ></b
+    >
+</p>
+{% endblock %}

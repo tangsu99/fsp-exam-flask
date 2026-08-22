@@ -7,9 +7,13 @@
 - 答卷审核支持填写拒绝理由，理由将随邮件发送给用户（新增 `responses.reject_reason` 字段，涉及数据库结构变更）
 - 支持关闭邮件提醒功能
 - 添加 github CI workflow
-- 答卷完成邮件展示东八区完成时间，并在邮件末尾注明收信原因与"请勿回复"
+- 邮件时间统一为东八区显示（答卷完成时间、考试批改日期、担保处理日期）
 
-### Fixes
+### Refactor
+
+- 统一全部邮件模板样式：所有邮件继承 `mail_base.html` 母版（含网站 logo、统一页脚），邮件主题与正文大标题统一由代码单点定义
+
+### Bug Fixes
 
 - 修复答题问题
 - 修复不支持题目分数批改为 0 分的问题
@@ -29,7 +33,7 @@
 - 重构问卷和阅卷相关代码
 - OPTIONS 预检请求统一返回 204
 
-### Fixes
+### Bug Fixes
 
 - 修复 `/admin/config/set` 的字段问题
 - 修复 `/admin/survey/<int:sid>` 和 `/survey/survey/<int:sid>` 中图片列表的字段错误
