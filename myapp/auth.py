@@ -11,7 +11,7 @@ from flask_login import (
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
-from myapp import APP, db
+from myapp import APP, db, limiter
 from myapp.db_model import ActivationToken, RegistrationLimit, ResetPasswordToken, Token, User, UserStatus
 from myapp.mail import activation_mail, reset_password_mail, send_mail
 from myapp.utils import check_password_format, validate_username
@@ -20,6 +20,8 @@ auth = Blueprint("auth", __name__)
 
 
 @auth.route("/login", methods=["POST"])
+@limiter.limit("5 per minute")  # 登录限速：同一 IP 每分钟最多 5 次尝试
+@limiter.limit("20 per hour")  # 同一 IP 每小时最多 20 次尝试
 def login():
     req_data: dict[str, str] | None = request.json
     if req_data:

@@ -7,6 +7,7 @@ from flask import Flask, Request, Response, jsonify, request
 from flask_apscheduler import APScheduler
 from flask_bcrypt import Bcrypt
 from flask_cors import CORS
+from flask_limiter import Limiter
 from flask_login import LoginManager
 from flask_mail import Mail
 from flask_migrate import Migrate
@@ -26,6 +27,21 @@ migrate = Migrate()
 bcrypt: Bcrypt = Bcrypt()
 mail: Mail = Mail()
 cors = CORS()
+
+
+def _limiter_key_func() -> str:
+    """限流 key：优先取 X-Forwarded-For 第一个值（适配反向代理），否则用 remote_addr"""
+    forwarded = request.headers.get("X-Forwarded-For")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.remote_addr or "unknown"
+
+
+limiter: Limiter = Limiter(
+    key_func=_limiter_key_func,
+    default_limits=[],
+    storage_uri="memory://",  # 内存存储，单进程小项目足够；多 worker 部署如需精确限速需换共享存储
+)
 
 
 APP: Flask
@@ -70,6 +86,7 @@ def create_app():
     migrate.init_app(app, db)
     bcrypt.init_app(app)  # type: ignore[reportUnknownMemberType]
     mail.init_app(app)
+    limiter.init_app(app)  # type: ignore[reportUnknownMemberType]
 
     # Flask debug 模式的 reloader 会启动两个进程，只在子进程中启动 scheduler 避免重复执行
     if not app.debug or os.environ.get("WERKZEUG_RUN_MAIN"):
