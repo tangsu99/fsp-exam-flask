@@ -350,19 +350,25 @@ def revoke_token(token: str):
         db.session.commit()
 
 
-def is_token_revoked(token: str):
+def is_token_revoked(token: str) -> bool:
+    """Token 是否已失效：数据库记录不存在（logout 删除）或标记了 is_revoked 均视为已吊销"""
     token_record = db.session.scalar(select(Token).where(Token.token == token))
-    if token_record and token_record.is_revoked:
-        return True
-    return False
+    return token_record is None or token_record.is_revoked
 
 
 def verify_token(token: str, secret_key: str) -> int:
+    """验证 JWT 签名，并检查数据库中的吊销状态（与 request_loader 保持一致）。
+
+    返回：user_id 有效；-1 过期；0 无效；2 已吊销/已删除
+    """
     try:
         payload = jwt.decode(token, secret_key, algorithm="HS256")  # type: ignore[reportUnknownMemberType]
         user_id = payload["user_id"]
-        return user_id
     except jwt.ExpiredSignatureError:
         return -1  # Token 过期
     except jwt.InvalidTokenError:
         return 0  # 无效 Token
+
+    if is_token_revoked(token):
+        return 2  # 已吊销/已删除
+    return user_id
