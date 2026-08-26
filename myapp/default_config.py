@@ -1,14 +1,5 @@
 DEFAULT_CONFIG = [
     {
-        "key": "SECRET_KEY",
-        "value": "c4329f5e3bc9daf6cd2b82bf9355a5d2",
-        "type": "str",
-        "description": (
-            "这是 Flask 应用的“主密码”，主要用于保护用户 Cookie、Session 数据不被篡改。"
-            "在生产环境中，建议使用环境变量注入，避免直接硬编码在代码或数据库里。"
-        ),
-    },
-    {
         "key": "API_TOKEN",
         "value": "5d0f1a51226e42a8b35908823eadfcab",
         "type": "str",

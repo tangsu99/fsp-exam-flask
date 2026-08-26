@@ -1,3 +1,7 @@
+import logging
+import os
+import secrets
+
 from attr.converters import to_bool
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
@@ -5,6 +9,8 @@ from sqlalchemy import select
 
 from myapp.db_model import ConfigModel
 from myapp.default_config import DEFAULT_CONFIG
+
+logger = logging.getLogger(__name__)
 
 
 class Config:
@@ -26,6 +32,9 @@ class Config:
         """
 
         with self.app.app_context():
+            # SECRET_KEY 完全由环境变量/随机生成提供，不落库，清除数据库中遗留的记录
+            self.__purge_secret_key_from_db()
+
             for default_config_item in DEFAULT_CONFIG:
                 stmt = select(ConfigModel).where(ConfigModel.key == default_config_item.get("key"))
                 conf: ConfigModel | None = self.db.session.execute(stmt).scalar_one_or_none()
@@ -52,6 +61,38 @@ class Config:
 
             for key, value, type_ in rows:
                 self.app.config[key] = self.type_conversion(value, type_)
+
+        # 敏感密钥优先从环境变量注入，不落数据库
+        self.__apply_secret_key()
+
+    def __purge_secret_key_from_db(self) -> None:
+        """清除数据库中遗留的 SECRET_KEY 配置记录（SECRET_KEY 由环境变量/随机生成提供，不落库）"""
+        stmt = select(ConfigModel).where(ConfigModel.key == "SECRET_KEY")
+        legacy_records = self.db.session.execute(stmt).scalars().all()
+        if legacy_records:
+            for record in legacy_records:
+                self.db.session.delete(record)
+            self.db.session.commit()
+            logger.warning("已清除数据库中遗留的 SECRET_KEY 配置记录，SECRET_KEY 改为环境变量注入")
+
+    def __apply_secret_key(self) -> None:
+        """
+        SECRET_KEY 解析策略：
+        1. 优先从环境变量 SECRET_KEY 注入（稳定持久，推荐）
+        2. 未设置时，每次启动随机生成临时 key（重启后所有登录态失效），
+           绝不复用默认/弱值，也不写入数据库
+        """
+        env_secret = os.environ.get("SECRET_KEY", "").strip()
+        if env_secret:
+            self.app.config["SECRET_KEY"] = env_secret
+            return
+
+        temp_secret = secrets.token_hex(32)
+        self.app.config["SECRET_KEY"] = temp_secret
+        logger.warning(
+            "未检测到环境变量 SECRET_KEY，已生成临时随机密钥（进程重启后所有登录态失效）。"
+            "生产环境请通过环境变量 SECRET_KEY 提供固定密钥。"
+        )
 
     def get_item(self, key: str) -> dict[str, str] | None:
         stmt = select(ConfigModel).where(ConfigModel.key == key)
