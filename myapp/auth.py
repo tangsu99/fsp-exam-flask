@@ -1,3 +1,5 @@
+import secrets
+import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -17,6 +19,9 @@ from myapp.mail import activation_mail, reset_password_mail, send_mail
 from myapp.utils import check_password_format, validate_username
 
 auth = Blueprint("auth", __name__)
+
+# JWT 签发方标识
+JWT_ISSUER = "fsp-exam"
 
 
 @auth.route("/login", methods=["POST"])
@@ -290,7 +295,8 @@ def activation():
 
 def send_activation_mail(user: User):
     with APP.app_context():
-        token = generate_token(user)
+        # 邮件 token 仅用于数据库查找（不解码/不验签），用不透明随机串即可，无需 JWT
+        token = secrets.token_urlsafe(32)
         db.session.add(ActivationToken(user_id=user.id, token=token))
         db.session.commit()
         msg = activation_mail([f"{user.user_qq}@qq.com"], token)
@@ -299,7 +305,8 @@ def send_activation_mail(user: User):
 
 def send_reset_password(user: User):
     with APP.app_context():
-        token = generate_token(user)
+        # 邮件 token 仅用于数据库查找（不解码/不验签），用不透明随机串即可，无需 JWT
+        token = secrets.token_urlsafe(32)
         db.session.add(ResetPasswordToken(user.id, token))
         db.session.commit()
         msg = reset_password_mail([f"{user.user_qq}@qq.com"], token)
@@ -322,9 +329,18 @@ def record_ip_registration(ip: str):
 
 
 def generate_token(user: User, expires_in: int = 3600) -> str:
+    """生成 JWT 令牌。
+
+    expires_in：过期时间（秒），默认 3600 秒 = 1 小时。
+    携带标准声明：user_id（主体）、iss（签发方）、iat（签发时间）、exp（过期时间）、jti（唯一标识）。
+    """
+    now = datetime.now(UTC)
     payload: dict[str, Any] = {
         "user_id": user.id,
-        "exp": datetime.now(UTC) + timedelta(hours=expires_in * 24),
+        "iss": JWT_ISSUER,
+        "iat": now,
+        "exp": now + timedelta(seconds=expires_in),
+        "jti": uuid.uuid4().hex,
     }
     secret_key: str = current_app.config["SECRET_KEY"]  # type: ignore[reportUnknownVariableType]
     token: str = jwt.encode(payload, secret_key, algorithm="HS256")  # type: ignore[reportUnknownMemberType]
@@ -362,7 +378,8 @@ def verify_token(token: str, secret_key: str) -> int:
     返回：user_id 有效；-1 过期；0 无效；2 已吊销/已删除
     """
     try:
-        payload = jwt.decode(token, secret_key, algorithm="HS256")  # type: ignore[reportUnknownMemberType]
+        # 注意：pyjwt 的 decode 参数是 algorithms（复数），encode 才是 algorithm（单数）
+        payload = jwt.decode(token, secret_key, algorithms=["HS256"])  # type: ignore[reportUnknownMemberType]
         user_id = payload["user_id"]
     except jwt.ExpiredSignatureError:
         return -1  # Token 过期
