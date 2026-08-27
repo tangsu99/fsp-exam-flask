@@ -79,7 +79,10 @@ def create_app():
             r"/*": {
                 "origins": app.config["ALLOWED_ORIGINS"],
                 "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-                "allow_headers": ["Content-Type", "Authorization"],
+                # iOS Safari/WebKit 的 CORS 预检会把 user-agent 列入 Access-Control-Request-Headers，
+                # 白名单不含它会导致预检失败（仅 Safari 系报 "User-Agent not allowed"）。
+                # 显式放行 User-Agent 以兼容 Safari（也可直接改用 "*"）。
+                "allow_headers": ["Content-Type", "Authorization", "User-Agent"],
             }
         },
     )

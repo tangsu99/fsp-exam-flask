@@ -18,6 +18,10 @@
 - 邮件激活/重置密码 token 不再使用 JWT，改用 `secrets.token_urlsafe(32)` 生成短小的不透明随机串（验证路径本就仅按 token 查库、不验签），链接更短且无法被解码
 - 修复 `verify_token` 中 `jwt.decode` 参数错误（误用单数 `algorithm`，应为复数 `algorithms`），此前该函数实际无法完成验签、恒返回"无效 token"；该问题由新增单元测试发现并验证
 
+### Bug Fixes
+
+- 修复 iOS Safari/WebKit 的 CORS 预检失败问题：Safari 系浏览器的预检请求会在 `Access-Control-Request-Headers` 中携带 `User-Agent`，原先的白名单不含它导致预检被拒（报 "User-Agent not allowed"），现已显式放行 `User-Agent` (#13)
+
 ### Tests
 
 - 新增认证安全单元测试（发送环节通过 mock 屏蔽，无需配置邮件服务器），覆盖：`SECRET_KEY` 解析（环境变量优先 / 随机兜底 / 清理遗留记录）、登录接口限速（同一 IP 超限返回 429）、`verify_token` 与 `request_loader` 的吊销/删除/过期校验、JWT 标准声明与过期时间、邮件 token 格式
