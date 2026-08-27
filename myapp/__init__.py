@@ -167,7 +167,9 @@ def create_app():
             response.headers["Access-Control-Allow-Origin"] = origin
 
         response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
-        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+        # 注意：此处的硬编码列表会覆盖 flask-cors 的 allow_headers 配置，必须与上方 cors.init_app 保持一致。
+        # iOS Safari/WebKit 预检会携带 user-agent，放行 User-Agent 才能通过预检。
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, User-Agent"
         return response
 
     return app

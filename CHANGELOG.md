@@ -29,7 +29,7 @@
 
 ### Bug Fixes
 
-- 修复 iOS Safari/WebKit 的 CORS 预检失败问题：Safari 系浏览器的预检请求会在 `Access-Control-Request-Headers` 中携带 `User-Agent`，原先的白名单不含它导致预检被拒（报 "User-Agent not allowed"），现已显式放行 `User-Agent` (#13)
+- 修复 iOS Safari/WebKit 的 CORS 预检失败问题：Safari 系浏览器的预检请求会在 `Access-Control-Request-Headers` 中携带 `User-Agent`，而 `after_request` 钩子硬编码的 `Access-Control-Allow-Headers` 白名单不含它导致预检被拒（报 "User-Agent not allowed"），现已放行 `User-Agent` (#13)
 
 ### Tests
 
