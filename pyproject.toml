@@ -1,6 +1,6 @@
 [project]
 name = "fsp-exam-flask"
-version = "0.2.4"
+version = "0.2.5"
 description = "Minecraft FSP Server Website Backend system"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -9,6 +9,7 @@ dependencies = [
     "flask-apscheduler>=1.13.1",
     "flask-bcrypt==1.0.1",
     "flask-cors>=5.0.0",
+    "flask-limiter>=4.1.1",
     "flask-login==0.6.3",
     "flask-mail>=0.10.0",
     "flask-migrate>=4.1.0",

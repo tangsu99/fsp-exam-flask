@@ -7,6 +7,10 @@ block content %}
 {% if reason %}
 <p style="color: #d9534f">很遗憾，您的答卷未通过审核</p>
 <p style="color: #d9534f">拒绝理由：{{ reason }}</p>
+{% else %}
+<p>恭喜您，您的答卷已通过审核</p>
+<p>服务器地址请扫码加群获取</p>
+<img style="width: 250px" src="cid:qrcode" />
 {% endif %} {% if review_time %}
 <p>批改日期：{{ review_time }}</p>
 {% endif %}

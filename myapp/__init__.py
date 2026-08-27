@@ -7,6 +7,7 @@ from flask import Flask, Request, Response, jsonify, request
 from flask_apscheduler import APScheduler
 from flask_bcrypt import Bcrypt
 from flask_cors import CORS
+from flask_limiter import Limiter
 from flask_login import LoginManager
 from flask_mail import Mail
 from flask_migrate import Migrate
@@ -26,6 +27,21 @@ migrate = Migrate()
 bcrypt: Bcrypt = Bcrypt()
 mail: Mail = Mail()
 cors = CORS()
+
+
+def _limiter_key_func() -> str:
+    """限流 key：优先取 X-Forwarded-For 第一个值（适配反向代理），否则用 remote_addr"""
+    forwarded = request.headers.get("X-Forwarded-For")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.remote_addr or "unknown"
+
+
+limiter: Limiter = Limiter(
+    key_func=_limiter_key_func,
+    default_limits=[],
+    storage_uri="memory://",  # 内存存储，单进程小项目足够；多 worker 部署如需精确限速需换共享存储
+)
 
 
 APP: Flask
@@ -63,13 +79,17 @@ def create_app():
             r"/*": {
                 "origins": app.config["ALLOWED_ORIGINS"],
                 "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-                "allow_headers": ["Content-Type", "Authorization"],
+                # iOS Safari/WebKit 的 CORS 预检会把 user-agent 列入 Access-Control-Request-Headers，
+                # 白名单不含它会导致预检失败（仅 Safari 系报 "User-Agent not allowed"）。
+                # 显式放行 User-Agent 以兼容 Safari（也可直接改用 "*"）。
+                "allow_headers": ["Content-Type", "Authorization", "User-Agent"],
             }
         },
     )
     migrate.init_app(app, db)
     bcrypt.init_app(app)  # type: ignore[reportUnknownMemberType]
     mail.init_app(app)
+    limiter.init_app(app)  # type: ignore[reportUnknownMemberType]
 
     # Flask debug 模式的 reloader 会启动两个进程，只在子进程中启动 scheduler 避免重复执行
     if not app.debug or os.environ.get("WERKZEUG_RUN_MAIN"):
@@ -147,7 +167,9 @@ def create_app():
             response.headers["Access-Control-Allow-Origin"] = origin
 
         response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
-        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+        # 注意：此处的硬编码列表会覆盖 flask-cors 的 allow_headers 配置，必须与上方 cors.init_app 保持一致。
+        # iOS Safari/WebKit 预检会携带 user-agent，放行 User-Agent 才能通过预检。
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, User-Agent"
         return response
 
     return app

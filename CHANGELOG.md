@@ -1,5 +1,41 @@
 # Changelog
 
+<!-- ## [Unreleased] -->
+
+## [0.2.5] (2026-08-27)
+
+本次更新涉及严重问题，强烈建议立即升级
+
+影响性：
+
+- 数据库：无
+- 前端：无
+
+### Features
+
+- 问卷审核通过后，考试结果邮件展示加群二维码；担保通过后，担保结果邮件同样展示加群二维码
+- 拒绝时不再展示二维码，也不再附带无用的图片附件
+
+### Security
+
+- 修复 `SECRET_KEY` 硬编码漏洞：不再在代码/数据库中内置固定默认密钥，改为优先通过环境变量 `SECRET_KEY` 注入；未设置时每次启动随机生成临时密钥（进程重启后所有登录态失效，生产/多 worker 部署必须设置固定环境变量）。密钥生成方式详见 `.env.example`
+- 启动时自动清除数据库中历史版本硬编码的弱密钥记录
+- 注意：更换 `SECRET_KEY` 后，此前签发的 JWT（登录态、邮件激活/重置密码链接）将失效，相关用户需重新登录或重新发送邮件
+- 为登录接口添加基于 IP 的速率限制（同一 IP 每分钟最多 5 次、每小时最多 20 次登录尝试，超出返回 429），防止暴力破解
+- 修复 `verify_token` 未校验吊销状态的问题：现在验签后会检查数据库中的 Token 记录，logout 删除或标记 `is_revoked` 的 Token 均视为已吊销，与 `request_loader` 行为保持一致
+- 完善 JWT payload 设计：新增 `iss`（签发方）、`iat`（签发时间）、`jti`（唯一标识）标准声明；修复 `exp` 计算单位错误（原按「小时×24」计算导致过期时间被放大到数年，现改为按秒精确计算），使 JWT 自身过期时间与数据库 `expires_at` 保持一致
+- 邮件激活/重置密码 token 不再使用 JWT，改用 `secrets.token_urlsafe(32)` 生成短小的不透明随机串（验证路径本就仅按 token 查库、不验签），链接更短且无法被解码
+- 修复 `verify_token` 中 `jwt.decode` 参数错误（误用单数 `algorithm`，应为复数 `algorithms`），此前该函数实际无法完成验签、恒返回"无效 token"；该问题由新增单元测试发现并验证
+
+### Bug Fixes
+
+- 修复 iOS Safari/WebKit 的 CORS 预检失败问题：Safari 系浏览器的预检请求会在 `Access-Control-Request-Headers` 中携带 `User-Agent`，而 `after_request` 钩子硬编码的 `Access-Control-Allow-Headers` 白名单不含它导致预检被拒（报 "User-Agent not allowed"），现已放行 `User-Agent` (#13)
+
+### Tests
+
+- 新增认证安全单元测试（发送环节通过 mock 屏蔽，无需配置邮件服务器），覆盖：`SECRET_KEY` 解析（环境变量优先 / 随机兜底 / 清理遗留记录）、登录接口限速（同一 IP 超限返回 429）、`verify_token` 与 `request_loader` 的吊销/删除/过期校验、JWT 标准声明与过期时间、邮件 token 格式
+- 测试基建：sqlite 内存库兼容 MySQL `LONGTEXT` 类型，测试间自动清理业务表保证用例隔离
+
 ## [0.2.4] (2026-08-22)
 
 ### Breaking Changes
