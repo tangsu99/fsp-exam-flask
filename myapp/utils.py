@@ -14,8 +14,8 @@ from werkzeug.datastructures import FileStorage
 from myapp import db
 from myapp.db_model import User
 
-# 密码强度校验的正则，要求密码 8~16 位，且必须同时包含大写字母、小写字母、数字、特殊字符四种字符
-PASSWORD_PATTERN = re.compile(r"^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[\W_])[A-Za-z\d\W_]{8,16}$")
+# 密码复杂性校验：长度 8~16 位，至少包含一个字母和一个数字
+PASSWORD_PATTERN = re.compile(r"^(?=.*[A-Za-z])(?=.*[0-9])[\s\S]{8,16}$")
 
 
 def token_check() -> Callable[[Callable[..., Any]], Callable[..., Any]]:
@@ -63,7 +63,7 @@ def required_role(role: str) -> Callable[[Callable[..., Any]], Callable[..., Any
     return decorator
 
 
-def check_password_format(password: str) -> bool:
+def is_password_complexity_valid(password: str) -> bool:
     """密码强度校验"""
     return bool(PASSWORD_PATTERN.match(password))
 

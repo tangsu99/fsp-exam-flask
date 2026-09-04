@@ -16,7 +16,7 @@ from sqlalchemy.exc import IntegrityError
 from myapp import APP, db, limiter
 from myapp.db_model import ActivationToken, RegistrationLimit, ResetPasswordToken, Token, User, UserStatus
 from myapp.mail import activation_mail, reset_password_mail, send_mail
-from myapp.utils import check_password_format, validate_username
+from myapp.utils import is_password_complexity_valid, validate_username
 
 auth = Blueprint("auth", __name__)
 
@@ -113,7 +113,7 @@ def register():
         return jsonify({"code": 2, "desc": "密码与重复密码不一致!"})
 
     # 验证密码是否合法
-    if not check_password_format(password):
+    if not is_password_complexity_valid(password):
         return jsonify({"code": 2, "desc": "密码不合法!"})
 
     # 验证 QQ 号格式（QQ 号不能带邮箱后缀）
@@ -226,7 +226,7 @@ def find_password_set():
     data = request.json
     if data:
         password = data.get("password")
-        if not check_password_format(password):
+        if not is_password_complexity_valid(password):
             return jsonify({"code": 2, "desc": "密码不合法!"})
 
         user: User | None = token.user_r_p_t

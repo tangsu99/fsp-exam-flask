@@ -11,8 +11,8 @@ from werkzeug.datastructures import FileStorage
 from myapp.db_model import User
 from myapp.utils import (
     check_data_size,
-    check_password_format,
     get_file_size,
+    is_password_complexity_valid,
     is_white_list_url,
     parse_dt_to_iso_utc,
     parse_frontend_time_to_utc,
@@ -20,39 +20,36 @@ from myapp.utils import (
 )
 
 
-class TestCheckPasswordFormat:
-    """测试密码格式校验"""
+class TestPasswordComplexity:
+    """测试密码复杂性校验"""
 
     @pytest.mark.parametrize(
         "password",
         [
-            "Abc12345!",
-            "Strong@Pass1",
-            "aB3$defghijk",
-            "1A@bcdefghijklm",  # 16 位边界
+            "abc12345",  # 仅小写字母和数字
+            "ABCD1234!",  # 仅大写字母和数字
+            "Abc12345",  # 无特殊字符
+            "a1234567",  # 8 位边界
+            "A123456789012345",  # 16 位边界
         ],
     )
     def test_valid_passwords(self, password: str) -> None:
-        """有效密码（大小写字母 + 数字 + 特殊字符，8~16 位）"""
-        assert check_password_format(password) is True
+        """有效密码（至少一个字母和数字，8~16 位）"""
+        assert is_password_complexity_valid(password) is True
 
     @pytest.mark.parametrize(
         "password",
         [
             "",  # 空字符串
-            "abc12345",  # 无大写和特殊字符
-            "ABCD1234!",  # 无小写
-            "Abcdefgh!",  # 无数字
-            "Abc12345",  # 无特殊字符
+            "abcdefgh",  # 无数字
+            "12345678",  # 无字母
             "Ab1@",  # 太短（<8）
-            "A1@bcdefghijklmno",  # 太长（>16）
-            "12345678!",  # 无字母
-            "abcdefgh!",  # 无大写和数字
+            "A1234567890123456",  # 太长（>16）
         ],
     )
     def test_invalid_passwords(self, password: str) -> None:
         """各种无效密码均应返回 False"""
-        assert check_password_format(password) is False
+        assert is_password_complexity_valid(password) is False
 
 
 class TestIsWhiteListUrl:

@@ -41,7 +41,7 @@ from myapp.survey_utils import (
 )
 from myapp.utils import (
     build_pagination_dict,
-    check_password_format,
+    is_password_complexity_valid,
     parse_dt_to_iso_utc,
     parse_frontend_time_to_utc,
     required_role,
@@ -542,7 +542,7 @@ def set_user():
                 return jsonify(username_result)
             user.username = username_result["username"]
 
-        if password is not None and check_password_format(password):
+        if password is not None and is_password_complexity_valid(password):
             user.password = password
 
         if user_qq:
