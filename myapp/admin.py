@@ -284,7 +284,7 @@ def edit_question():
     """
     data = request.get_json()
     question_data = data.get("question", None)
-    survey_id = question_data.get("surveyId", None)
+    survey_id = data.get("surveyId", None)
 
     if question_data is None:
         return jsonify({"code": 1, "desc": "fail"})
